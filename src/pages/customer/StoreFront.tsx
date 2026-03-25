@@ -699,7 +699,7 @@ function ProductCard({ product, onAddToCart }: {
   onAddToCart: (p: Product, qty: number, note?: string) => void;
 }) {
   const isOccasion = product.category === 'Sweets';
-  const qtyStep  = product.unit === 'piece' ? 1 : 250;
+  const qtyStep  = product.unit === 'piece' ? 1 : product.unit === 'kg' ? 0.25 : 250;
   const minQty   = product.minOrderQty && product.minOrderQty > 0 ? product.minOrderQty : qtyStep;
   const [qty, setQty]       = useState(minQty);
   const [showDetail, setShowDetail] = useState(false);
@@ -707,11 +707,15 @@ function ProductCard({ product, onAddToCart }: {
 
   const qtyLabel = product.unit === 'piece'
     ? `${qty} pc${qty !== 1 ? 's' : ''}`
-    : qty >= 1000 ? `${qty / 1000}kg` : `${qty}g`;
+    : product.unit === 'kg'
+      ? qty < 1 ? `${Math.round(qty * 1000)}g` : `${qty}kg`
+      : qty >= 1000 ? `${qty / 1000}kg` : `${qty}g`;
 
   const priceDisplay = product.unit === 'gram'
     ? `₹${Math.round(product.pricePerUnit * 250)}/250g`
-    : `₹${product.pricePerUnit}/pc`;
+    : product.unit === 'kg'
+      ? `₹${product.pricePerUnit}/kg`
+      : `₹${product.pricePerUnit}/pc`;
 
   // Category → emoji
   const catEmoji: Record<string, string> = {
@@ -843,7 +847,9 @@ function ProductDetailSheet({ product, qty, setQty, qtyStep, minQty, qtyLabel, p
 
         <p className="text-2xl font-bold" style={{ color: '#c45c00' }}>
           {priceDisplay}
-          {product.unit === 'gram' && <span className="text-sm font-normal text-gray-400 ml-2">= ₹{Math.round(price)} for {qtyLabel}</span>}
+          {(product.unit === 'gram' || product.unit === 'kg') && (
+            <span className="text-sm font-normal text-gray-400 ml-2">= ₹{Math.round(price)} for {qtyLabel}</span>
+          )}
         </p>
 
         {/* Qty selector */}
@@ -860,6 +866,9 @@ function ProductDetailSheet({ product, qty, setQty, qtyStep, minQty, qtyLabel, p
         </div>
         {product.unit === 'gram' && (
           <p className="text-xs text-gray-400 text-center -mt-2">Min {minQty}g · steps of {qtyStep}g</p>
+        )}
+        {product.unit === 'kg' && (
+          <p className="text-xs text-gray-400 text-center -mt-2">Min {minQty < 1 ? `${Math.round(minQty*1000)}g` : `${minQty}kg`} · steps of {qtyStep < 1 ? `${Math.round(qtyStep*1000)}g` : `${qtyStep}kg`}</p>
         )}
 
         {/* Customization */}
