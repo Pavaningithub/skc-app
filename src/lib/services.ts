@@ -1,0 +1,303 @@
+import {
+  collection, doc, addDoc, updateDoc, deleteDoc,
+  getDocs, getDoc, query, where, setDoc, onSnapshot,
+  type Unsubscribe,
+} from "firebase/firestore";
+import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { db } from "./firebase";
+import type {
+  Product, StockItem, RawMaterial, RawMaterialPurchase,
+  Batch, Customer, Order, Expense, Subscription, Feedback,
+} from "./types";
+
+// ─── Collection Names ─────────────────────────────────────────────────────────
+export const COLLECTIONS = {
+  PRODUCTS:              "products",
+  STOCK:                 "stock",
+  RAW_MATERIALS:         "rawMaterials",
+  RAW_MATERIAL_PURCHASES:"rawMaterialPurchases",
+  BATCHES:               "batches",
+  CUSTOMERS:             "customers",
+  ORDERS:                "orders",
+  EXPENSES:              "expenses",
+  SUBSCRIPTIONS:         "subscriptions",
+  FEEDBACK:              "feedback",
+  SETTINGS:              "settings",
+} as const;
+
+function now() { return new Date().toISOString(); }
+
+// ─── File Upload (Firebase Storage) ──────────────────────────────────────────
+export async function uploadBillPhoto(file: File, purchaseId: string): Promise<string> {
+  const storage = getStorage();
+  const storageRef = ref(storage, `bills/${purchaseId}_${Date.now()}_${file.name}`);
+  await uploadBytes(storageRef, file);
+  return getDownloadURL(storageRef);
+}
+
+// ─── Products ────────────────────────────────────────────────────────────────
+export const productsService = {
+  async getAll(): Promise<Product[]> {
+    const snap = await getDocs(collection(db, COLLECTIONS.PRODUCTS));
+    const items = snap.docs.map(d => ({ id: d.id, ...d.data() } as Product));
+    return items.sort((a, b) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999) || a.name.localeCompare(b.name));
+  },
+  async getActive(): Promise<Product[]> {
+    const snap = await getDocs(query(collection(db, COLLECTIONS.PRODUCTS), where("isActive", "==", true)));
+    const items = snap.docs.map(d => ({ id: d.id, ...d.data() } as Product));
+    return items.sort((a, b) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999) || a.name.localeCompare(b.name));
+  },
+  async add(product: Omit<Product, "id">): Promise<string> {
+    const ref = await addDoc(collection(db, COLLECTIONS.PRODUCTS), { ...product, createdAt: now(), updatedAt: now() });
+    return ref.id;
+  },
+  async update(id: string, data: Partial<Product>): Promise<void> {
+    await updateDoc(doc(db, COLLECTIONS.PRODUCTS, id), { ...data, updatedAt: now() });
+  },
+  async delete(id: string): Promise<void> {
+    await deleteDoc(doc(db, COLLECTIONS.PRODUCTS, id));
+  },
+};
+
+// ─── Stock ────────────────────────────────────────────────────────────────────
+export const stockService = {
+  async getAll(): Promise<StockItem[]> {
+    const snap = await getDocs(collection(db, COLLECTIONS.STOCK));
+    return snap.docs.map(d => ({ id: d.id, ...d.data() } as StockItem));
+  },
+  async upsert(item: Omit<StockItem, "id"> & { id?: string }): Promise<void> {
+    if (item.id) {
+      await updateDoc(doc(db, COLLECTIONS.STOCK, item.id), { ...item, updatedAt: now() });
+    } else {
+      await addDoc(collection(db, COLLECTIONS.STOCK), { ...item, updatedAt: now() });
+    }
+  },
+  async deduct(productId: string, quantity: number): Promise<void> {
+    const snap = await getDocs(query(collection(db, COLLECTIONS.STOCK), where("productId", "==", productId)));
+    if (!snap.empty) {
+      const stockDoc = snap.docs[0];
+      const current = (stockDoc.data() as StockItem).quantityAvailable;
+      await updateDoc(doc(db, COLLECTIONS.STOCK, stockDoc.id), {
+        quantityAvailable: Math.max(0, current - quantity),
+        updatedAt: now(),
+      });
+    }
+  },
+  async getLowStock(): Promise<StockItem[]> {
+    const all = await this.getAll();
+    return all.filter(s => s.quantityAvailable <= s.lowStockThreshold);
+  },
+};
+
+// ─── Raw Materials ────────────────────────────────────────────────────────────
+export const rawMaterialsService = {
+  async getAll(): Promise<RawMaterial[]> {
+    const snap = await getDocs(collection(db, COLLECTIONS.RAW_MATERIALS));
+    return snap.docs.map(d => ({ id: d.id, ...d.data() } as RawMaterial));
+  },
+  async add(item: Omit<RawMaterial, "id">): Promise<string> {
+    const ref = await addDoc(collection(db, COLLECTIONS.RAW_MATERIALS), { ...item, updatedAt: now() });
+    return ref.id;
+  },
+  async update(id: string, data: Partial<RawMaterial>): Promise<void> {
+    await updateDoc(doc(db, COLLECTIONS.RAW_MATERIALS, id), { ...data, updatedAt: now() });
+  },
+  async delete(id: string): Promise<void> {
+    await deleteDoc(doc(db, COLLECTIONS.RAW_MATERIALS, id));
+  },
+};
+
+// ─── Raw Material Purchases ───────────────────────────────────────────────────
+export const rawMaterialPurchasesService = {
+  async getAll(): Promise<RawMaterialPurchase[]> {
+    const snap = await getDocs(collection(db, COLLECTIONS.RAW_MATERIAL_PURCHASES));
+    const items = snap.docs.map(d => ({ id: d.id, ...d.data() } as RawMaterialPurchase));
+    return items.sort((a, b) => b.date.localeCompare(a.date));
+  },
+  async add(purchase: Omit<RawMaterialPurchase, "id">): Promise<string> {
+    const ref = await addDoc(collection(db, COLLECTIONS.RAW_MATERIAL_PURCHASES), { ...purchase, createdAt: now() });
+    return ref.id;
+  },
+  async updateBillPhoto(id: string, billPhotoUrl: string): Promise<void> {
+    await updateDoc(doc(db, COLLECTIONS.RAW_MATERIAL_PURCHASES, id), { billPhotoUrl });
+  },
+  async delete(id: string): Promise<void> {
+    await deleteDoc(doc(db, COLLECTIONS.RAW_MATERIAL_PURCHASES, id));
+  },
+};
+
+// ─── Batches ──────────────────────────────────────────────────────────────────
+export const batchesService = {
+  async getAll(): Promise<Batch[]> {
+    const snap = await getDocs(collection(db, COLLECTIONS.BATCHES));
+    const items = snap.docs.map(d => ({ id: d.id, ...d.data() } as Batch));
+    return items.sort((a, b) => b.date.localeCompare(a.date));
+  },
+  async add(batch: Omit<Batch, "id">): Promise<string> {
+    const ref = await addDoc(collection(db, COLLECTIONS.BATCHES), { ...batch, createdAt: now() });
+    return ref.id;
+  },
+  async delete(id: string): Promise<void> {
+    await deleteDoc(doc(db, COLLECTIONS.BATCHES, id));
+  },
+};
+
+// ─── Customers ────────────────────────────────────────────────────────────────
+export const customersService = {
+  async getAll(): Promise<Customer[]> {
+    const snap = await getDocs(collection(db, COLLECTIONS.CUSTOMERS));
+    const items = snap.docs.map(d => ({ id: d.id, ...d.data() } as Customer));
+    return items.sort((a, b) => a.name.localeCompare(b.name));
+  },
+  async getByWhatsapp(whatsapp: string): Promise<Customer | null> {
+    const snap = await getDocs(query(collection(db, COLLECTIONS.CUSTOMERS), where("whatsapp", "==", whatsapp)));
+    if (snap.empty) return null;
+    return { id: snap.docs[0].id, ...snap.docs[0].data() } as Customer;
+  },
+  async upsert(data: Omit<Customer, "id" | "totalOrders" | "totalSpent" | "pendingAmount">, id?: string): Promise<string> {
+    if (id) {
+      await updateDoc(doc(db, COLLECTIONS.CUSTOMERS, id), data);
+      return id;
+    }
+    const ref = await addDoc(collection(db, COLLECTIONS.CUSTOMERS), {
+      ...data, totalOrders: 0, totalSpent: 0, pendingAmount: 0, createdAt: now(),
+    });
+    return ref.id;
+  },
+  async update(id: string, data: Partial<Customer>): Promise<void> {
+    await updateDoc(doc(db, COLLECTIONS.CUSTOMERS, id), data);
+  },
+  async updateAfterOrder(id: string, amount: number, paymentStatus: string): Promise<void> {
+    const docSnap = await getDoc(doc(db, COLLECTIONS.CUSTOMERS, id));
+    if (!docSnap.exists()) return;
+    const c = docSnap.data() as Customer;
+    await updateDoc(doc(db, COLLECTIONS.CUSTOMERS, id), {
+      totalOrders: (c.totalOrders || 0) + 1,
+      totalSpent: (c.totalSpent || 0) + amount,
+      pendingAmount: paymentStatus === "pending" ? (c.pendingAmount || 0) + amount : (c.pendingAmount || 0),
+    });
+  },
+};
+
+// ─── Orders ──────────────────────────────────────────────────────────────────
+export const ordersService = {
+  async getAll(): Promise<Order[]> {
+    const snap = await getDocs(collection(db, COLLECTIONS.ORDERS));
+    const items = snap.docs.map(d => ({ id: d.id, ...d.data() } as Order));
+    return items.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  },
+  async getById(id: string): Promise<Order | null> {
+    const docSnap = await getDoc(doc(db, COLLECTIONS.ORDERS, id));
+    if (!docSnap.exists()) return null;
+    return { id: docSnap.id, ...docSnap.data() } as Order;
+  },
+  async add(order: Omit<Order, "id">): Promise<string> {
+    const ref = await addDoc(collection(db, COLLECTIONS.ORDERS), { ...order, createdAt: now(), updatedAt: now() });
+    return ref.id;
+  },
+  async updateStatus(id: string, status: Order["status"], extra?: Partial<Order>): Promise<void> {
+    await updateDoc(doc(db, COLLECTIONS.ORDERS, id), {
+      status, updatedAt: now(), ...(extra || {}),
+      ...(status === "delivered" ? { deliveredAt: now() } : {}),
+    });
+  },
+  async updatePayment(id: string, paymentStatus: Order["paymentStatus"]): Promise<void> {
+    await updateDoc(doc(db, COLLECTIONS.ORDERS, id), { paymentStatus, updatedAt: now() });
+  },
+  async update(id: string, data: Partial<Order>): Promise<void> {
+    await updateDoc(doc(db, COLLECTIONS.ORDERS, id), { ...data, updatedAt: now() });
+  },
+  async delete(id: string): Promise<void> {
+    await deleteDoc(doc(db, COLLECTIONS.ORDERS, id));
+  },
+  // Real-time listener: calls onNew(order) for every order created since subscribeTime
+  subscribeToNewOrders(since: string, onNew: (order: Order) => void): Unsubscribe {
+    const q = query(
+      collection(db, COLLECTIONS.ORDERS),
+      where('createdAt', '>', since),
+    );
+    return onSnapshot(q, snap => {
+      snap.docChanges().forEach(change => {
+        if (change.type === 'added') {
+          onNew({ id: change.doc.id, ...change.doc.data() } as Order);
+        }
+      });
+    });
+  },
+};
+
+// ─── Expenses ────────────────────────────────────────────────────────────────
+export const expensesService = {
+  async getAll(): Promise<Expense[]> {
+    const snap = await getDocs(collection(db, COLLECTIONS.EXPENSES));
+    const items = snap.docs.map(d => ({ id: d.id, ...d.data() } as Expense));
+    return items.sort((a, b) => b.date.localeCompare(a.date));
+  },
+  async getByMonth(year: number, month: number): Promise<Expense[]> {
+    const start = new Date(year, month - 1, 1).toISOString();
+    const end = new Date(year, month, 0, 23, 59, 59).toISOString();
+    const snap = await getDocs(query(
+      collection(db, COLLECTIONS.EXPENSES),
+      where("date", ">=", start),
+      where("date", "<=", end),
+    ));
+    return snap.docs.map(d => ({ id: d.id, ...d.data() } as Expense));
+  },
+  async add(expense: Omit<Expense, "id">): Promise<string> {
+    const ref = await addDoc(collection(db, COLLECTIONS.EXPENSES), { ...expense, createdAt: now() });
+    return ref.id;
+  },
+  async delete(id: string): Promise<void> {
+    await deleteDoc(doc(db, COLLECTIONS.EXPENSES, id));
+  },
+};
+
+// ─── Subscriptions ────────────────────────────────────────────────────────────
+export const subscriptionsService = {
+  async getAll(): Promise<Subscription[]> {
+    const snap = await getDocs(collection(db, COLLECTIONS.SUBSCRIPTIONS));
+    const items = snap.docs.map(d => ({ id: d.id, ...d.data() } as Subscription));
+    return items.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  },
+  async add(sub: Omit<Subscription, "id">): Promise<string> {
+    const ref = await addDoc(collection(db, COLLECTIONS.SUBSCRIPTIONS), { ...sub, createdAt: now() });
+    return ref.id;
+  },
+  async update(id: string, data: Partial<Subscription>): Promise<void> {
+    await updateDoc(doc(db, COLLECTIONS.SUBSCRIPTIONS, id), data);
+  },
+};
+
+// ─── Feedback ────────────────────────────────────────────────────────────────
+export const feedbackService = {
+  async getAll(): Promise<Feedback[]> {
+    const snap = await getDocs(collection(db, COLLECTIONS.FEEDBACK));
+    const items = snap.docs.map(d => ({ id: d.id, ...d.data() } as Feedback));
+    return items.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  },
+  async getPublic(): Promise<Feedback[]> {
+    const snap = await getDocs(query(collection(db, COLLECTIONS.FEEDBACK), where("isPublic", "==", true)));
+    return snap.docs.map(d => ({ id: d.id, ...d.data() } as Feedback));
+  },
+  async add(feedback: Omit<Feedback, "id">): Promise<string> {
+    const ref = await addDoc(collection(db, COLLECTIONS.FEEDBACK), { ...feedback, createdAt: now() });
+    return ref.id;
+  },
+  async getByOrder(orderId: string): Promise<Feedback | null> {
+    const snap = await getDocs(query(collection(db, COLLECTIONS.FEEDBACK), where("orderId", "==", orderId)));
+    if (snap.empty) return null;
+    return { id: snap.docs[0].id, ...snap.docs[0].data() } as Feedback;
+  },
+};
+
+// ─── Settings (PIN) ───────────────────────────────────────────────────────────
+export const settingsService = {
+  async getPin(): Promise<string> {
+    const docSnap = await getDoc(doc(db, COLLECTIONS.SETTINGS, "admin"));
+    if (!docSnap.exists()) return "1234";
+    return (docSnap.data().pin as string) || "1234";
+  },
+  async setPin(pin: string): Promise<void> {
+    await setDoc(doc(db, COLLECTIONS.SETTINGS, "admin"), { pin }, { merge: true });
+  },
+};
