@@ -1,0 +1,72 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]:
+        - img [ref=e8]
+        - generic [ref=e11]:
+          - paragraph [ref=e12]: Sri Krishna Condiments
+          - paragraph [ref=e13]: Pure · Fresh · Handcrafted
+      - button [ref=e15]:
+        - img [ref=e16]
+  - generic [ref=e20]:
+    - generic:
+      - generic:
+        - img
+      - generic:
+        - img
+      - generic:
+        - img
+      - generic:
+        - img
+      - generic:
+        - img
+      - generic:
+        - img
+    - generic [ref=e21]:
+      - generic [ref=e22]:
+        - img [ref=e23]
+        - text: Small batch · Always fresh
+      - heading "ಶ್ರೀ ಕೃಷ್ಣ ಕಾಂಡಿಮೆಂಟ್ಸ್" [level=1] [ref=e26]
+      - paragraph [ref=e27]: Sri Krishna Condiments
+      - paragraph [ref=e28]: Authentic Karnataka, Andra flavours — Chutney Powders, Masalas & Health Mixes made at home with love.
+      - generic [ref=e29]:
+        - button "Shop Now →" [ref=e30]
+        - button "🎁 Free Sample" [ref=e31]
+  - generic [ref=e32]:
+    - button "All" [ref=e34]
+    - generic [ref=e36]:
+      - img [ref=e37]
+      - paragraph [ref=e40]: No products in this category
+  - generic [ref=e42]:
+    - heading "Stay Connected" [level=2] [ref=e43]
+    - link "Join Our WhatsApp Group Offers, new products & updates" [ref=e44] [cursor=pointer]:
+      - /url: https://chat.whatsapp.com/***REMOVED***
+      - generic [ref=e45]:
+        - img [ref=e47]
+        - generic [ref=e52]:
+          - paragraph [ref=e53]: Join Our WhatsApp Group
+          - paragraph [ref=e54]: Offers, new products & updates
+      - img [ref=e55]
+    - link "Follow Our Channel Latest news & announcements" [ref=e57] [cursor=pointer]:
+      - /url: https://whatsapp.com/channel/0029VbBxnQ8BlHpdsWMhZV2T
+      - generic [ref=e58]:
+        - img [ref=e60]
+        - generic [ref=e62]:
+          - paragraph [ref=e63]: Follow Our Channel
+          - paragraph [ref=e64]: Latest news & announcements
+      - img [ref=e65]
+  - contentinfo [ref=e67]:
+    - generic [ref=e68]:
+      - img [ref=e70]
+      - generic [ref=e73]: Sri Krishna Condiments
+    - paragraph [ref=e74]: Pure · Fresh · Made with Love 🌿
+    - paragraph [ref=e75]:
+      - text: "WhatsApp:"
+      - link "+91 97318 74874" [ref=e76] [cursor=pointer]:
+        - /url: https://wa.me/919731874874
+    - link "Admin Login" [ref=e77] [cursor=pointer]:
+      - /url: /admin/login
+```

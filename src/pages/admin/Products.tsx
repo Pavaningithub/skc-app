@@ -1,0 +1,300 @@
+import { useEffect, useState } from 'react';
+import { Plus, Pencil, Trash2, ToggleLeft, ToggleRight, Search } from 'lucide-react';
+import toast from 'react-hot-toast';
+import Portal from '../../components/Portal';
+import { productsService } from '../../lib/services';
+import { formatCurrency } from '../../lib/utils';
+import { UNIT_LABELS } from '../../lib/constants';
+import type { Product } from '../../lib/types';
+import type { Unit } from '../../lib/constants';
+
+const CATEGORIES = ['Chutney Powder', 'Masala', 'Health Mix', 'Spices', 'Pickles', 'Other'];
+
+const emptyForm: Omit<Product, 'id' | 'createdAt' | 'updatedAt'> = {
+  name: '', nameKannada: '', description: '', unit: 'gram', pricePerUnit: 0,
+  minOrderQty: 0, category: 'Other', isActive: true,
+  isOnDemand: false, isPopular: false, allowCustomization: false, customizationHint: '', sortOrder: 0,
+};
+
+export default function Products() {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
+  const [form, setForm] = useState({ ...emptyForm });
+  const [saving, setSaving] = useState(false);
+  const [search, setSearch] = useState('');
+
+  useEffect(() => { load(); }, []);
+
+  async function load() {
+    setLoading(true);
+    try { setProducts(await productsService.getAll()); }
+    finally { setLoading(false); }
+  }
+
+  function openAdd() { setForm({ ...emptyForm }); setEditId(null); setShowForm(true); }
+  function openEdit(p: Product) {
+    setForm({
+      name: p.name, nameKannada: p.nameKannada || '', description: p.description,
+      unit: p.unit, pricePerUnit: p.pricePerUnit, minOrderQty: p.minOrderQty ?? 100,
+      category: p.category, isActive: p.isActive, isOnDemand: p.isOnDemand ?? false,
+      isPopular: p.isPopular ?? false,
+      allowCustomization: p.allowCustomization ?? false,
+      customizationHint: p.customizationHint || '', sortOrder: p.sortOrder ?? 0,
+    });
+    setEditId(p.id); setShowForm(true);
+  }
+
+  async function handleSave() {
+    if (!form.name.trim()) return toast.error('Product name is required');
+    if (form.pricePerUnit <= 0) return toast.error('Price must be greater than 0');
+    setSaving(true);
+    try {
+      if (editId) {
+        await productsService.update(editId, form);
+        toast.success('Product updated');
+      } else {
+        await productsService.add(form as Omit<Product, 'id'>);
+        toast.success('Product added');
+      }
+      setShowForm(false);
+      load();
+    } finally { setSaving(false); }
+  }
+
+  async function toggleActive(p: Product) {
+    await productsService.update(p.id, { isActive: !p.isActive });
+    toast.success(`${p.name} ${p.isActive ? 'deactivated' : 'activated'}`);
+    load();
+  }
+
+  async function handleDelete(p: Product) {
+    if (!confirm(`Delete "${p.name}"? This cannot be undone.`)) return;
+    await productsService.delete(p.id);
+    toast.success('Product deleted');
+    load();
+  }
+
+  const filtered = products.filter(p =>
+    p.name.toLowerCase().includes(search.toLowerCase()) ||
+    p.category.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const priceLabel = (unit: Unit) => {
+    if (unit === 'gram') return '/ gram';
+    if (unit === 'kg') return '/ kg';
+    return '/ piece';
+  };
+
+  return (
+    <div className="p-4 md:p-6 space-y-4 animate-fade-in">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-800 font-display">Products</h1>
+          <p className="text-sm text-gray-500">{products.length} products</p>
+        </div>
+        <button onClick={openAdd}
+          className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-xl text-sm font-semibold transition-colors">
+          <Plus className="w-4 h-4" /> Add Product
+        </button>
+      </div>
+
+      {/* Search */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+        <input
+          type="text" placeholder="Search products…" value={search}
+          onChange={e => setSearch(e.target.value)}
+          className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:border-orange-400 bg-white"
+        />
+      </div>
+
+      {/* Product List */}
+      {loading ? (
+        <div className="flex justify-center py-12">
+          <div className="w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : (
+        <div className="grid gap-3">
+          {filtered.length === 0 && (
+            <div className="text-center py-12 text-gray-400">
+              <p className="text-lg">No products found</p>
+              <p className="text-sm">Add your first product above</p>
+            </div>
+          )}
+          {filtered.map(p => (
+            <div key={p.id}
+              className={`bg-white rounded-xl border p-4 flex items-center gap-4 transition-all
+                ${p.isActive ? 'border-gray-200' : 'border-gray-100 opacity-60'}`}>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="font-semibold text-gray-800">{p.name}</h3>
+                  <span className="text-xs bg-orange-50 text-orange-600 px-2 py-0.5 rounded-full">{p.category}</span>
+                  {!p.isActive && <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">Inactive</span>}
+                </div>
+                {p.description && <p className="text-sm text-gray-500 mt-0.5 truncate">{p.description}</p>}
+                <p className="text-sm font-bold text-orange-600 mt-1">
+                  {formatCurrency(p.pricePerUnit)} {priceLabel(p.unit)}
+                  <span className="text-xs font-normal text-gray-400 ml-1">({UNIT_LABELS[p.unit]})</span>
+                </p>
+              </div>
+              <div className="flex items-center gap-1 flex-shrink-0">
+                <button onClick={() => toggleActive(p)}
+                  className="p-2 rounded-lg hover:bg-gray-100 transition-colors" title={p.isActive ? 'Deactivate' : 'Activate'}>
+                  {p.isActive
+                    ? <ToggleRight className="w-5 h-5 text-green-500" />
+                    : <ToggleLeft className="w-5 h-5 text-gray-400" />
+                  }
+                </button>
+                <button onClick={() => openEdit(p)}
+                  className="p-2 rounded-lg hover:bg-blue-50 transition-colors">
+                  <Pencil className="w-4 h-4 text-blue-500" />
+                </button>
+                <button onClick={() => handleDelete(p)}
+                  className="p-2 rounded-lg hover:bg-red-50 transition-colors">
+                  <Trash2 className="w-4 h-4 text-red-500" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Add / Edit Modal */}
+      {showForm && (
+        <Portal>
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center sm:items-center sm:p-4">
+          <div className="bg-white rounded-t-3xl sm:rounded-2xl w-full max-w-md max-h-[92vh] flex flex-col" style={{ maxHeight: '92dvh' }}>
+            {/* Header */}
+            <div className="flex-shrink-0 bg-white border-b border-gray-100 px-5 py-4 flex items-center justify-between rounded-t-3xl sm:rounded-t-2xl">
+              <h2 className="font-bold text-gray-800">{editId ? 'Edit Product' : 'Add Product'}</h2>
+              <button onClick={() => setShowForm(false)} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">×</button>
+            </div>
+
+            {/* Scrollable body */}
+            <div className="overflow-y-auto flex-1 p-5 space-y-4">
+
+              {/* Name */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Product Name *</label>
+                <input
+                  type="text" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                  placeholder="e.g. Coconut Chutney Powder"
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-orange-400"
+                />
+              </div>
+
+              {/* Kannada name */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Name in Kannada <span className="text-gray-400 font-normal">(optional)</span></label>
+                <input
+                  type="text" value={form.nameKannada || ''} onChange={e => setForm(f => ({ ...f, nameKannada: e.target.value }))}
+                  placeholder="ಕನ್ನಡದಲ್ಲಿ ಹೆಸರು"
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-orange-400"
+                />
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                <textarea
+                  value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+                  placeholder="Short description for customers…" rows={2}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-orange-400 resize-none"
+                />
+              </div>
+
+              {/* Unit + Price */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Unit *</label>
+                  <select
+                    value={form.unit} onChange={e => setForm(f => ({ ...f, unit: e.target.value as Unit }))}
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-orange-400 bg-white"
+                  >
+                    {Object.entries(UNIT_LABELS).map(([val, label]) => (
+                      <option key={val} value={val}>{label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Price (₹) per {form.unit} *</label>
+                  <input
+                    type="number" min="0" step="0.01" value={form.pricePerUnit || ''}
+                    onChange={e => setForm(f => ({ ...f, pricePerUnit: parseFloat(e.target.value) || 0 }))}
+                    placeholder="0.00"
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-orange-400"
+                  />
+                </div>
+              </div>
+
+              {/* Min Order Qty */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Minimum Order Quantity
+                  <span className="text-gray-400 font-normal ml-1">
+                    ({form.unit === 'piece' ? 'pieces' : 'grams'}) — 0 means no minimum
+                  </span>
+                </label>
+                <input
+                  type="number" min="0" step={form.unit === 'piece' ? 1 : 50}
+                  value={form.minOrderQty || ''}
+                  onChange={e => setForm(f => ({ ...f, minOrderQty: parseInt(e.target.value) || 0 }))}
+                  placeholder="0"
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-orange-400"
+                />
+              </div>
+
+              {/* Category */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                <select
+                  value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-orange-400 bg-white"
+                >
+                  {CATEGORIES.map(c => <option key={c}>{c}</option>)}
+                </select>
+              </div>
+
+              {/* Toggles */}
+              <div className="space-y-3 pt-1">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input type="checkbox" checked={form.isActive}
+                    onChange={e => setForm(f => ({ ...f, isActive: e.target.checked }))}
+                    className="w-4 h-4 accent-orange-500" />
+                  <span className="text-sm text-gray-700">Active <span className="text-gray-400">(visible to customers)</span></span>
+                </label>
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input type="checkbox" checked={form.isOnDemand ?? false}
+                    onChange={e => setForm(f => ({ ...f, isOnDemand: e.target.checked }))}
+                    className="w-4 h-4 accent-orange-500" />
+                  <span className="text-sm text-gray-700">🔥 Made Fresh on Order <span className="text-gray-400">(prepared after order is placed)</span></span>
+                </label>
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input type="checkbox" checked={form.isPopular ?? false}
+                    onChange={e => setForm(f => ({ ...f, isPopular: e.target.checked }))}
+                    className="w-4 h-4 accent-orange-500" />
+                  <span className="text-sm text-gray-700">⭐ Popular at SKC <span className="text-gray-400">(shows first in Popular sort)</span></span>
+                </label>
+              </div>
+            </div>
+
+            {/* Footer buttons */}
+            <div className="flex-shrink-0 px-5 py-4 border-t border-gray-100 flex gap-3">
+              <button onClick={() => setShowForm(false)}
+                className="flex-1 border border-gray-200 text-gray-600 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-50">
+                Cancel
+              </button>
+              <button onClick={handleSave} disabled={saving}
+                className="flex-1 bg-orange-500 hover:bg-orange-600 text-white py-2.5 rounded-xl text-sm font-semibold transition-colors disabled:opacity-50">
+                {saving ? 'Saving…' : (editId ? 'Save Changes' : 'Add Product')}
+              </button>
+            </div>
+          </div>
+        </div>
+        </Portal>
+      )}
+    </div>
+  );
+}

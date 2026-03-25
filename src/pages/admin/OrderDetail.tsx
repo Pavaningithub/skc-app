@@ -1,0 +1,369 @@
+import { useEffect, useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { ArrowLeft, MessageCircle, ChevronDown, ChevronUp, TrendingUp, Trash2, XCircle } from 'lucide-react';
+import toast from 'react-hot-toast';
+import { ordersService } from '../../lib/services';
+import {
+  formatCurrency, formatDateTime, buildCustomerWhatsAppUrl,
+  orderConfirmedToCustomer, outForDeliveryToCustomer, deliveredToCustomer,
+  orderCancelledToCustomer, formatQuantity,
+} from '../../lib/utils';
+import { ORDER_STATUS_COLORS, ORDER_STATUS_LABELS } from '../../lib/constants';
+import type { Order } from '../../lib/types';
+import type { OrderStatus } from '../../lib/constants';
+
+export default function OrderDetail() {
+  const { orderId } = useParams<{ orderId: string }>();
+  const navigate = useNavigate();
+  const [order, setOrder] = useState<Order | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [showCost, setShowCost] = useState(false);
+  const [itemCosts, setItemCosts] = useState<Record<number, number>>({});
+  const [savingCost, setSavingCost] = useState(false);
+  const [confirm, setConfirm] = useState<'cancel' | 'delete' | null>(null);
+  const [lastStatusChanged, setLastStatusChanged] = useState<OrderStatus | null>(null);
+
+  useEffect(() => { if (orderId) load(); }, [orderId]);
+
+  async function load() {
+    setLoading(true);
+    try { setOrder(await ordersService.getById(orderId!)); }
+    finally { setLoading(false); }
+  }
+
+  async function updateStatus(status: OrderStatus) {
+    if (!order) return;
+    await ordersService.updateStatus(order.id, status);
+    toast.success(`Status → ${ORDER_STATUS_LABELS[status]}`);
+    setLastStatusChanged(status);
+    load();
+  }
+
+  async function markPaid() {
+    if (!order) return;
+    await ordersService.updatePayment(order.id, 'paid');
+    toast.success('Marked as paid');
+    load();
+  }
+
+  async function cancelOrder() {
+    if (!order) return;
+    await ordersService.updateStatus(order.id, 'cancelled');
+    toast.success('Order cancelled');
+    setConfirm(null);
+    setLastStatusChanged('cancelled');
+    load();
+  }
+
+  async function deleteOrder() {
+    if (!order) return;
+    await ordersService.delete(order.id);
+    toast.success('Order deleted');
+    navigate('/admin/orders');
+  }
+
+  async function saveProductionCost() {
+    if (!order) return;
+    setSavingCost(true);
+    try {
+      const updatedItems = order.items.map((item, i) => {
+        const cost = itemCosts[i] ?? item.rawMaterialCost ?? 0;
+        return { ...item, rawMaterialCost: cost, profitAmount: item.totalPrice - cost };
+      });
+      const totalProfit = updatedItems.reduce((s, i) => s + (i.profitAmount ?? 0), 0);
+      await ordersService.update(order.id, { items: updatedItems, totalProfit });
+      toast.success('Production cost saved ✅');
+      load();
+    } finally { setSavingCost(false); }
+  }
+
+  if (loading) return (
+    <div className="flex justify-center items-center min-h-64">
+      <div className="w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
+  if (!order) return <div className="p-6 text-gray-500">Order not found</div>;
+
+  const origin = window.location.origin;
+
+  return (
+    <div className="p-4 md:p-6 space-y-4 max-w-2xl animate-fade-in">
+      <div className="flex items-center gap-3">
+        <button onClick={() => navigate('/admin/orders')} className="p-2 hover:bg-gray-100 rounded-lg">
+          <ArrowLeft className="w-5 h-5 text-gray-600" />
+        </button>
+        <div>
+          <h1 className="text-xl font-bold text-gray-800 font-display">#{order.orderNumber}</h1>
+          <p className="text-xs text-gray-500">{formatDateTime(order.createdAt)}</p>
+        </div>
+      </div>
+
+      {/* Status & Actions */}
+      <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-4">
+        {/* Current status + payment */}
+        <div className="flex items-center justify-between">
+          <span className={`px-3 py-1 rounded-full text-sm font-medium ${ORDER_STATUS_COLORS[order.status]}`}>
+            {ORDER_STATUS_LABELS[order.status]}
+          </span>
+          <span className={`px-3 py-1 rounded-full text-sm font-medium
+            ${order.paymentStatus === 'paid' ? 'bg-green-100 text-green-700' :
+              order.paymentStatus === 'na' ? 'bg-gray-100 text-gray-600' : 'bg-red-100 text-red-700'}`}>
+            {order.paymentStatus === 'paid' ? '✅ Paid' : order.paymentStatus === 'na' ? 'N/A' : '💰 Payment Pending'}
+          </span>
+        </div>
+
+        {/* Step 1 — Change status */}
+        <div>
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Step 1 — Update Status</p>
+          <div className="flex gap-2 flex-wrap">
+            {(['pending', 'confirmed', 'out_for_delivery', 'delivered'] as OrderStatus[]).map(s => (
+              <button key={s} onClick={() => updateStatus(s)}
+                disabled={order.status === s}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors
+                  ${order.status === s
+                    ? 'bg-orange-500 text-white border-orange-500'
+                    : 'bg-white text-gray-600 border-gray-200 hover:border-orange-300'}`}>
+                {ORDER_STATUS_LABELS[s]}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Step 2 — Notify customer via your WA number */}
+        <div className="border-t border-gray-100 pt-3">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Step 2 — Notify Customer</p>
+          <p className="text-xs text-gray-400 mb-2">Opens WhatsApp on your phone. Send message to customer from your number.</p>
+          <div className="flex gap-2 flex-wrap">
+            {([
+              { status: 'confirmed',        label: '✅ Order Confirmed',     url: buildCustomerWhatsAppUrl(order.customerWhatsapp, orderConfirmedToCustomer(order)) },
+              { status: 'out_for_delivery', label: '🚚 Out for Delivery',  url: buildCustomerWhatsAppUrl(order.customerWhatsapp, outForDeliveryToCustomer(order)) },
+              { status: 'delivered',        label: '🎉 Delivered',          url: buildCustomerWhatsAppUrl(order.customerWhatsapp, deliveredToCustomer(order, `${origin}/feedback/${order.id}`)) },
+              { status: 'cancelled',        label: '❌ Cancelled',           url: buildCustomerWhatsAppUrl(order.customerWhatsapp, orderCancelledToCustomer(order)) },
+            ] as const).map(({ status: s, label, url }) => (
+              <a key={s} href={url} target="_blank" rel="noreferrer"
+                className={`flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-medium border transition-all
+                  ${lastStatusChanged === s
+                    ? 'bg-green-500 text-white border-green-500 shadow-sm ring-2 ring-green-300'
+                    : 'border-green-300 text-green-700 hover:bg-green-50'}`}>
+                <MessageCircle className="w-3.5 h-3.5" />
+                {label}
+                {lastStatusChanged === s && <span className="ml-1 text-xs opacity-80">← tap now</span>}
+              </a>
+            ))}
+          </div>
+        </div>
+
+        {order.paymentStatus === 'pending' && order.total > 0 && (
+          <button onClick={markPaid}
+            className="w-full bg-green-500 hover:bg-green-600 text-white py-2 rounded-xl text-sm font-semibold transition-colors">
+            ✅ Mark as Paid
+          </button>
+        )}
+      </div>
+
+      {/* Customer */}
+      <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-2">
+        <h2 className="font-semibold text-gray-800 text-sm uppercase tracking-wide text-gray-400">Customer</h2>
+        <p className="font-semibold text-gray-800 text-lg">{order.customerName}</p>
+        <div className="flex items-center gap-4 flex-wrap text-sm text-gray-600">
+          <a href={`https://wa.me/91${order.customerWhatsapp}`} target="_blank" rel="noreferrer"
+            className="flex items-center gap-1 text-green-600 hover:underline">
+            📱 {order.customerWhatsapp}
+          </a>
+          <span>📍 {order.customerPlace}</span>
+        </div>
+      </div>
+
+      {/* Items */}
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <h2 className="font-semibold text-gray-700 px-4 pt-4 pb-2 text-sm">Order Items</h2>
+        {order.items.map((item, i) => (
+          <div key={i} className={`flex items-center justify-between px-4 py-3 ${i > 0 ? 'border-t border-gray-50' : ''}`}>
+            <div>
+              <p className="text-sm font-medium text-gray-800">{item.productName}</p>
+              <p className="text-xs text-gray-500">{formatQuantity(item.quantity, item.unit)} × ₹{item.pricePerUnit}/{item.unit}</p>
+            </div>
+            <p className="font-semibold text-gray-800">{formatCurrency(item.totalPrice)}</p>
+          </div>
+        ))}
+        <div className="border-t border-gray-100 px-4 py-3 bg-gray-50 space-y-1">
+          <div className="flex justify-between text-sm text-gray-600">
+            <span>Subtotal</span><span>{formatCurrency(order.subtotal)}</span>
+          </div>
+          {order.discount > 0 && (
+            <div className="flex justify-between text-sm text-green-600">
+              <span>Discount</span><span>-{formatCurrency(order.discount)}</span>
+            </div>
+          )}
+          <div className="flex justify-between font-bold text-gray-800 text-lg pt-1 border-t border-gray-100 mt-1">
+            <span>Total</span>
+            <span className="text-orange-600">
+              {order.type === 'sample' ? 'FREE SAMPLE' : formatCurrency(order.total)}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {order.notes && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
+          <p className="text-sm font-medium text-yellow-800">📝 Notes</p>
+          <p className="text-sm text-yellow-700 mt-1">{order.notes}</p>
+        </div>
+      )}
+
+      {/* Danger Zone */}
+      <div className="bg-white rounded-xl border border-red-100 p-4 space-y-2">
+        <p className="text-xs font-semibold text-red-400 uppercase tracking-wide">Danger Zone</p>
+        <div className="flex gap-2">
+          {order.status !== 'cancelled' && (
+            <button
+              onClick={() => setConfirm('cancel')}
+              className="flex-1 flex items-center justify-center gap-1.5 border border-red-300 text-red-600
+                hover:bg-red-50 py-2 rounded-xl text-sm font-medium transition-colors">
+              <XCircle className="w-4 h-4" />
+              Cancel Order
+            </button>
+          )}
+          <button
+            onClick={() => setConfirm('delete')}
+            className="flex-1 flex items-center justify-center gap-1.5 bg-red-500 hover:bg-red-600
+              text-white py-2 rounded-xl text-sm font-medium transition-colors">
+            <Trash2 className="w-4 h-4" />
+            Delete Order
+          </button>
+        </div>
+      </div>
+
+      {/* Confirm Dialog */}
+      {confirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full space-y-4 shadow-xl">
+            {confirm === 'cancel' ? (
+              <>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                    <XCircle className="w-5 h-5 text-red-500" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-gray-800">Cancel Order?</h3>
+                    <p className="text-sm text-gray-500">#{order.orderNumber} will be marked as cancelled.</p>
+                  </div>
+                </div>
+                <p className="text-sm text-gray-600">You can also notify the customer via WhatsApp after cancelling.</p>
+                <div className="flex gap-2">
+                  <button onClick={() => setConfirm(null)}
+                    className="flex-1 border border-gray-200 text-gray-600 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-50">
+                    Keep Order
+                  </button>
+                  <button onClick={cancelOrder}
+                    className="flex-1 bg-red-500 hover:bg-red-600 text-white py-2.5 rounded-xl text-sm font-medium">
+                    Yes, Cancel
+                  </button>
+                </div>
+                {order.customerWhatsapp && (
+                  <a href={buildCustomerWhatsAppUrl(order.customerWhatsapp, orderCancelledToCustomer(order))}
+                    target="_blank" rel="noreferrer"
+                    className="flex items-center justify-center gap-1.5 border border-green-300 text-green-600
+                      hover:bg-green-50 py-2 rounded-xl text-sm font-medium transition-colors w-full">
+                    <MessageCircle className="w-4 h-4" />
+                    Notify Customer on WhatsApp
+                  </a>
+                )}
+              </>
+            ) : (
+              <>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                    <Trash2 className="w-5 h-5 text-red-500" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-gray-800">Delete Order?</h3>
+                    <p className="text-sm text-gray-500">This cannot be undone.</p>
+                  </div>
+                </div>
+                <p className="text-sm text-gray-600">Order <strong>#{order.orderNumber}</strong> will be permanently removed from the database.</p>
+                <div className="flex gap-2">
+                  <button onClick={() => setConfirm(null)}
+                    className="flex-1 border border-gray-200 text-gray-600 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-50">
+                    Cancel
+                  </button>
+                  <button onClick={deleteOrder}
+                    className="flex-1 bg-red-500 hover:bg-red-600 text-white py-2.5 rounded-xl text-sm font-medium">
+                    Yes, Delete
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Production Cost Tracker — only for on-demand orders */}
+      {order.hasOnDemandItems && (
+        <div className="bg-white rounded-xl border border-orange-200 overflow-hidden">
+          <button
+            onClick={() => setShowCost(s => !s)}
+            className="w-full flex items-center justify-between px-4 py-3 hover:bg-orange-50 transition-colors">
+            <div className="flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-orange-500" />
+              <span className="font-semibold text-gray-800 text-sm">Production Cost & Profit</span>
+              {order.totalProfit !== undefined && (
+                <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${order.totalProfit >= 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                  {order.totalProfit >= 0 ? '+' : ''}₹{order.totalProfit.toFixed(0)}
+                </span>
+              )}
+            </div>
+            {showCost ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+          </button>
+
+          {showCost && (
+            <div className="border-t border-orange-100 p-4 space-y-3">
+              <p className="text-xs text-gray-500">Enter the raw material / ingredient cost for each on-demand item to track profit.</p>
+
+              {order.items.filter(item => item.isOnDemand).map((item) => {
+                const realIdx = order.items.indexOf(item);
+                const cost = itemCosts[realIdx] ?? item.rawMaterialCost ?? 0;
+                const profit = item.totalPrice - cost;
+                return (
+                  <div key={realIdx} className="bg-gray-50 rounded-xl p-3 space-y-2">
+                    <p className="text-sm font-semibold text-gray-800">{item.productName}</p>
+                    <p className="text-xs text-gray-500">Selling price: ₹{item.totalPrice} ({formatQuantity(item.quantity, item.unit)})</p>
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1">
+                        <label className="block text-xs text-gray-500 mb-1">Ingredient / Material Cost (₹)</label>
+                        <input
+                          type="number" min="0" step="1"
+                          value={cost || ''}
+                          onChange={e => setItemCosts(c => ({ ...c, [realIdx]: parseFloat(e.target.value) || 0 }))}
+                          placeholder="0"
+                          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400"
+                        />
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xs text-gray-500 mb-1">Profit</p>
+                        <p className={`text-base font-bold ${profit >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                          {profit >= 0 ? '+' : ''}₹{profit.toFixed(0)}
+                        </p>
+                      </div>
+                    </div>
+                    {cost > 0 && (
+                      <div className="text-xs text-gray-400">
+                        Margin: {((profit / item.totalPrice) * 100).toFixed(1)}%
+                        {profit < 0 && <span className="text-red-500 font-medium ml-2">⚠️ Selling below cost! Consider updating price.</span>}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+
+              <button onClick={saveProductionCost} disabled={savingCost}
+                className="w-full bg-orange-500 hover:bg-orange-600 text-white py-2.5 rounded-xl text-sm font-semibold disabled:opacity-50">
+                {savingCost ? 'Saving…' : '💾 Save Production Cost'}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
