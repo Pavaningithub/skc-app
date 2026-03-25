@@ -1,26 +1,38 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './contexts/AuthContext';
+import { Suspense, lazy } from 'react';
 
-// Customer pages
+// Customer pages — eagerly loaded (public-facing, must be fast)
 import StoreFront from './pages/customer/StoreFront';
-import OrderConfirmation from './pages/customer/OrderConfirmation';
-import FeedbackPage from './pages/customer/FeedbackPage';
+const OrderConfirmation = lazy(() => import('./pages/customer/OrderConfirmation'));
+const FeedbackPage      = lazy(() => import('./pages/customer/FeedbackPage'));
 
-// Admin pages
-import AdminLayout from './pages/admin/AdminLayout';
-import PinLogin from './pages/admin/PinLogin';
-import Dashboard from './pages/admin/Dashboard';
-import Products from './pages/admin/Products';
-import StockPage from './pages/admin/StockPage';
-import OrdersPage from './pages/admin/OrdersPage';
-import OrderDetail from './pages/admin/OrderDetail';
-import ExpensesPage from './pages/admin/ExpensesPage';
-import CustomersPage from './pages/admin/CustomersPage';
-import SubscriptionsPage from './pages/admin/SubscriptionsPage';
-import FeedbackAdmin from './pages/admin/FeedbackAdmin';
-import BatchesPage from './pages/admin/BatchesPage';
-import SettingsPage from './pages/admin/SettingsPage';
+// Admin pages — all lazy loaded (never needed by customers)
+const AdminLayout      = lazy(() => import('./pages/admin/AdminLayout'));
+const PinLogin         = lazy(() => import('./pages/admin/PinLogin'));
+const Dashboard        = lazy(() => import('./pages/admin/Dashboard'));
+const Products         = lazy(() => import('./pages/admin/Products'));
+const StockPage        = lazy(() => import('./pages/admin/StockPage'));
+const OrdersPage       = lazy(() => import('./pages/admin/OrdersPage'));
+const OrderDetail      = lazy(() => import('./pages/admin/OrderDetail'));
+const ExpensesPage     = lazy(() => import('./pages/admin/ExpensesPage'));
+const CustomersPage    = lazy(() => import('./pages/admin/CustomersPage'));
+const SubscriptionsPage = lazy(() => import('./pages/admin/SubscriptionsPage'));
+const FeedbackAdmin    = lazy(() => import('./pages/admin/FeedbackAdmin'));
+const BatchesPage      = lazy(() => import('./pages/admin/BatchesPage'));
+const SettingsPage     = lazy(() => import('./pages/admin/SettingsPage'));
+
+function PageLoader() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-amber-50">
+      <div className="flex flex-col items-center gap-3">
+        <div className="w-10 h-10 border-4 border-amber-400 border-t-transparent rounded-full animate-spin" />
+        <p className="text-sm text-amber-700 font-medium">Loading…</p>
+      </div>
+    </div>
+  );
+}
 
 export default function App() {
   return (
@@ -34,6 +46,7 @@ export default function App() {
             success: { iconTheme: { primary: "#f97316", secondary: "#fff" } },
           }}
         />
+        <Suspense fallback={<PageLoader />}>
         <Routes>
           <Route path="/" element={<StoreFront />} />
           <Route path="/order-confirmation/:orderId" element={<OrderConfirmation />} />
@@ -57,6 +70,7 @@ export default function App() {
 
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        </Suspense>
       </AuthProvider>
     </BrowserRouter>
   );
