@@ -1,40 +1,61 @@
-import { useEffect, useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, Plus } from 'lucide-react';
+import { Search, Plus, ArrowUpDown } from 'lucide-react';
 import { ordersService } from '../../lib/services';
+import { useRealtimeCollection } from '../../lib/useRealtimeCollection';
 import { formatCurrency, formatDateTime } from '../../lib/utils';
 import { ORDER_STATUS_COLORS, ORDER_STATUS_LABELS } from '../../lib/constants';
 import type { Order } from '../../lib/types';
 import type { OrderStatus } from '../../lib/constants';
 import CreateOrderModal from '../../components/admin/CreateOrderModal';
 
+type SortKey = 'date_desc' | 'date_asc' | 'amount_desc' | 'amount_asc' | 'name_asc';
+type PayFilter = 'all' | 'unpaid' | 'paid';
+
+const SORT_LABELS: Record<SortKey, string> = {
+  date_desc:   'Newest first',
+  date_asc:    'Oldest first',
+  amount_desc: 'Amount ↓',
+  amount_asc:  'Amount ↑',
+  name_asc:    'Name A–Z',
+};
+
 export default function OrdersPage() {
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [orders, loading] = useRealtimeCollection<Order>(ordersService.subscribe.bind(ordersService));
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<OrderStatus | 'all'>('all');
+  const [payFilter, setPayFilter] = useState<PayFilter>('all');
+  const [sortKey, setSortKey] = useState<SortKey>('date_desc');
   const [showCreate, setShowCreate] = useState(false);
-
-  useEffect(() => { load(); }, []);
-
-  async function load() {
-    setLoading(true);
-    try { setOrders(await ordersService.getAll()); }
-    finally { setLoading(false); }
-  }
 
   async function updateStatus(order: Order, status: OrderStatus) {
     await ordersService.updateStatus(order.id, status);
-    load();
   }
 
-  const filtered = orders.filter(o => {
-    const matchSearch = o.customerName.toLowerCase().includes(search.toLowerCase()) ||
-      o.orderNumber.toLowerCase().includes(search.toLowerCase()) ||
-      o.customerPlace.toLowerCase().includes(search.toLowerCase());
-    const matchStatus = statusFilter === 'all' || o.status === statusFilter;
-    return matchSearch && matchStatus;
-  });
+  const filtered = useMemo(() => {
+    let result = orders.filter(o => {
+      const matchSearch = o.customerName.toLowerCase().includes(search.toLowerCase()) ||
+        o.orderNumber.toLowerCase().includes(search.toLowerCase()) ||
+        o.customerPlace.toLowerCase().includes(search.toLowerCase());
+      const matchStatus = statusFilter === 'all' || o.status === statusFilter;
+      const matchPay = payFilter === 'all'
+        ? true
+        : payFilter === 'unpaid'
+          ? o.paymentStatus === 'pending' && o.total > 0
+          : o.paymentStatus === 'paid';
+      return matchSearch && matchStatus && matchPay;
+    });
+    result = [...result].sort((a, b) => {
+      switch (sortKey) {
+        case 'date_asc':    return a.createdAt.localeCompare(b.createdAt);
+        case 'amount_desc': return b.total - a.total;
+        case 'amount_asc':  return a.total - b.total;
+        case 'name_asc':    return a.customerName.localeCompare(b.customerName);
+        default:            return b.createdAt.localeCompare(a.createdAt); // date_desc
+      }
+    });
+    return result;
+  }, [orders, search, statusFilter, payFilter, sortKey]);
 
   const statusCounts = {
     all: orders.length,
@@ -61,7 +82,7 @@ export default function OrdersPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-800 font-display">Orders</h1>
-          <p className="text-sm text-gray-500">{orders.length} total orders</p>
+          <p className="text-sm text-gray-500">{filtered.length !== orders.length ? `${filtered.length} of ${orders.length}` : `${orders.length} total`} orders</p>
         </div>
         <button onClick={() => setShowCreate(true)}
           className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-xl text-sm font-semibold transition-colors">
@@ -88,6 +109,32 @@ export default function OrdersPage() {
           value={search} onChange={e => setSearch(e.target.value)}
           className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:border-orange-400 bg-white"
         />
+      </div>
+
+      {/* Sort + Payment filter */}
+      <div className="flex gap-2 flex-wrap">
+        <div className="flex items-center gap-1.5 flex-1 min-w-[160px]">
+          <ArrowUpDown className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+          <select value={sortKey} onChange={e => setSortKey(e.target.value as SortKey)}
+            className="flex-1 border border-gray-200 rounded-lg px-2 py-1.5 text-xs outline-none focus:border-orange-400 bg-white">
+            {(Object.entries(SORT_LABELS) as [SortKey, string][]).map(([k, v]) => (
+              <option key={k} value={k}>{v}</option>
+            ))}
+          </select>
+        </div>
+        <div className="flex gap-1">
+          {(['all', 'unpaid', 'paid'] as PayFilter[]).map(f => (
+            <button key={f} onClick={() => setPayFilter(f)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors
+                ${payFilter === f
+                  ? f === 'unpaid' ? 'bg-red-500 text-white border-red-500'
+                    : f === 'paid' ? 'bg-green-500 text-white border-green-500'
+                    : 'bg-orange-500 text-white border-orange-500'
+                  : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'}`}>
+              {f === 'all' ? 'All payments' : f === 'unpaid' ? '💰 Unpaid' : '✅ Paid'}
+            </button>
+          ))}
+        </div>
       </div>
 
       {loading ? (
@@ -153,7 +200,6 @@ export default function OrdersPage() {
                   <button
                     onClick={async () => {
                       await ordersService.updatePayment(order.id, 'paid');
-                      load();
                     }}
                     className="bg-green-500 hover:bg-green-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors">
                     Mark Paid
@@ -173,7 +219,7 @@ export default function OrdersPage() {
         </div>
       )}
 
-      {showCreate && <CreateOrderModal onClose={() => setShowCreate(false)} onCreated={load} />}
+      {showCreate && <CreateOrderModal onClose={() => setShowCreate(false)} onCreated={() => setShowCreate(false)} />}
     </div>
   );
 }
