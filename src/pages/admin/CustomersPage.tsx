@@ -1,25 +1,37 @@
-import { useEffect, useState } from 'react';
-import { Search, ChevronDown, ChevronUp, Tag } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { Search, ChevronDown, ChevronUp, Tag, ArrowUpDown } from 'lucide-react';
 import { customersService, ordersService } from '../../lib/services';
+import { useRealtimeCollection } from '../../lib/useRealtimeCollection';
 import { formatCurrency, formatDate } from '../../lib/utils';
 import type { Customer, Order } from '../../lib/types';
 
+type CustSort = 'name_asc' | 'spent_desc' | 'orders_desc' | 'pending_desc';
+type CustFilter = 'all' | 'has_discount' | 'has_pending' | 'in_wa_group' | 'not_in_wa_group';
+
+const CUST_SORT_LABELS: Record<CustSort, string> = {
+  name_asc:     'Name A–Z',
+  spent_desc:   'Highest spent',
+  orders_desc:  'Most orders',
+  pending_desc: 'Highest pending',
+};
+
+const CUST_FILTER_LABELS: Record<CustFilter, string> = {
+  all:              'All',
+  has_discount:     '🏷️ Discounted',
+  has_pending:      '💰 Pending payment',
+  in_wa_group:      '✅ In WA group',
+  not_in_wa_group:  '❌ Not in WA group',
+};
+
 export default function CustomersPage() {
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [customers, loading] = useRealtimeCollection<Customer>(customersService.subscribe.bind(customersService));
   const [search, setSearch] = useState('');
   const [expanded, setExpanded] = useState<string | null>(null);
   const [customerOrders, setCustomerOrders] = useState<Record<string, Order[]>>({});
   const [discountEdit, setDiscountEdit] = useState<Record<string, string>>({}); // customerId -> draft string
   const [savingDiscount, setSavingDiscount] = useState<string | null>(null);
-
-  useEffect(() => { load(); }, []);
-
-  async function load() {
-    setLoading(true);
-    try { setCustomers(await customersService.getAll()); }
-    finally { setLoading(false); }
-  }
+  const [custFilter, setCustFilter] = useState<CustFilter>('all');
+  const [sortKey, setSortKey] = useState<CustSort>('name_asc');
 
   async function loadOrders(customerId: string) {
     if (customerOrders[customerId]) return;
@@ -41,31 +53,71 @@ export default function CustomersPage() {
     setSavingDiscount(c.id);
     try {
       await customersService.update(c.id, { discountPercent: pct });
-      setCustomers(prev => prev.map(x => x.id === c.id ? { ...x, discountPercent: pct } : x));
       setDiscountEdit(prev => ({ ...prev, [c.id]: String(pct) }));
     } finally {
       setSavingDiscount(null);
     }
   }
 
-  const filtered = customers.filter(c =>
-    c.name.toLowerCase().includes(search.toLowerCase()) ||
-    c.whatsapp.includes(search) ||
-    c.place.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = useMemo(() => {
+    let result = customers.filter(c => {
+      const matchSearch = c.name.toLowerCase().includes(search.toLowerCase()) ||
+        c.whatsapp.includes(search) ||
+        c.place.toLowerCase().includes(search.toLowerCase());
+      const matchFilter =
+        custFilter === 'all'             ? true :
+        custFilter === 'has_discount'    ? (c.discountPercent ?? 0) > 0 :
+        custFilter === 'has_pending'     ? c.pendingAmount > 0 :
+        custFilter === 'in_wa_group'     ? c.joinedWhatsappGroup :
+        /* not_in_wa_group */              !c.joinedWhatsappGroup;
+      return matchSearch && matchFilter;
+    });
+    result = [...result].sort((a, b) => {
+      switch (sortKey) {
+        case 'spent_desc':   return b.totalSpent - a.totalSpent;
+        case 'orders_desc':  return b.totalOrders - a.totalOrders;
+        case 'pending_desc': return b.pendingAmount - a.pendingAmount;
+        default:             return a.name.localeCompare(b.name);
+      }
+    });
+    return result;
+  }, [customers, search, custFilter, sortKey]);
 
   return (
     <div className="p-4 md:p-6 space-y-4 animate-fade-in">
       <div>
         <h1 className="text-2xl font-bold text-gray-800 font-display">Customers</h1>
-        <p className="text-sm text-gray-500">{customers.length} total customers</p>
+        <p className="text-sm text-gray-500">{filtered.length !== customers.length ? `${filtered.length} of ${customers.length}` : `${customers.length} total`} customers</p>
       </div>
 
+      {/* Search */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
         <input type="text" placeholder="Search by name, number, place…"
           value={search} onChange={e => setSearch(e.target.value)}
           className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:border-orange-400 bg-white" />
+      </div>
+
+      {/* Filter pills */}
+      <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4">
+        {(Object.entries(CUST_FILTER_LABELS) as [CustFilter, string][]).map(([k, v]) => (
+          <button key={k} onClick={() => setCustFilter(k)}
+            className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors
+              ${custFilter === k ? 'bg-orange-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+            {v}
+          </button>
+        ))}
+      </div>
+
+      {/* Sort */}
+      <div className="flex items-center gap-2">
+        <ArrowUpDown className="w-3.5 h-3.5 text-gray-400" />
+        <select value={sortKey} onChange={e => setSortKey(e.target.value as CustSort)}
+          className="border border-gray-200 rounded-lg px-2 py-1.5 text-xs outline-none focus:border-orange-400 bg-white">
+          {(Object.entries(CUST_SORT_LABELS) as [CustSort, string][]).map(([k, v]) => (
+            <option key={k} value={k}>{v}</option>
+          ))}
+        </select>
       </div>
 
       {loading ? (
@@ -168,7 +220,6 @@ export default function CustomersPage() {
                     {c.pendingAmount > 0 && (
                       <button onClick={async () => {
                         await customersService.update(c.id, { pendingAmount: 0 });
-                        load();
                       }} className="text-xs bg-blue-500 text-white px-3 py-1.5 rounded-lg hover:bg-blue-600 transition-colors">
                         Clear Pending
                       </button>

@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Plus, Pencil, Trash2, ToggleLeft, ToggleRight, Search } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { Plus, Pencil, Trash2, ToggleLeft, ToggleRight, Search, ArrowUpDown, Filter } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Portal from '../../components/Portal';
 import { productsService } from '../../lib/services';
@@ -10,6 +10,16 @@ import type { Product } from '../../lib/types';
 import type { Unit } from '../../lib/constants';
 
 const CATEGORIES = ['Chutney Powder', 'Masala', 'Health Mix', 'Spices', 'Pickles', 'Other'];
+
+type ProdSort = 'name_asc' | 'price_asc' | 'price_desc' | 'category';
+type ActiveFilter = 'all' | 'active' | 'inactive';
+
+const PROD_SORT_LABELS: Record<ProdSort, string> = {
+  name_asc:    'Name A–Z',
+  price_asc:   'Price low–high',
+  price_desc:  'Price high–low',
+  category:    'By category',
+};
 
 const emptyForm: Omit<Product, 'id' | 'createdAt' | 'updatedAt'> = {
   name: '', nameKannada: '', description: '', unit: 'gram', pricePerUnit: 0,
@@ -24,6 +34,10 @@ export default function Products() {
   const [form, setForm] = useState({ ...emptyForm });
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState('');
+  const [catFilter, setCatFilter] = useState<string>('all');
+  const [activeFilter, setActiveFilter] = useState<ActiveFilter>('all');
+  const [onDemandOnly, setOnDemandOnly] = useState(false);
+  const [sortKey, setSortKey] = useState<ProdSort>('name_asc');
 
   function openAdd() { setForm({ ...emptyForm }); setEditId(null); setShowForm(true); }
   function openEdit(p: Product) {
@@ -65,10 +79,25 @@ export default function Products() {
     toast.success('Product deleted');
   }
 
-  const filtered = products.filter(p =>
-    p.name.toLowerCase().includes(search.toLowerCase()) ||
-    p.category.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = useMemo(() => {
+    let result = products.filter((p: Product) => {
+      const matchSearch = p.name.toLowerCase().includes(search.toLowerCase()) ||
+        p.category.toLowerCase().includes(search.toLowerCase());
+      const matchCat = catFilter === 'all' || p.category === catFilter;
+      const matchActive = activeFilter === 'all' || (activeFilter === 'active' ? p.isActive : !p.isActive);
+      const matchDemand = !onDemandOnly || p.isOnDemand;
+      return matchSearch && matchCat && matchActive && matchDemand;
+    });
+    result = [...result].sort((a: Product, b: Product) => {
+      switch (sortKey) {
+        case 'price_asc':  return a.pricePerUnit - b.pricePerUnit;
+        case 'price_desc': return b.pricePerUnit - a.pricePerUnit;
+        case 'category':   return a.category.localeCompare(b.category) || a.name.localeCompare(b.name);
+        default:           return a.name.localeCompare(b.name);
+      }
+    });
+    return result;
+  }, [products, search, catFilter, activeFilter, onDemandOnly, sortKey]);
 
   const priceLabel = (unit: Unit) => {
     if (unit === 'gram') return '/ gram';
@@ -81,7 +110,7 @@ export default function Products() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-800 font-display">Products</h1>
-          <p className="text-sm text-gray-500">{products.length} products</p>
+          <p className="text-sm text-gray-500">{filtered.length !== products.length ? `${filtered.length} of ${products.length}` : `${products.length}`} products</p>
         </div>
         <button onClick={openAdd}
           className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-xl text-sm font-semibold transition-colors">
@@ -97,6 +126,45 @@ export default function Products() {
           onChange={e => setSearch(e.target.value)}
           className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:border-orange-400 bg-white"
         />
+      </div>
+
+      {/* Filter + Sort row */}
+      <div className="flex gap-2 flex-wrap items-center">
+        {/* Category filter */}
+        <div className="flex items-center gap-1.5">
+          <Filter className="w-3.5 h-3.5 text-gray-400" />
+          <select value={catFilter} onChange={e => setCatFilter(e.target.value)}
+            className="border border-gray-200 rounded-lg px-2 py-1.5 text-xs outline-none focus:border-orange-400 bg-white">
+            <option value="all">All categories</option>
+            {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+        {/* Active filter */}
+        <div className="flex gap-1">
+          {(['all', 'active', 'inactive'] as ActiveFilter[]).map(f => (
+            <button key={f} onClick={() => setActiveFilter(f)}
+              className={`px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-colors
+                ${activeFilter === f ? 'bg-orange-500 text-white border-orange-500' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'}`}>
+              {f === 'all' ? 'All' : f === 'active' ? '✅ Active' : '⏸ Inactive'}
+            </button>
+          ))}
+        </div>
+        {/* On-demand toggle */}
+        <button onClick={() => setOnDemandOnly(v => !v)}
+          className={`px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-colors
+            ${onDemandOnly ? 'bg-orange-100 text-orange-700 border-orange-300' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'}`}>
+          🔥 On-demand only
+        </button>
+        {/* Sort */}
+        <div className="flex items-center gap-1.5 ml-auto">
+          <ArrowUpDown className="w-3.5 h-3.5 text-gray-400" />
+          <select value={sortKey} onChange={e => setSortKey(e.target.value as ProdSort)}
+            className="border border-gray-200 rounded-lg px-2 py-1.5 text-xs outline-none focus:border-orange-400 bg-white">
+            {(Object.entries(PROD_SORT_LABELS) as [ProdSort, string][]).map(([k, v]) => (
+              <option key={k} value={k}>{v}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {/* Product List */}
