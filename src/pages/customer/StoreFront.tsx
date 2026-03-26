@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  ShoppingCart, Star, Leaf, Plus, Minus,
-  Trash2, X, MessageCircle, Users, ChevronRight, Flame, Sparkles,
+  ShoppingCart, Star, Plus, Minus,
+  Trash2, X, MessageCircle, Users, ChevronRight, Flame,
   Search
 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -196,13 +196,11 @@ export default function StoreFront() {
   }
 
   if (loading) return (
-    <div className="min-h-screen flex items-center justify-center" style={{ background: '#fff4eb' }}>
+    <div className="min-h-screen flex items-center justify-center" style={{ background: 'linear-gradient(160deg, #7b1500 0%, #c45c00 60%, #2e7d32 100%)' }}>
       <div className="text-center">
-        <div className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-3"
-          style={{ background: '#c45c00' }}>
-          <Leaf className="w-7 h-7 text-white" />
-        </div>
-        <p className="text-sm" style={{ color: '#c45c00' }}>Loading products…</p>
+        <div className="text-5xl mb-4 animate-bounce">🪷</div>
+        <p className="font-bold text-white text-lg mb-1" style={{ fontFamily: 'Poppins, sans-serif' }}>Sri Krishna Condiments</p>
+        <p className="text-sm" style={{ color: '#ffd700' }}>🙏 Hare Krishna…</p>
       </div>
     </div>
   );
@@ -211,27 +209,28 @@ export default function StoreFront() {
     <div className="min-h-screen bg-white font-sans">
 
       {/* Header */}
-      <header className="sticky top-0 z-40 bg-white border-b" style={{ borderColor: '#f0d9c8' }}>
-        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2 min-w-0">
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-              style={{ background: '#c45c00' }}>
-              <Leaf className="w-5 h-5 text-white" />
+      <header className="sticky top-0 z-40 shadow-sm" style={{ background: 'linear-gradient(90deg, #7b1500 0%, #c45c00 60%, #7b1500 100%)' }}>
+        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5 min-w-0">
+            {/* Sacred tilak/lotus icon */}
+            <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 text-xl"
+              style={{ background: 'rgba(255,255,255,0.15)', border: '1.5px solid rgba(255,215,0,0.5)' }}>
+              🪷
             </div>
             <div className="min-w-0">
-              <p className="font-bold text-sm leading-tight truncate" style={{ color: '#c45c00' }}>
+              <p className="font-bold text-sm leading-tight text-white" style={{ fontFamily: 'Poppins, sans-serif', letterSpacing: '0.3px' }}>
                 Sri Krishna Condiments
               </p>
-              <p className="text-xs leading-tight" style={{ color: '#2e7d32' }}>Pure · Fresh · Handcrafted</p>
+              <p className="text-xs leading-tight" style={{ color: '#ffd700', letterSpacing: '0.5px' }}>🙏 Pure · Fresh · Made with Love</p>
             </div>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
             <button onClick={() => setShowCart(true)}
-              className="relative w-10 h-10 rounded-xl flex items-center justify-center"
-              style={{ background: '#c45c00' }}>
+              className="relative w-11 h-11 rounded-full flex items-center justify-center"
+              style={{ background: 'rgba(255,255,255,0.15)', border: '1.5px solid rgba(255,215,0,0.4)' }}>
               <ShoppingCart className="w-5 h-5 text-white" />
               {cartCount > 0 && (
-                <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold">
+                <span className="absolute -top-1 -right-1 w-5 h-5 bg-yellow-400 text-yellow-900 text-xs rounded-full flex items-center justify-center font-bold">
                   {cartCount}
                 </span>
               )}
@@ -241,36 +240,65 @@ export default function StoreFront() {
       </header>
 
       {/* Hero */}
-      <div className="relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #c45c00 0%, #e8762a 50%, #2e7d32 100%)' }}>
-        <div className="absolute inset-0 pointer-events-none">
-          {[...Array(6)].map((_, i) => (
-            <div key={i} className="absolute opacity-10"
-              style={{ left: `${(i * 17) % 100}%`, top: `${(i * 23) % 100}%` }}>
-              <Leaf className="w-12 h-12 text-white" style={{ transform: `rotate(${i * 60}deg)` }} />
-            </div>
+      <div className="relative overflow-hidden" style={{ background: 'linear-gradient(160deg, #7b1500 0%, #c45c00 40%, #e8762a 70%, #2e7d32 100%)' }}>
+        {/* Decorative pattern */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+          {/* Lotus petals pattern */}
+          {[...Array(8)].map((_, i) => (
+            <div key={i} className="absolute opacity-10 text-white select-none"
+              style={{
+                left: `${(i * 13 + 5) % 100}%`,
+                top: `${(i * 17 + 10) % 100}%`,
+                fontSize: i % 2 === 0 ? '40px' : '28px',
+                transform: `rotate(${i * 45}deg)`,
+              }}>🪷</div>
           ))}
         </div>
-        <div className="relative max-w-2xl mx-auto px-4 py-10 text-center text-white">
-          <div className="inline-flex items-center gap-2 bg-white/20 rounded-full px-4 py-1.5 mb-4 text-sm font-medium">
-            <Sparkles className="w-4 h-4" /> Small batch · Always fresh
+
+        <div className="relative max-w-5xl mx-auto px-4 py-10 md:py-14">
+          {/* Sacred greeting */}
+          <div className="text-center mb-6">
+            <div className="inline-flex items-center gap-2 rounded-full px-5 py-2 mb-4 text-sm font-semibold"
+              style={{ background: 'rgba(255,215,0,0.18)', border: '1px solid rgba(255,215,0,0.4)', color: '#ffd700' }}>
+              🙏 Hare Krishna — Hare Rama 🙏
+            </div>
+            <h1 className="text-3xl md:text-4xl font-bold text-white mb-1.5"
+              style={{ fontFamily: 'Poppins, sans-serif', textShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>
+              ಶ್ರೀ ಕೃಷ್ಣ ಕಾಂಡಿಮೆಂಟ್ಸ್
+            </h1>
+            <p className="text-white/90 font-medium mb-1" style={{ letterSpacing: '1px' }}>Sri Krishna Condiments</p>
+            <p className="text-white/70 text-sm mb-6 max-w-sm mx-auto">
+              Authentic Karnataka &amp; Andhra flavours — Chutney Powders, Masalas &amp; Health Mixes made at home with love &amp; devotion.
+            </p>
           </div>
-          <h1 className="text-3xl font-bold mb-1" style={{ fontFamily: 'Poppins, sans-serif' }}>
-            ಶ್ರೀ ಕೃಷ್ಣ ಕಾಂಡಿಮೆಂಟ್ಸ್
-          </h1>
-          <p className="text-white/80 text-sm mb-1">Sri Krishna Condiments</p>
-          <p className="text-white/70 text-xs mb-6 max-w-xs mx-auto">
-            Authentic Karnataka, Andra flavours — Chutney Powders, Masalas &amp; Health Mixes made at home with love.
-          </p>
+
+          {/* Trust badges */}
+          <div className="flex flex-wrap justify-center gap-2 mb-6">
+            {[
+              { icon: '🌿', text: 'No Preservatives' },
+              { icon: '🏠', text: 'Home Made' },
+              { icon: '✨', text: 'Small Batch' },
+              { icon: '❤️', text: 'Made with Love' },
+            ].map(b => (
+              <span key={b.text}
+                className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full"
+                style={{ background: 'rgba(255,255,255,0.15)', color: '#fff', border: '1px solid rgba(255,255,255,0.25)' }}>
+                {b.icon} {b.text}
+              </span>
+            ))}
+          </div>
+
           <div className="flex gap-3 justify-center flex-wrap">
             <button
               onClick={() => document.getElementById('products')?.scrollIntoView({ behavior: 'smooth' })}
-              className="font-semibold px-5 py-2.5 rounded-xl text-sm"
-              style={{ background: 'white', color: '#c45c00' }}>
-              Shop Now →
+              className="font-bold px-7 py-3 rounded-2xl text-sm shadow-lg"
+              style={{ background: '#ffd700', color: '#7b1500', boxShadow: '0 4px 15px rgba(255,215,0,0.4)' }}>
+              🛍️ Shop Now
             </button>
             <button
               onClick={openSampleForm}
-              className="border border-white/70 text-white font-medium px-5 py-2.5 rounded-xl text-sm">
+              className="border-2 text-white font-semibold px-7 py-3 rounded-2xl text-sm"
+              style={{ borderColor: 'rgba(255,255,255,0.5)', background: 'rgba(255,255,255,0.1)' }}>
               🎁 Free Sample
             </button>
           </div>
@@ -357,8 +385,10 @@ export default function StoreFront() {
 
       {/* ── Products Section (scroll target) ─────────────────────────────── */}
       <div id="products" className="max-w-5xl mx-auto px-4 pt-6 pb-28">
-        <h2 className="text-lg font-bold mb-1" style={{ color: '#c45c00', fontFamily: 'Poppins, sans-serif' }}>Our Products</h2>
-        <p className="text-xs text-gray-500 mb-4">Tap any product to see details &amp; add to cart</p>
+        <div className="flex items-center justify-between mb-1">
+          <h2 className="text-xl font-bold" style={{ color: '#7b1500', fontFamily: 'Poppins, sans-serif' }}>🌿 Our Products</h2>
+        </div>
+        <p className="text-xs text-gray-400 mb-4">Tap any product to add to cart · Made fresh in small batches 🙏</p>
         <div className="relative mb-4">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
@@ -420,7 +450,7 @@ export default function StoreFront() {
           ))}
           {filtered.length === 0 && (
             <div className="col-span-3 sm:col-span-4 text-center py-16 text-gray-400">
-              <Leaf className="w-10 h-10 mx-auto mb-3 text-gray-300" />
+              <span className="text-5xl mb-3 block">🌿</span>
               <p>No products in this category</p>
             </div>
           )}
@@ -428,39 +458,42 @@ export default function StoreFront() {
       </div>
 
       {/* Footer */}
-      <footer className="py-6 text-center" style={{ background: '#1a1a1a' }}>
-        <div className="flex justify-center items-center gap-2 mb-2">
-          <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ background: '#c45c00' }}>
-            <Leaf className="w-4 h-4 text-white" />
+      <footer className="py-8 text-center" style={{ background: 'linear-gradient(160deg, #7b1500 0%, #2d1a00 100%)' }}>
+        <div className="max-w-md mx-auto px-4">
+          <div className="flex justify-center items-center gap-2 mb-2">
+            <span className="text-2xl">🪷</span>
+            <span className="font-bold text-white text-base" style={{ fontFamily: 'Poppins, sans-serif' }}>Sri Krishna Condiments</span>
           </div>
-          <span className="font-semibold text-white text-sm">Sri Krishna Condiments</span>
+          <p className="text-xs mb-1" style={{ color: '#ffd700' }}>🙏 Hare Krishna — Pure · Fresh · Made with Devotion 🌿</p>
+          <p className="text-xs mt-3" style={{ color: '#d4a574' }}>
+            WhatsApp:{' '}
+            <a href={`https://wa.me/${APP_CONFIG.WHATSAPP_NUMBER}`}
+              className="underline" style={{ color: '#25d366' }}>
+              {APP_CONFIG.WHATSAPP_DISPLAY}
+            </a>
+            {' · '}
+            <a href={`https://wa.me/${APP_CONFIG.WHATSAPP_NUMBER2}`}
+              className="underline" style={{ color: '#25d366' }}>
+              {APP_CONFIG.WHATSAPP_DISPLAY2}
+            </a>
+          </p>
+          <a href="/admin/login" className="block mt-5 text-xs" style={{ color: '#555' }}>Admin Login</a>
         </div>
-        <p className="text-xs" style={{ color: '#aaa' }}>Pure · Fresh · Made with Love 🌿</p>
-        <p className="text-xs mt-1" style={{ color: '#888' }}>
-          WhatsApp:{' '}
-          <a href={`https://wa.me/${APP_CONFIG.WHATSAPP_NUMBER}`}
-            className="underline" style={{ color: '#25d366' }}>
-            {APP_CONFIG.WHATSAPP_DISPLAY}
-          </a>
-          {' · '}
-          <a href={`https://wa.me/${APP_CONFIG.WHATSAPP_NUMBER2}`}
-            className="underline" style={{ color: '#25d366' }}>
-            {APP_CONFIG.WHATSAPP_DISPLAY2}
-          </a>
-        </p>
-        <a href="/admin/login" className="block mt-4 text-xs" style={{ color: '#555' }}>Admin Login</a>
       </footer>
 
       {/* Sticky cart bar */}
       {cartCount > 0 && !showCart && !showOrderForm && !showSampleForm && (
         <div className="fixed bottom-0 left-0 right-0 z-30 p-3">
-          <div className="max-w-2xl mx-auto">
+          <div className="max-w-lg mx-auto">
             <button onClick={() => setShowCart(true)}
-              className="w-full flex items-center justify-between text-white font-semibold px-5 py-3.5 rounded-2xl shadow-lg"
-              style={{ background: '#c45c00' }}>
-              <span className="bg-white/20 rounded-xl px-2 py-0.5 text-sm">{cartCount} item{cartCount > 1 ? 's' : ''}</span>
-              <span>View Cart</span>
-              <span className="font-bold">{formatCurrency(cartTotal)}</span>
+              className="w-full flex items-center justify-between text-white font-bold px-5 py-4 rounded-2xl shadow-2xl"
+              style={{ background: 'linear-gradient(90deg, #7b1500 0%, #c45c00 100%)', boxShadow: '0 8px 24px rgba(196,92,0,0.5)' }}>
+              <span className="flex items-center gap-2">
+                <span className="bg-yellow-400 text-yellow-900 rounded-xl px-2.5 py-0.5 text-sm font-bold">{cartCount}</span>
+                <span className="text-sm">item{cartCount > 1 ? 's' : ''} in cart</span>
+              </span>
+              <span className="text-sm">View Cart 🛒</span>
+              <span className="font-bold text-yellow-300">{formatCurrency(cartTotal)}</span>
             </button>
           </div>
         </div>

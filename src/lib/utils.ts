@@ -38,7 +38,9 @@ export function orderConfirmedToCustomer(order: Order): string {
   const items = order.items
     .map(i => `  • ${i.productName}: ${formatQuantity(i.quantity, i.unit)} = ₹${i.totalPrice}`)
     .join('\n');
-  return `🙏 *${BUSINESS_NAME}*
+  return `🙏 *Hare Krishna!* 🪷
+
+*${BUSINESS_NAME}*
 
 Hi *${order.customerName}*, your order is confirmed! 🎉
 
@@ -50,28 +52,35 @@ ${order.discount > 0 ? `\nDiscount: -₹${order.discount}` : ''}
 *Total: ₹${order.total}*
 ${order.type === 'sample' ? '\n✅ This is a *FREE SAMPLE* — no payment needed.' : `\n💳 Payment of ₹${order.total} due on delivery.`}
 
-We will notify you when your order is out for delivery.
+We will keep you updated on your order.
 Thank you for choosing ${BUSINESS_NAME}! 🌿`;
 }
 
 // Sent TO CUSTOMER when out for delivery
 export function outForDeliveryToCustomer(order: Order): string {
   const upiLink = buildUPILink(order.total, order.orderNumber);
-  return `🚚 *${BUSINESS_NAME}*
+  return `🙏 *Hare Krishna!* 🪷
 
-Hi *${order.customerName}*, your order is on the way!
+*${BUSINESS_NAME}*
+
+Hi *${order.customerName}*, your order is on the way! 🚀
 
 Order No: *#${order.orderNumber}*
-${order.type === 'sample' ? '\n✅ FREE SAMPLE — no payment needed.' : `\n💳 *Please keep ₹${order.total} ready.*
-UPI ID: \`${UPI_ID}\`
-Or pay here: ${upiLink}`}
+${order.type === 'sample' ? '\n✅ FREE SAMPLE — no payment needed.' : `\n💳 *Payment Due: ₹${order.total}*
 
-Our delivery person will reach you shortly. 🌿`;
+Pay via UPI:
+📲 UPI ID: \`${APP_CONFIG.UPI_ID}\`
+🔗 Pay directly: ${upiLink}`}
+
+Thank you for choosing ${BUSINESS_NAME}! 🌿
+_Pure • Fresh • Handcrafted with Love_ 🙏`;
 }
 
 // Sent TO CUSTOMER after delivery
 export function deliveredToCustomer(order: Order, feedbackUrl: string): string {
-  return `✅ *${BUSINESS_NAME}*
+  return `🙏 *Hare Krishna!* 🪷
+
+*${BUSINESS_NAME}*
 
 Hi *${order.customerName}*, your order has been delivered! 🎉
 
@@ -155,7 +164,10 @@ export function paymentReminderToCustomer(order: Order): string {
   const items = order.items
     .map(i => `  • ${i.productName}: ${formatQuantity(i.quantity, i.unit)} = ₹${i.totalPrice}`)
     .join('\n');
-  return `🙏 *${BUSINESS_NAME}*
+  const upiLink = buildUPILink(order.total, order.orderNumber);
+  return `🙏 *Hare Krishna!* 🪷
+
+*${BUSINESS_NAME}*
 
 Hi *${order.customerName}*, hope you're enjoying your order! 😊
 
@@ -166,9 +178,10 @@ ${items}${order.discount > 0 ? `\nDiscount: -₹${order.discount}` : ''}
 *Total Due: ₹${order.total}*
 
 You can pay via UPI:
-📲 *${APP_CONFIG.UPI_DISPLAY}*
+📲 UPI ID: \`${APP_CONFIG.UPI_ID}\`
+🔗 Pay directly: ${upiLink}
 
-Thank you so much! 🌿
+Thank you so much! 🙏
 _${BUSINESS_NAME} — Pure • Fresh • Handcrafted_`;
 }
 
