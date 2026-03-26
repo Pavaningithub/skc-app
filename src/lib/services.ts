@@ -72,10 +72,21 @@ export const stockService = {
     return snap.docs.map(d => ({ id: d.id, ...d.data() } as StockItem));
   },
   async upsert(item: Omit<StockItem, "id"> & { id?: string }): Promise<void> {
-    if (item.id) {
-      await updateDoc(doc(db, COLLECTIONS.STOCK, item.id), { ...item, updatedAt: now() });
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { id, ...data } = item;
+    if (id) {
+      // editing an existing entry by doc id
+      await updateDoc(doc(db, COLLECTIONS.STOCK, id), { ...data, updatedAt: now() });
     } else {
-      await addDoc(collection(db, COLLECTIONS.STOCK), { ...item, updatedAt: now() });
+      // adding — check if a doc already exists for this productId to avoid duplicates
+      const existing = await getDocs(
+        query(collection(db, COLLECTIONS.STOCK), where("productId", "==", item.productId))
+      );
+      if (!existing.empty) {
+        await updateDoc(doc(db, COLLECTIONS.STOCK, existing.docs[0].id), { ...data, updatedAt: now() });
+      } else {
+        await addDoc(collection(db, COLLECTIONS.STOCK), { ...data, updatedAt: now() });
+      }
     }
   },
   async deduct(productId: string, quantity: number): Promise<void> {

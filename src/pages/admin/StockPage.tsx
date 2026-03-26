@@ -18,9 +18,19 @@ export default function StockPage() {
   });
   const [saving, setSaving] = useState(false);
 
+  // derive unit from selected product
+  const selectedProduct = products.find(p => p.id === form.productId) ?? null;
+  const isPiece = selectedProduct?.unit === 'piece';
+
+  function defaultThreshold(product: Product | undefined) {
+    if (!product) return 500;
+    return product.unit === 'piece' ? 10 : 500;
+  }
+
   function openAdd() {
+    const first = products[0];
     setEditItem(null);
-    setForm({ productId: products[0]?.id || '', quantityAvailable: 0, lowStockThreshold: 500 });
+    setForm({ productId: first?.id || '', quantityAvailable: 0, lowStockThreshold: defaultThreshold(first) });
     setShowForm(true);
   }
 
@@ -121,7 +131,10 @@ export default function StockPage() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Product</label>
                 <select
-                  value={form.productId} onChange={e => setForm(f => ({ ...f, productId: e.target.value }))}
+                  value={form.productId} onChange={e => {
+                    const p = products.find(pr => pr.id === e.target.value);
+                    setForm(f => ({ ...f, productId: e.target.value, quantityAvailable: 0, lowStockThreshold: defaultThreshold(p) }));
+                  }}
                   disabled={!!editItem}
                   className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-orange-400 bg-white"
                 >
@@ -130,18 +143,25 @@ export default function StockPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Available Quantity (in grams / pieces)
+                  Available Quantity {isPiece ? '(pieces)' : '(grams)'}
                 </label>
-                <input
-                  type="number" min="0" value={form.quantityAvailable || ''}
-                  onChange={e => setForm(f => ({ ...f, quantityAvailable: parseFloat(e.target.value) || 0 }))}
-                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-orange-400"
-                />
-                <p className="text-xs text-gray-400 mt-1">Enter in grams (e.g. 1kg = 1000g) or pieces</p>
+                <div className="relative">
+                  <input
+                    type="number" min="0" value={form.quantityAvailable || ''}
+                    onChange={e => setForm(f => ({ ...f, quantityAvailable: parseFloat(e.target.value) || 0 }))}
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 pr-14 text-sm outline-none focus:border-orange-400"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-gray-400 pointer-events-none">
+                    {isPiece ? 'pcs' : 'g'}
+                  </span>
+                </div>
+                {!isPiece && (
+                  <p className="text-xs text-gray-400 mt-1">Tip: 1 kg = 1000 g</p>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Low Stock Alert Threshold (grams / pieces)
+                  Low Stock Alert Threshold {isPiece ? '(pieces)' : '(grams)'}
                 </label>
                 <input
                   type="number" min="0" value={form.lowStockThreshold || ''}
