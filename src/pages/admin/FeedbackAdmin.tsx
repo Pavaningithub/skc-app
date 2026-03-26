@@ -1,21 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Star } from 'lucide-react';
 import { feedbackService } from '../../lib/services';
+import { useRealtimeCollection } from '../../lib/useRealtimeCollection';
 import { formatDate } from '../../lib/utils';
 import type { Feedback } from '../../lib/types';
 
 export default function FeedbackAdmin() {
-  const [feedback, setFeedback] = useState<Feedback[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [feedback, loading] = useRealtimeCollection<Feedback>(feedbackService.subscribe.bind(feedbackService));
   const [tab, setTab] = useState<'all' | 'public' | 'private'>('all');
-
-  useEffect(() => { load(); }, []);
-
-  async function load() {
-    setLoading(true);
-    try { setFeedback(await feedbackService.getAll()); }
-    finally { setLoading(false); }
-  }
 
   const filtered = feedback.filter(f => {
     if (tab === 'public') return f.isPublic;

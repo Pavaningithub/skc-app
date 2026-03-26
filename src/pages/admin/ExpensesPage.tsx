@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Portal from '../../components/Portal';
 import { expensesService } from '../../lib/services';
+import { useRealtimeCollection } from '../../lib/useRealtimeCollection';
 import { formatCurrency, formatDate } from '../../lib/utils';
 import { EXPENSE_CATEGORY_LABELS } from '../../lib/constants';
 import type { Expense } from '../../lib/types';
@@ -13,8 +14,7 @@ const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov
 
 export default function ExpensesPage() {
   const now = new Date();
-  const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [allExpenses, loading] = useRealtimeCollection<Expense>(expensesService.subscribe.bind(expensesService));
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [year, setYear] = useState(now.getFullYear());
   const [showForm, setShowForm] = useState(false);
@@ -26,13 +26,10 @@ export default function ExpensesPage() {
     date: new Date().toISOString().slice(0, 10),
   });
 
-  useEffect(() => { load(); }, [month, year]);
-
-  async function load() {
-    setLoading(true);
-    try { setExpenses(await expensesService.getByMonth(year, month)); }
-    finally { setLoading(false); }
-  }
+  // Filter to selected month client-side (real-time)
+  const monthStart = new Date(year, month - 1, 1).toISOString();
+  const monthEnd = new Date(year, month, 0, 23, 59, 59).toISOString();
+  const expenses = allExpenses.filter(e => e.date >= monthStart && e.date <= monthEnd);
 
   async function handleSave() {
     if (!form.description.trim()) return toast.error('Description required');
@@ -47,7 +44,6 @@ export default function ExpensesPage() {
       toast.success('Expense added');
       setShowForm(false);
       setForm({ category: 'raw_material', description: '', amount: 0, date: new Date().toISOString().slice(0, 10) });
-      load();
     } finally { setSaving(false); }
   }
 
@@ -55,7 +51,6 @@ export default function ExpensesPage() {
     if (!confirm('Delete this expense?')) return;
     await expensesService.delete(id);
     toast.success('Deleted');
-    load();
   }
 
   const total = expenses.reduce((s, e) => s + e.amount, 0);
