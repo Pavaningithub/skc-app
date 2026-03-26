@@ -1,17 +1,18 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Plus } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Portal from '../../components/Portal';
 import { subscriptionsService, productsService, customersService, ordersService } from '../../lib/services';
+import { useRealtimeCollection } from '../../lib/useRealtimeCollection';
 import { formatCurrency, formatDate, generateOrderNumber } from '../../lib/utils';
 import { SUBSCRIPTION_DISCOUNTS } from '../../lib/constants';
 import type { Subscription, Product, OrderItem } from '../../lib/types';
 import type { SubscriptionDuration } from '../../lib/constants';
 
 export default function SubscriptionsPage() {
-  const [subs, setSubs] = useState<Subscription[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [subs, subsLoading] = useRealtimeCollection<Subscription>(subscriptionsService.subscribe.bind(subscriptionsService));
+  const [products, prodLoading] = useRealtimeCollection<Product>(productsService.subscribe.bind(productsService));
+  const loading = subsLoading || prodLoading;
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -24,17 +25,6 @@ export default function SubscriptionsPage() {
   });
   const [selectedProductId, setSelectedProductId] = useState('');
   const [selectedQty, setSelectedQty] = useState(100);
-
-  useEffect(() => { load(); }, []);
-
-  async function load() {
-    setLoading(true);
-    try {
-      const [s, p] = await Promise.all([subscriptionsService.getAll(), productsService.getActive()]);
-      setSubs(s); setProducts(p);
-      if (p.length > 0) setSelectedProductId(p[0].id);
-    } finally { setLoading(false); }
-  }
 
   function addItem() {
     const product = products.find(p => p.id === selectedProductId);
@@ -117,7 +107,6 @@ export default function SubscriptionsPage() {
 
       toast.success('Subscription created!');
       setShowForm(false);
-      load();
     } finally { setSaving(false); }
   }
 
@@ -195,7 +184,6 @@ export default function SubscriptionsPage() {
                   {sub.paymentStatus === 'pending' && (
                     <button onClick={async () => {
                       await subscriptionsService.update(sub.id, { paymentStatus: 'paid' });
-                      load();
                     }} className="text-xs bg-green-500 text-white px-3 py-1.5 rounded-lg hover:bg-green-600">
                       Mark Paid
                     </button>

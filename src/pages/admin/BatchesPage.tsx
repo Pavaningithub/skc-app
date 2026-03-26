@@ -1,16 +1,17 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Plus, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Portal from '../../components/Portal';
 import { batchesService, rawMaterialsService, productsService, expensesService } from '../../lib/services';
+import { useRealtimeCollection } from '../../lib/useRealtimeCollection';
 import { generateBatchNumber, formatCurrency, formatDate } from '../../lib/utils';
 import type { Batch, RawMaterial, Product } from '../../lib/types';
 
 export default function BatchesPage() {
-  const [batches, setBatches] = useState<Batch[]>([]);
-  const [rawMaterials, setRawMaterials] = useState<RawMaterial[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [batches, batchLoading] = useRealtimeCollection<Batch>(batchesService.subscribe.bind(batchesService));
+  const [rawMaterials, rmLoading] = useRealtimeCollection<RawMaterial>(rawMaterialsService.subscribe.bind(rawMaterialsService));
+  const [products, prodLoading] = useRealtimeCollection<Product>(productsService.subscribe.bind(productsService));
+  const loading = batchLoading || rmLoading || prodLoading;
   const [showForm, setShowForm] = useState(false);
   const [showRMForm, setShowRMForm] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -29,17 +30,6 @@ export default function BatchesPage() {
     name: '', unit: 'gram' as 'gram' | 'kg' | 'piece',
     currentStock: 0, costPerUnit: 0, lowStockThreshold: 500,
   });
-
-  useEffect(() => { load(); }, []);
-
-  async function load() {
-    setLoading(true);
-    try {
-      const [b, r, p] = await Promise.all([batchesService.getAll(), rawMaterialsService.getAll(), productsService.getAll()]);
-      setBatches(b); setRawMaterials(r); setProducts(p);
-      if (p.length > 0) setBatchForm(f => ({ ...f, productId: p[0].id }));
-    } finally { setLoading(false); }
-  }
 
   async function handleSaveBatch() {
     const product = products.find(p => p.id === batchForm.productId);
@@ -93,7 +83,6 @@ export default function BatchesPage() {
 
       toast.success('Batch recorded');
       setShowForm(false);
-      load();
     } finally { setSaving(false); }
   }
 
@@ -105,7 +94,6 @@ export default function BatchesPage() {
       toast.success('Raw material added');
       setShowRMForm(false);
       setRmForm({ name: '', unit: 'gram', currentStock: 0, costPerUnit: 0, lowStockThreshold: 500 });
-      load();
     } finally { setSaving(false); }
   }
 
