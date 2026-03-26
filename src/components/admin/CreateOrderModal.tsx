@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Minus, Trash2 } from 'lucide-react';
+import { Plus, Minus, Trash2, Tag } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { productsService, ordersService, customersService, stockService } from '../../lib/services';
 import { generateOrderNumber, buildAdminWhatsAppUrl, orderPlacedMessage } from '../../lib/utils';
@@ -23,6 +23,10 @@ export default function CreateOrderModal({ onClose, onCreated }: Props) {
   const [saving, setSaving] = useState(false);
   const [selectedProductId, setSelectedProductId] = useState('');
   const [selectedQty, setSelectedQty] = useState(100);
+  // discount
+  const [discountPercent, setDiscountPercent] = useState(0); // from customer standing discount
+  const [manualDiscount, setManualDiscount] = useState(0);   // overridden manually
+  const [customerDiscountLabel, setCustomerDiscountLabel] = useState(''); // label shown when auto-applied
 
   useEffect(() => {
     productsService.getActive().then(p => {
@@ -30,6 +34,27 @@ export default function CreateOrderModal({ onClose, onCreated }: Props) {
       if (p.length > 0) setSelectedProductId(p[0].id);
     });
   }, []);
+
+  // Auto-fill customer details + apply standing discount when a known WA number is entered
+  useEffect(() => {
+    const digits = customerWhatsapp.replace(/\D/g, '');
+    if (digits.length < 10) {
+      setCustomerDiscountLabel('');
+      return;
+    }
+    customersService.getByWhatsapp(digits).then(c => {
+      if (!c) { setCustomerDiscountLabel(''); return; }
+      if (!customerName) setCustomerName(c.name);
+      if (!customerPlace && c.place) setCustomerPlace(c.place);
+      if (c.discountPercent && c.discountPercent > 0) {
+        setDiscountPercent(c.discountPercent);
+        setCustomerDiscountLabel(`${c.discountPercent}% standing discount for ${c.name}`);
+      } else {
+        setDiscountPercent(0);
+        setCustomerDiscountLabel('');
+      }
+    });
+  }, [customerWhatsapp]);
 
   function addItem() {
     const product = products.find(p => p.id === selectedProductId);
@@ -69,7 +94,11 @@ export default function CreateOrderModal({ onClose, onCreated }: Props) {
 
   const subtotal = items.reduce((s, i) => s + i.totalPrice, 0);
   const isSample = orderType === 'sample';
-  const total = isSample ? 0 : subtotal;
+  // Effective discount: standing % takes priority; admin can also set manualDiscount
+  const effectiveDiscountAmt = isSample ? 0 : Math.round(
+    manualDiscount > 0 ? manualDiscount : subtotal * discountPercent / 100
+  );
+  const total = isSample ? 0 : Math.max(0, subtotal - effectiveDiscountAmt);
 
   async function handleSubmit() {
     if (!customerName.trim()) return toast.error('Customer name required');
@@ -104,7 +133,7 @@ export default function CreateOrderModal({ onClose, onCreated }: Props) {
         customerPlace: customerPlace.trim(),
         items,
         subtotal,
-        discount: 0,
+        discount: effectiveDiscountAmt,
         total,
         status: 'confirmed',
         paymentStatus: isSample ? 'na' : paymentStatus,
@@ -248,10 +277,44 @@ export default function CreateOrderModal({ onClose, onCreated }: Props) {
                   </button>
                 </div>
               ))}
-              <div className="border-t border-gray-100 px-4 py-3 bg-gray-50 flex justify-between">
-                <span className="font-semibold text-gray-700">{isSample ? 'Total (Sample - Free)' : 'Total'}</span>
-                <span className="font-bold text-lg text-orange-600">₹{total}</span>
+              <div className="border-t border-gray-100 px-4 py-3 bg-gray-50 space-y-1.5">
+                {customerDiscountLabel && (
+                  <div className="flex items-center gap-1.5 text-xs text-green-700 bg-green-50 rounded-lg px-2 py-1.5 mb-1">
+                    <Tag className="w-3 h-3" />
+                    <span>{customerDiscountLabel} — auto-applied below</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-sm text-gray-600">
+                  <span>Subtotal</span><span>₹{subtotal}</span>
+                </div>
+                {effectiveDiscountAmt > 0 && (
+                  <div className="flex justify-between text-sm text-green-600">
+                    <span>Discount {discountPercent > 0 && manualDiscount === 0 ? `(${discountPercent}%)` : ''}</span>
+                    <span>−₹{effectiveDiscountAmt}</span>
+                  </div>
+                )}
+                <div className="flex justify-between font-semibold text-gray-700 border-t border-gray-100 pt-1.5">
+                  <span>{isSample ? 'Total (Sample - Free)' : 'Total'}</span>
+                  <span className="text-lg text-orange-600">₹{total}</span>
+                </div>
               </div>
+            </div>
+          )}
+
+          {/* Manual discount override */}
+          {!isSample && items.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1">
+                <Tag className="w-3.5 h-3.5 text-green-600" /> Manual Discount (₹)
+                {discountPercent > 0 && manualDiscount === 0 && (
+                  <span className="text-xs text-green-600 ml-1">(auto: {discountPercent}% = ₹{Math.round(subtotal * discountPercent / 100)})</span>
+                )}
+              </label>
+              <input type="number" min="0" step="1"
+                value={manualDiscount || ''}
+                onChange={e => setManualDiscount(Math.max(0, Number(e.target.value)))}
+                placeholder={discountPercent > 0 ? `Leave blank for ${discountPercent}% auto-discount` : 'e.g. 50'}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-orange-400" />
             </div>
           )}
 

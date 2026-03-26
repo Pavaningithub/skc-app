@@ -101,6 +101,7 @@ export interface Customer {
   totalSpent: number;
   pendingAmount: number;
   joinedWhatsappGroup: boolean;
+  discountPercent?: number;       // standing discount % for close family/friends (applied to all future orders)
   createdAt: string;
 }
 
