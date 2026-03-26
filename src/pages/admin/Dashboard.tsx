@@ -1,89 +1,64 @@
-import { useEffect, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ShoppingBag, AlertTriangle, CreditCard, TrendingUp, TrendingDown, Users, ArrowRight } from 'lucide-react';
+import {
+  ShoppingBag, AlertTriangle, CreditCard, TrendingUp, TrendingDown,
+  Users, ArrowRight, Clock, MessageCircle, ChevronDown, ChevronUp, CheckCircle2,
+} from 'lucide-react';
 import { ordersService, stockService, customersService, expensesService } from '../../lib/services';
-import { formatCurrency, formatDate } from '../../lib/utils';
-import type { Order, StockItem } from '../../lib/types';
+import { useRealtimeCollection } from '../../lib/useRealtimeCollection';
+import { formatCurrency, formatDate, formatDateTime, buildCustomerWhatsAppUrl, paymentReminderToCustomer } from '../../lib/utils';
+import type { Order, StockItem, Customer, Expense } from '../../lib/types';
 
-interface Stats {
-  pendingOrders: number;
-  pendingPaymentAmount: number;
-  lowStockCount: number;
-  monthlyRevenue: number;
-  monthlyExpenses: number;
-  totalCustomers: number;
+const OVERDUE_DAYS = 3;
+
+function daysSince(dateStr: string): number {
+  return Math.floor((Date.now() - new Date(dateStr).getTime()) / (1000 * 60 * 60 * 24));
 }
 
 export default function Dashboard() {
-  const [stats, setStats] = useState<Stats>({
-    pendingOrders: 0, pendingPaymentAmount: 0, lowStockCount: 0,
-    monthlyRevenue: 0, monthlyExpenses: 0, totalCustomers: 0,
-  });
-  const [recentOrders, setRecentOrders] = useState<Order[]>([]);
-  const [lowStockItems, setLowStockItems] = useState<StockItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [orders, ordersLoading]       = useRealtimeCollection<Order>(ordersService.subscribe.bind(ordersService));
+  const [stock, stockLoading]         = useRealtimeCollection<StockItem>(stockService.subscribe.bind(stockService));
+  const [customers, customersLoading] = useRealtimeCollection<Customer>(customersService.subscribe.bind(customersService));
+  const [expenses, expensesLoading]   = useRealtimeCollection<Expense>(expensesService.subscribe.bind(expensesService));
+  const loading = ordersLoading || stockLoading || customersLoading || expensesLoading;
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  const [showAllOverdue, setShowAllOverdue] = useState(false);
+  const [reminderSent, setReminderSent] = useState<Set<string>>(new Set());
 
-  async function loadData() {
-    try {
-      const [orders, stock, customers, expenses] = await Promise.all([
-        ordersService.getAll(),
-        stockService.getLowStock(),
-        customersService.getAll(),
-        expensesService.getAll(),
-      ]);
+  const { stats, recentOrders, lowStockItems, overdueOrders, allPendingPayment } = useMemo(() => {
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    const monthEnd   = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).toISOString();
 
-      const now = new Date();
-      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-      const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).toISOString();
+    const pendingOrders  = orders.filter(o => ['pending', 'confirmed'].includes(o.status));
+    const allPendingPay  = orders.filter(o => o.paymentStatus === 'pending' && o.total > 0);
+    const overdue        = allPendingPay
+      .filter(o => daysSince(o.createdAt) >= OVERDUE_DAYS)
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    const monthOrders    = orders.filter(o => o.createdAt >= monthStart && o.createdAt <= monthEnd && o.status !== 'cancelled');
+    const monthExpenses  = expenses.filter(e => e.date >= monthStart && e.date <= monthEnd);
+    const lowStock       = stock.filter(s => s.quantityAvailable <= s.lowStockThreshold);
 
-      const pendingOrders = orders.filter(o => ['pending', 'confirmed'].includes(o.status));
-      const pendingPayment = orders.filter(o => o.paymentStatus === 'pending' && o.total > 0);
-      const monthOrders = orders.filter(o => o.createdAt >= monthStart && o.createdAt <= monthEnd && o.status !== 'cancelled');
-      const monthExpenses = expenses.filter(e => e.date >= monthStart && e.date <= monthEnd);
-
-      setStats({
-        pendingOrders: pendingOrders.length,
-        pendingPaymentAmount: pendingPayment.reduce((s, o) => s + o.total, 0),
-        lowStockCount: stock.length,
-        monthlyRevenue: monthOrders.reduce((s, o) => s + o.total, 0),
-        monthlyExpenses: monthExpenses.reduce((s, e) => s + e.amount, 0),
-        totalCustomers: customers.length,
-      });
-      setRecentOrders(orders.slice(0, 5));
-      setLowStockItems(stock);
-    } finally {
-      setLoading(false);
-    }
-  }
+    return {
+      stats: {
+        pendingOrders:        pendingOrders.length,
+        pendingPaymentAmount: allPendingPay.reduce((s, o) => s + o.total, 0),
+        overdueCount:         overdue.length,
+        lowStockCount:        lowStock.length,
+        monthlyRevenue:       monthOrders.reduce((s, o) => s + o.total, 0),
+        monthlyExpenses:      monthExpenses.reduce((s, e) => s + e.amount, 0),
+        totalCustomers:       customers.length,
+        totalOrdersMonth:     monthOrders.length,
+      },
+      recentOrders:      orders.slice(0, 5),
+      lowStockItems:     lowStock,
+      overdueOrders:     overdue,
+      allPendingPayment: allPendingPay,
+    };
+  }, [orders, stock, customers, expenses]);
 
   const profit = stats.monthlyRevenue - stats.monthlyExpenses;
-
-  const cards = [
-    {
-      title: 'Pending Orders', value: stats.pendingOrders, icon: ShoppingBag,
-      color: 'text-yellow-600', bg: 'bg-yellow-50', border: 'border-yellow-200',
-      link: '/admin/orders',
-    },
-    {
-      title: 'Payment Pending', value: formatCurrency(stats.pendingPaymentAmount),
-      icon: CreditCard, color: 'text-red-600', bg: 'bg-red-50', border: 'border-red-200',
-      link: '/admin/orders',
-    },
-    {
-      title: 'Low Stock Items', value: stats.lowStockCount, icon: AlertTriangle,
-      color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-200',
-      link: '/admin/stock',
-    },
-    {
-      title: 'Total Customers', value: stats.totalCustomers, icon: Users,
-      color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-200',
-      link: '/admin/customers',
-    },
-  ];
+  const visibleOverdue = showAllOverdue ? overdueOrders : overdueOrders.slice(0, 3);
 
   if (loading) {
     return (
@@ -91,9 +66,7 @@ export default function Dashboard() {
         <div className="w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full animate-spin" />
       </div>
     );
-  }
-
-  return (
+  }  return (
     <div className="p-4 md:p-6 space-y-6 animate-fade-in">
       <div>
         <h1 className="text-2xl font-bold text-gray-800 font-display">Dashboard</h1>
@@ -102,44 +75,198 @@ export default function Dashboard() {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        {cards.map(card => (
-          <Link key={card.title} to={card.link}
-            className={`bg-white rounded-xl border ${card.border} p-4 hover:shadow-md transition-shadow`}>
-            <div className={`w-9 h-9 ${card.bg} rounded-lg flex items-center justify-center mb-3`}>
-              <card.icon className={`w-5 h-5 ${card.color}`} />
-            </div>
-            <p className="text-2xl font-bold text-gray-800">{card.value}</p>
-            <p className="text-xs text-gray-500 mt-0.5">{card.title}</p>
-          </Link>
-        ))}
+        <Link to="/admin/orders"
+          className="bg-white rounded-xl border border-yellow-200 p-4 hover:shadow-md transition-shadow">
+          <div className="w-9 h-9 bg-yellow-50 rounded-lg flex items-center justify-center mb-3">
+            <ShoppingBag className="w-5 h-5 text-yellow-600" />
+          </div>
+          <p className="text-2xl font-bold text-gray-800">{stats.pendingOrders}</p>
+          <p className="text-xs text-gray-500 mt-0.5">Pending Orders</p>
+        </Link>
+
+        <Link to="/admin/orders"
+          className={`bg-white rounded-xl border p-4 hover:shadow-md transition-shadow ${stats.overdueCount > 0 ? 'border-red-300 bg-red-50' : 'border-red-200'}`}>
+          <div className="w-9 h-9 bg-red-100 rounded-lg flex items-center justify-center mb-3">
+            <CreditCard className="w-5 h-5 text-red-600" />
+          </div>
+          <p className="text-2xl font-bold text-gray-800">{formatCurrency(stats.pendingPaymentAmount)}</p>
+          <p className="text-xs text-gray-500 mt-0.5">Payment Pending</p>
+          {stats.overdueCount > 0 && (
+            <p className="text-xs text-red-600 font-semibold mt-1 flex items-center gap-1">
+              <Clock className="w-3 h-3" /> {stats.overdueCount} overdue {OVERDUE_DAYS}+ days
+            </p>
+          )}
+        </Link>
+
+        <Link to="/admin/stock"
+          className="bg-white rounded-xl border border-orange-200 p-4 hover:shadow-md transition-shadow">
+          <div className="w-9 h-9 bg-orange-50 rounded-lg flex items-center justify-center mb-3">
+            <AlertTriangle className="w-5 h-5 text-orange-600" />
+          </div>
+          <p className="text-2xl font-bold text-gray-800">{stats.lowStockCount}</p>
+          <p className="text-xs text-gray-500 mt-0.5">Low Stock Items</p>
+        </Link>
+
+        <Link to="/admin/customers"
+          className="bg-white rounded-xl border border-blue-200 p-4 hover:shadow-md transition-shadow">
+          <div className="w-9 h-9 bg-blue-50 rounded-lg flex items-center justify-center mb-3">
+            <Users className="w-5 h-5 text-blue-600" />
+          </div>
+          <p className="text-2xl font-bold text-gray-800">{stats.totalCustomers}</p>
+          <p className="text-xs text-gray-500 mt-0.5">Total Customers</p>
+        </Link>
       </div>
 
       {/* Monthly P&L */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <div className="bg-white rounded-xl border border-green-200 p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <TrendingUp className="w-5 h-5 text-green-500" />
-            <span className="text-sm font-medium text-gray-600">This Month Revenue</span>
+          <div className="flex items-center gap-2 mb-1">
+            <TrendingUp className="w-4 h-4 text-green-500" />
+            <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Revenue this month</span>
           </div>
           <p className="text-2xl font-bold text-green-600">{formatCurrency(stats.monthlyRevenue)}</p>
+          <p className="text-xs text-gray-400 mt-0.5">{stats.totalOrdersMonth} orders</p>
         </div>
         <div className="bg-white rounded-xl border border-red-200 p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <TrendingDown className="w-5 h-5 text-red-500" />
-            <span className="text-sm font-medium text-gray-600">This Month Expenses</span>
+          <div className="flex items-center gap-2 mb-1">
+            <TrendingDown className="w-4 h-4 text-red-500" />
+            <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Expenses this month</span>
           </div>
           <p className="text-2xl font-bold text-red-600">{formatCurrency(stats.monthlyExpenses)}</p>
         </div>
         <div className={`rounded-xl border p-4 ${profit >= 0 ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'}`}>
-          <div className="flex items-center gap-2 mb-2">
-            <TrendingUp className={`w-5 h-5 ${profit >= 0 ? 'text-emerald-500' : 'text-red-500'}`} />
-            <span className="text-sm font-medium text-gray-600">Net Profit</span>
+          <div className="flex items-center gap-2 mb-1">
+            <TrendingUp className={`w-4 h-4 ${profit >= 0 ? 'text-emerald-500' : 'text-red-500'}`} />
+            <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Net Profit</span>
           </div>
           <p className={`text-2xl font-bold ${profit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
             {formatCurrency(profit)}
           </p>
+          {stats.monthlyRevenue > 0 && (
+            <p className="text-xs text-gray-400 mt-0.5">
+              {((profit / stats.monthlyRevenue) * 100).toFixed(1)}% margin
+            </p>
+          )}
         </div>
       </div>
+
+      {/* Payment Overdue — 3+ days */}
+      {overdueOrders.length > 0 && (
+        <div className="bg-white rounded-xl border border-red-200 overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 bg-red-50 border-b border-red-100">
+            <div className="flex items-center gap-2">
+              <Clock className="w-4 h-4 text-red-500" />
+              <h2 className="font-semibold text-red-800 text-sm">
+                Payment Overdue ({OVERDUE_DAYS}+ days) — {overdueOrders.length} order{overdueOrders.length !== 1 ? 's' : ''}
+              </h2>
+            </div>
+            <span className="text-sm font-bold text-red-600">
+              {formatCurrency(overdueOrders.reduce((s, o) => s + o.total, 0))}
+            </span>
+          </div>
+          <div className="divide-y divide-gray-50">
+            {visibleOverdue.map(order => {
+              const days = daysSince(order.createdAt);
+              const sent = reminderSent.has(order.id);
+              const waUrl = buildCustomerWhatsAppUrl(order.customerWhatsapp, paymentReminderToCustomer(order));
+              return (
+                <div key={order.id} className="flex items-center gap-3 px-4 py-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Link to={`/admin/orders/${order.id}`}
+                        className="text-sm font-semibold text-gray-800 hover:text-orange-500 transition-colors">
+                        #{order.orderNumber}
+                      </Link>
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium
+                        ${days >= 7 ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700'}`}>
+                        {days}d overdue
+                      </span>
+                      {sent && (
+                        <span className="text-xs text-green-600 flex items-center gap-0.5">
+                          <CheckCircle2 className="w-3 h-3" /> Reminded
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      {order.customerName} · 📱 {order.customerWhatsapp}
+                      {order.customerPlace ? ` · 📍 ${order.customerPlace}` : ''}
+                    </p>
+                    <p className="text-xs text-gray-400">{formatDateTime(order.createdAt)}</p>
+                  </div>
+                  <div className="text-right flex-shrink-0 space-y-1.5">
+                    <p className="font-bold text-gray-800">{formatCurrency(order.total)}</p>
+                    <a href={waUrl} target="_blank" rel="noreferrer"
+                      onClick={() => setReminderSent(prev => new Set(prev).add(order.id))}
+                      className={`flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors
+                        ${sent
+                          ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                          : 'bg-green-500 text-white hover:bg-green-600'}`}>
+                      <MessageCircle className="w-3 h-3" />
+                      {sent ? 'Resend' : 'Remind'}
+                    </a>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {overdueOrders.length > 3 && (
+            <button onClick={() => setShowAllOverdue(v => !v)}
+              className="w-full flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium text-gray-500 hover:bg-gray-50 border-t border-gray-100 transition-colors">
+              {showAllOverdue
+                ? <><ChevronUp className="w-3.5 h-3.5" /> Show less</>
+                : <><ChevronDown className="w-3.5 h-3.5" /> Show {overdueOrders.length - 3} more</>}
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Awaiting payment — within 3 days */}
+      {allPendingPayment.filter(o => daysSince(o.createdAt) < OVERDUE_DAYS).length > 0 && (
+        <div className="bg-white rounded-xl border border-amber-200 overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-amber-100">
+            <h2 className="font-semibold text-gray-800 text-sm flex items-center gap-2">
+              <CreditCard className="w-4 h-4 text-amber-500" />
+              Awaiting Payment
+              <span className="text-xs text-gray-400 font-normal">(within {OVERDUE_DAYS} days)</span>
+            </h2>
+            <span className="text-sm font-bold text-amber-700">
+              {formatCurrency(allPendingPayment.filter(o => daysSince(o.createdAt) < OVERDUE_DAYS).reduce((s, o) => s + o.total, 0))}
+            </span>
+          </div>
+          <div className="divide-y divide-gray-50">
+            {allPendingPayment
+              .filter(o => daysSince(o.createdAt) < OVERDUE_DAYS)
+              .map(order => {
+                const waUrl = buildCustomerWhatsAppUrl(order.customerWhatsapp, paymentReminderToCustomer(order));
+                const sent = reminderSent.has(order.id);
+                return (
+                  <div key={order.id} className="flex items-center justify-between px-4 py-2.5 gap-3">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <Link to={`/admin/orders/${order.id}`}
+                          className="text-sm font-medium text-gray-800 hover:text-orange-500">
+                          #{order.orderNumber}
+                        </Link>
+                        <span className="text-xs text-gray-400">{daysSince(order.createdAt)}d ago</span>
+                        {sent && <span className="text-xs text-green-600 flex items-center gap-0.5"><CheckCircle2 className="w-3 h-3" /> Reminded</span>}
+                      </div>
+                      <p className="text-xs text-gray-500 truncate">{order.customerName}</p>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <span className="text-sm font-bold text-gray-800">{formatCurrency(order.total)}</span>
+                      <a href={waUrl} target="_blank" rel="noreferrer"
+                        onClick={() => setReminderSent(prev => new Set(prev).add(order.id))}
+                        className="border border-green-300 text-green-600 hover:bg-green-50 px-2 py-1 rounded-lg text-xs font-medium transition-colors flex items-center gap-1">
+                        <MessageCircle className="w-3 h-3" />
+                        {sent ? 'Resend' : 'Remind'}
+                      </a>
+                    </div>
+                  </div>
+                );
+              })}
+          </div>
+        </div>
+      )}
 
       {/* Recent Orders + Low Stock */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -191,8 +318,7 @@ export default function Dashboard() {
               <div key={item.id} className="flex items-center justify-between px-4 py-3">
                 <div>
                   <p className="text-sm font-medium text-gray-800">{item.productName}</p>
-                  <p className="text-xs text-gray-500">Threshold: {item.lowStockThreshold}
-                    {item.unit === 'piece' ? ' pcs' : 'g'}</p>
+                  <p className="text-xs text-gray-500">Threshold: {item.lowStockThreshold}{item.unit === 'piece' ? ' pcs' : 'g'}</p>
                 </div>
                 <span className="text-sm font-bold text-red-600">
                   {item.quantityAvailable}{item.unit === 'piece' ? ' pcs' : 'g'} left
