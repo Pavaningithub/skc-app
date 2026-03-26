@@ -7,7 +7,7 @@ import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { db } from "./firebase";
 import type {
   Product, StockItem, RawMaterial, RawMaterialPurchase,
-  Batch, Customer, Order, Expense, Subscription, Feedback,
+  Batch, Customer, Order, Expense, Subscription, Feedback, AdminAction, AdminActionType,
 } from "./types";
 
 // ─── Collection Names ─────────────────────────────────────────────────────────
@@ -23,6 +23,7 @@ export const COLLECTIONS = {
   SUBSCRIPTIONS:         "subscriptions",
   FEEDBACK:              "feedback",
   SETTINGS:              "settings",
+  ADMIN_ACTIVITY:        "adminActivity",
 } as const;
 
 function now() { return new Date().toISOString(); }
@@ -381,5 +382,36 @@ export const settingsService = {
   },
   async setPin(pin: string): Promise<void> {
     await setDoc(doc(db, COLLECTIONS.SETTINGS, "admin"), { pin }, { merge: true });
+  },
+};
+
+// ─── Admin Activity Log ───────────────────────────────────────────────────────
+export const activityService = {
+  async log(
+    type: AdminActionType,
+    label: string,
+    entityId?: string,
+    entityLabel?: string,
+  ): Promise<void> {
+    await addDoc(collection(db, COLLECTIONS.ADMIN_ACTIVITY), {
+      type,
+      label,
+      entityId: entityId ?? null,
+      entityLabel: entityLabel ?? null,
+      createdAt: now(),
+    });
+  },
+  subscribe(cb: (items: AdminAction[]) => void): Unsubscribe {
+    // order by createdAt desc, last 50 docs
+    return onSnapshot(
+      query(collection(db, COLLECTIONS.ADMIN_ACTIVITY)),
+      snap => {
+        const items = snap.docs
+          .map(d => ({ id: d.id, ...d.data() } as AdminAction))
+          .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+          .slice(0, 50);
+        cb(items);
+      },
+    );
   },
 };

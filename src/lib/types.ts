@@ -190,7 +190,30 @@ export interface Feedback {
   createdAt: string;
 }
 
-// ─── Dashboard Stats ─────────────────────────────────────────────────────────
+// ─── Admin Activity Log ──────────────────────────────────────────────────────
+export type AdminActionType =
+  | 'order_created'
+  | 'order_status_changed'
+  | 'payment_marked'
+  | 'order_edited'
+  | 'order_cancelled'
+  | 'order_deleted'
+  | 'payment_reminder_sent'
+  | 'stock_updated'
+  | 'customer_updated'
+  | 'expense_added'
+  | 'batch_recorded';
+
+export interface AdminAction {
+  id: string;
+  type: AdminActionType;
+  label: string;          // human-readable summary
+  entityId?: string;      // orderId / customerId / etc.
+  entityLabel?: string;   // e.g. order number or customer name
+  createdAt: string;
+}
+
+// ─── Dashboard Stats ──────────────────────────────────────────────────────────
 export interface DashboardStats {
   pendingOrders: number;
   pendingPayments: number;

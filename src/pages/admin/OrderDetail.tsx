@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, MessageCircle, ChevronDown, ChevronUp, TrendingUp, Trash2, XCircle, Pencil, Plus, Minus, Tag } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { ordersService, productsService, customersService } from '../../lib/services';
+import { ordersService, productsService, customersService, activityService } from '../../lib/services';
 import {
   formatCurrency, formatDateTime, buildCustomerWhatsAppUrl,
   orderConfirmedToCustomer, outForDeliveryToCustomer, deliveredToCustomer,
@@ -117,6 +117,7 @@ export default function OrderDetail() {
         await customersService.adjustAfterOrderEdit(order.customerId, oldTotal, newTotal, order.paymentStatus);
       }
       toast.success('Order updated ✅');
+      activityService.log('order_edited', `Order #${order.orderNumber} edited — new total ₹${newTotal}`, order.id, order.orderNumber);
       setShowEdit(false);
       load();
     } catch (e) {
@@ -130,6 +131,7 @@ export default function OrderDetail() {
     if (!order) return;
     await ordersService.updateStatus(order.id, status);
     toast.success(`Status → ${ORDER_STATUS_LABELS[status]}`);
+    activityService.log('order_status_changed', `#${order.orderNumber} status → ${ORDER_STATUS_LABELS[status]} (${order.customerName})`, order.id, order.orderNumber);
     setLastStatusChanged(status);
     load();
   }
@@ -138,6 +140,7 @@ export default function OrderDetail() {
     if (!order) return;
     await ordersService.updatePayment(order.id, 'paid');
     toast.success('Marked as paid');
+    activityService.log('payment_marked', `Payment marked as paid for #${order.orderNumber} (${order.customerName}) ₹${order.total}`, order.id, order.orderNumber);
     load();
   }
 
@@ -145,6 +148,7 @@ export default function OrderDetail() {
     if (!order) return;
     await ordersService.updateStatus(order.id, 'cancelled');
     toast.success('Order cancelled');
+    activityService.log('order_cancelled', `Order #${order.orderNumber} cancelled (${order.customerName})`, order.id, order.orderNumber);
     setConfirm(null);
     setLastStatusChanged('cancelled');
     load();
@@ -154,6 +158,7 @@ export default function OrderDetail() {
     if (!order) return;
     await ordersService.delete(order.id);
     toast.success('Order deleted');
+    activityService.log('order_deleted', `Order #${order.orderNumber} deleted (${order.customerName})`, order.id, order.orderNumber);
     navigate('/admin/orders');
   }
 
