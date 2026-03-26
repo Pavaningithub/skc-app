@@ -22,30 +22,30 @@ jobs:
 
       - name: Build
         env:
-          VITE_FIREBASE_API_KEY:               ${{ secrets.VITE_FIREBASE_API_KEY }}
-          VITE_FIREBASE_AUTH_DOMAIN:           ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
-          VITE_FIREBASE_PROJECT_ID:            ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
-          VITE_FIREBASE_STORAGE_BUCKET:        ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
-          VITE_FIREBASE_MESSAGING_SENDER_ID:   ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
-          VITE_FIREBASE_APP_ID:                ${{ secrets.VITE_FIREBASE_APP_ID }}
-          VITE_WHATSAPP_NUMBER:                ${{ secrets.VITE_WHATSAPP_NUMBER }}
-          VITE_WHATSAPP_DISPLAY:               ${{ secrets.VITE_WHATSAPP_DISPLAY }}
-          VITE_WHATSAPP_NUMBER2:               ${{ secrets.VITE_WHATSAPP_NUMBER2 }}
-          VITE_WHATSAPP_DISPLAY2:              ${{ secrets.VITE_WHATSAPP_DISPLAY2 }}
-          VITE_UPI_ID:                         ${{ secrets.VITE_UPI_ID }}
-          VITE_UPI_NUMBER:                     ${{ secrets.VITE_UPI_NUMBER }}
-          VITE_UPI_DISPLAY:                    ${{ secrets.VITE_UPI_DISPLAY }}
-          VITE_ADMIN_PIN:                      ${{ secrets.VITE_ADMIN_PIN }}
-          VITE_WA_GROUP_LINK:                  ${{ secrets.VITE_WA_GROUP_LINK }}
-          VITE_WA_CHANNEL_LINK:                ${{ secrets.VITE_WA_CHANNEL_LINK }}
-          VITE_WA_TRACKING_LINK:               ${{ secrets.VITE_WA_TRACKING_LINK }}
+          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+          VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+          VITE_WHATSAPP_NUMBER: ${{ secrets.VITE_WHATSAPP_NUMBER }}
+          VITE_WHATSAPP_DISPLAY: ${{ secrets.VITE_WHATSAPP_DISPLAY }}
+          VITE_WHATSAPP_NUMBER2: ${{ secrets.VITE_WHATSAPP_NUMBER2 }}
+          VITE_WHATSAPP_DISPLAY2: ${{ secrets.VITE_WHATSAPP_DISPLAY2 }}
+          VITE_UPI_ID: ${{ secrets.VITE_UPI_ID }}
+          VITE_UPI_NUMBER: ${{ secrets.VITE_UPI_NUMBER }}
+          VITE_UPI_DISPLAY: ${{ secrets.VITE_UPI_DISPLAY }}
+          VITE_ADMIN_PIN: ${{ secrets.VITE_ADMIN_PIN }}
+          VITE_WA_GROUP_LINK: ${{ secrets.VITE_WA_GROUP_LINK }}
+          VITE_WA_CHANNEL_LINK: ${{ secrets.VITE_WA_CHANNEL_LINK }}
+          VITE_WA_TRACKING_LINK: ${{ secrets.VITE_WA_TRACKING_LINK }}
         run: npm run build
 
       - name: Deploy to Vercel (Production)
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         env:
-          VERCEL_TOKEN:   ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID:  ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
         run: |
           npm i -g vercel
