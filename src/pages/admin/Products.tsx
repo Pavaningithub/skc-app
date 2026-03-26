@@ -182,36 +182,40 @@ export default function Products() {
           )}
           {filtered.map(p => (
             <div key={p.id}
-              className={`bg-white rounded-xl border p-4 flex items-center gap-4 transition-all
+              className={`bg-white rounded-xl border p-4 flex flex-col gap-2 transition-all
                 ${p.isActive ? 'border-gray-200' : 'border-gray-100 opacity-60'}`}>
-              <div className="flex-1 min-w-0">
+              {/* Top: name + badges + description */}
+              <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <h3 className="font-semibold text-gray-800">{p.name}</h3>
                   <span className="text-xs bg-orange-50 text-orange-600 px-2 py-0.5 rounded-full">{p.category}</span>
                   {!p.isActive && <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">Inactive</span>}
                 </div>
-                {p.description && <p className="text-sm text-gray-500 mt-0.5 truncate">{p.description}</p>}
-                <p className="text-sm font-bold text-orange-600 mt-1">
+                {p.description && <p className="text-sm text-gray-500 mt-0.5">{p.description}</p>}
+              </div>
+              {/* Bottom: price left, actions right */}
+              <div className="flex items-center justify-between gap-2 pt-1 border-t border-gray-50">
+                <p className="text-sm font-bold text-orange-600">
                   {formatCurrency(p.pricePerUnit)} {priceLabel(p.unit)}
                   <span className="text-xs font-normal text-gray-400 ml-1">({UNIT_LABELS[p.unit]})</span>
                 </p>
-              </div>
-              <div className="flex items-center gap-1 flex-shrink-0">
-                <button onClick={() => toggleActive(p)}
-                  className="p-2 rounded-lg hover:bg-gray-100 transition-colors" title={p.isActive ? 'Deactivate' : 'Activate'}>
-                  {p.isActive
-                    ? <ToggleRight className="w-5 h-5 text-green-500" />
-                    : <ToggleLeft className="w-5 h-5 text-gray-400" />
-                  }
-                </button>
-                <button onClick={() => openEdit(p)}
-                  className="p-2 rounded-lg hover:bg-blue-50 transition-colors">
-                  <Pencil className="w-4 h-4 text-blue-500" />
-                </button>
-                <button onClick={() => handleDelete(p)}
-                  className="p-2 rounded-lg hover:bg-red-50 transition-colors">
-                  <Trash2 className="w-4 h-4 text-red-500" />
-                </button>
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  <button onClick={() => toggleActive(p)}
+                    className="p-2 rounded-lg hover:bg-gray-100 transition-colors" title={p.isActive ? 'Deactivate' : 'Activate'}>
+                    {p.isActive
+                      ? <ToggleRight className="w-5 h-5 text-green-500" />
+                      : <ToggleLeft className="w-5 h-5 text-gray-400" />
+                    }
+                  </button>
+                  <button onClick={() => openEdit(p)}
+                    className="p-2 rounded-lg hover:bg-blue-50 transition-colors">
+                    <Pencil className="w-4 h-4 text-blue-500" />
+                  </button>
+                  <button onClick={() => handleDelete(p)}
+                    className="p-2 rounded-lg hover:bg-red-50 transition-colors">
+                    <Trash2 className="w-4 h-4 text-red-500" />
+                  </button>
+                </div>
               </div>
             </div>
           ))}
