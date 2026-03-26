@@ -68,6 +68,7 @@ export const APP_CONFIG = {
     'Spices',
     'Pickles',
     'Snacks',
+    'Sweets',
     'Other',
   ],
 
