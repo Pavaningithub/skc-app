@@ -57,6 +57,12 @@ export const productsService = {
   async delete(id: string): Promise<void> {
     await deleteDoc(doc(db, COLLECTIONS.PRODUCTS, id));
   },
+  subscribe(cb: (items: Product[]) => void): Unsubscribe {
+    return onSnapshot(collection(db, COLLECTIONS.PRODUCTS), snap => {
+      const items = snap.docs.map(d => ({ id: d.id, ...d.data() } as Product));
+      cb(items.sort((a, b) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999) || a.name.localeCompare(b.name)));
+    });
+  },
 };
 
 // ─── Stock ────────────────────────────────────────────────────────────────────
@@ -87,6 +93,11 @@ export const stockService = {
     const all = await this.getAll();
     return all.filter(s => s.quantityAvailable <= s.lowStockThreshold);
   },
+  subscribe(cb: (items: StockItem[]) => void): Unsubscribe {
+    return onSnapshot(collection(db, COLLECTIONS.STOCK), snap => {
+      cb(snap.docs.map(d => ({ id: d.id, ...d.data() } as StockItem)));
+    });
+  },
 };
 
 // ─── Raw Materials ────────────────────────────────────────────────────────────
@@ -104,6 +115,11 @@ export const rawMaterialsService = {
   },
   async delete(id: string): Promise<void> {
     await deleteDoc(doc(db, COLLECTIONS.RAW_MATERIALS, id));
+  },
+  subscribe(cb: (items: RawMaterial[]) => void): Unsubscribe {
+    return onSnapshot(collection(db, COLLECTIONS.RAW_MATERIALS), snap => {
+      cb(snap.docs.map(d => ({ id: d.id, ...d.data() } as RawMaterial)));
+    });
   },
 };
 
@@ -139,6 +155,12 @@ export const batchesService = {
   },
   async delete(id: string): Promise<void> {
     await deleteDoc(doc(db, COLLECTIONS.BATCHES, id));
+  },
+  subscribe(cb: (items: Batch[]) => void): Unsubscribe {
+    return onSnapshot(collection(db, COLLECTIONS.BATCHES), snap => {
+      const items = snap.docs.map(d => ({ id: d.id, ...d.data() } as Batch));
+      cb(items.sort((a, b) => b.date.localeCompare(a.date)));
+    });
   },
 };
 
@@ -177,6 +199,30 @@ export const customersService = {
       pendingAmount: paymentStatus === "pending" ? (c.pendingAmount || 0) + amount : (c.pendingAmount || 0),
     });
   },
+  // Adjust totals when an order's total changes (e.g. after edit).
+  // Recalculates from ALL orders for this customer so any prior drift is healed.
+  async adjustAfterOrderEdit(customerId: string, _oldTotal: number, _newTotal: number, _paymentStatus: string): Promise<void> {
+    const ordersSnap = await getDocs(
+      query(collection(db, COLLECTIONS.ORDERS), where("customerId", "==", customerId))
+    );
+    const orders = ordersSnap.docs.map(d => d.data() as Order);
+    const totalSpent = orders.reduce((s, o) => s + (o.total || 0), 0);
+    const pendingAmount = orders
+      .filter(o => o.paymentStatus === "pending")
+      .reduce((s, o) => s + (o.total || 0), 0);
+    const totalOrders = orders.length;
+    await updateDoc(doc(db, COLLECTIONS.CUSTOMERS, customerId), {
+      totalSpent: Math.max(0, totalSpent),
+      pendingAmount: Math.max(0, pendingAmount),
+      totalOrders,
+    });
+  },
+  subscribe(cb: (items: Customer[]) => void): Unsubscribe {
+    return onSnapshot(collection(db, COLLECTIONS.CUSTOMERS), snap => {
+      const items = snap.docs.map(d => ({ id: d.id, ...d.data() } as Customer));
+      cb(items.sort((a, b) => a.name.localeCompare(b.name)));
+    });
+  },
 };
 
 // ─── Orders ──────────────────────────────────────────────────────────────────
@@ -209,6 +255,13 @@ export const ordersService = {
   },
   async delete(id: string): Promise<void> {
     await deleteDoc(doc(db, COLLECTIONS.ORDERS, id));
+  },
+  // Real-time listener for all orders
+  subscribe(cb: (items: Order[]) => void): Unsubscribe {
+    return onSnapshot(collection(db, COLLECTIONS.ORDERS), snap => {
+      const items = snap.docs.map(d => ({ id: d.id, ...d.data() } as Order));
+      cb(items.sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
+    });
   },
   // Real-time listener: calls onNew(order) for every order created since subscribeTime
   subscribeToNewOrders(since: string, onNew: (order: Order) => void): Unsubscribe {
@@ -250,6 +303,12 @@ export const expensesService = {
   async delete(id: string): Promise<void> {
     await deleteDoc(doc(db, COLLECTIONS.EXPENSES, id));
   },
+  subscribe(cb: (items: Expense[]) => void): Unsubscribe {
+    return onSnapshot(collection(db, COLLECTIONS.EXPENSES), snap => {
+      const items = snap.docs.map(d => ({ id: d.id, ...d.data() } as Expense));
+      cb(items.sort((a, b) => b.date.localeCompare(a.date)));
+    });
+  },
 };
 
 // ─── Subscriptions ────────────────────────────────────────────────────────────
@@ -265,6 +324,12 @@ export const subscriptionsService = {
   },
   async update(id: string, data: Partial<Subscription>): Promise<void> {
     await updateDoc(doc(db, COLLECTIONS.SUBSCRIPTIONS, id), data);
+  },
+  subscribe(cb: (items: Subscription[]) => void): Unsubscribe {
+    return onSnapshot(collection(db, COLLECTIONS.SUBSCRIPTIONS), snap => {
+      const items = snap.docs.map(d => ({ id: d.id, ...d.data() } as Subscription));
+      cb(items.sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
+    });
   },
 };
 
@@ -287,6 +352,12 @@ export const feedbackService = {
     const snap = await getDocs(query(collection(db, COLLECTIONS.FEEDBACK), where("orderId", "==", orderId)));
     if (snap.empty) return null;
     return { id: snap.docs[0].id, ...snap.docs[0].data() } as Feedback;
+  },
+  subscribe(cb: (items: Feedback[]) => void): Unsubscribe {
+    return onSnapshot(collection(db, COLLECTIONS.FEEDBACK), snap => {
+      const items = snap.docs.map(d => ({ id: d.id, ...d.data() } as Feedback));
+      cb(items.sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
+    });
   },
 };
 
