@@ -11,8 +11,9 @@ import type { Order, StockItem, Customer, Expense } from '../../lib/types';
 
 const OVERDUE_DAYS = 3;
 
-function daysSince(dateStr: string): number {
-  return Math.floor((Date.now() - new Date(dateStr).getTime()) / (1000 * 60 * 60 * 24));
+function daysSince(order: { createdAt: string; deliveredAt?: string }): number {
+  const from = order.deliveredAt ?? order.createdAt;
+  return Math.floor((Date.now() - new Date(from).getTime()) / (1000 * 60 * 60 * 24));
 }
 
 export default function Dashboard() {
@@ -33,7 +34,7 @@ export default function Dashboard() {
     const pendingOrders  = orders.filter(o => ['pending', 'confirmed'].includes(o.status));
     const allPendingPay  = orders.filter(o => o.paymentStatus === 'pending' && o.total > 0);
     const overdue        = allPendingPay
-      .filter(o => daysSince(o.createdAt) >= OVERDUE_DAYS)
+      .filter(o => daysSince(o) >= OVERDUE_DAYS)
       .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
     const monthOrders    = orders.filter(o => o.createdAt >= monthStart && o.createdAt <= monthEnd && o.status !== 'cancelled');
     const monthExpenses  = expenses.filter(e => e.date >= monthStart && e.date <= monthEnd);
@@ -166,7 +167,7 @@ export default function Dashboard() {
           </div>
           <div className="divide-y divide-gray-50">
             {visibleOverdue.map(order => {
-              const days = daysSince(order.createdAt);
+              const days = daysSince(order);
               const sent = reminderSent.has(order.id);
               const waUrl = buildCustomerWhatsAppUrl(order.customerWhatsapp, paymentReminderToCustomer(order));
               return (
@@ -221,7 +222,7 @@ export default function Dashboard() {
       )}
 
       {/* Awaiting payment — within 3 days */}
-      {allPendingPayment.filter(o => daysSince(o.createdAt) < OVERDUE_DAYS).length > 0 && (
+      {allPendingPayment.filter(o => daysSince(o) < OVERDUE_DAYS).length > 0 && (
         <div className="bg-white rounded-xl border border-amber-200 overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3 border-b border-amber-100">
             <h2 className="font-semibold text-gray-800 text-sm flex items-center gap-2">
@@ -230,12 +231,12 @@ export default function Dashboard() {
               <span className="text-xs text-gray-400 font-normal">(within {OVERDUE_DAYS} days)</span>
             </h2>
             <span className="text-sm font-bold text-amber-700">
-              {formatCurrency(allPendingPayment.filter(o => daysSince(o.createdAt) < OVERDUE_DAYS).reduce((s, o) => s + o.total, 0))}
+              {formatCurrency(allPendingPayment.filter(o => daysSince(o) < OVERDUE_DAYS).reduce((s, o) => s + o.total, 0))}
             </span>
           </div>
           <div className="divide-y divide-gray-50">
             {allPendingPayment
-              .filter(o => daysSince(o.createdAt) < OVERDUE_DAYS)
+              .filter(o => daysSince(o) < OVERDUE_DAYS)
               .map(order => {
                 const waUrl = buildCustomerWhatsAppUrl(order.customerWhatsapp, paymentReminderToCustomer(order));
                 const sent = reminderSent.has(order.id);
@@ -247,7 +248,7 @@ export default function Dashboard() {
                           className="text-sm font-medium text-gray-800 hover:text-orange-500">
                           #{order.orderNumber}
                         </Link>
-                        <span className="text-xs text-gray-400">{daysSince(order.createdAt)}d ago</span>
+                        <span className="text-xs text-gray-400">{daysSince(order)}d ago</span>
                         {sent && <span className="text-xs text-green-600 flex items-center gap-0.5"><CheckCircle2 className="w-3 h-3" /> Reminded</span>}
                       </div>
                       <p className="text-xs text-gray-500 truncate">{order.customerName}</p>
