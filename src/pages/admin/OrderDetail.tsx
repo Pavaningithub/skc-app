@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, MessageCircle, ChevronDown, ChevronUp, TrendingUp, Trash2, XCircle, Pencil, Plus, Minus, Tag } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { ordersService, productsService } from '../../lib/services';
+import { ordersService, productsService, customersService } from '../../lib/services';
 import {
   formatCurrency, formatDateTime, buildCustomerWhatsAppUrl,
   orderConfirmedToCustomer, outForDeliveryToCustomer, deliveredToCustomer,
@@ -97,14 +97,25 @@ export default function OrderDetail() {
     try {
       const subtotal = editItems.reduce((s, i) => s + i.totalPrice, 0);
       const discount = Math.min(editDiscount, subtotal);
-      const total = subtotal - discount;
+      const newTotal = subtotal - discount;
+
+      // Read the CURRENT order total fresh from Firestore to get the true baseline
+      // (avoids stale React state if the page was loaded after a prior edit)
+      const freshOrder = await ordersService.getById(order.id);
+      const oldTotal = freshOrder?.total ?? order.total;
+
       await ordersService.update(order.id, {
         items: editItems,
         subtotal,
         discount,
-        total,
+        total: newTotal,
         hasOnDemandItems: editItems.some(i => i.isOnDemand),
       });
+
+      // Sync customer totals using the real delta
+      if (order.customerId && newTotal !== oldTotal) {
+        await customersService.adjustAfterOrderEdit(order.customerId, oldTotal, newTotal, order.paymentStatus);
+      }
       toast.success('Order updated ✅');
       setShowEdit(false);
       load();
