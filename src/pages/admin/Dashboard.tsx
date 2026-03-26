@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import {
   ShoppingBag, AlertTriangle, CreditCard, TrendingUp, TrendingDown,
   Users, ArrowRight, Clock, MessageCircle, ChevronDown, ChevronUp, CheckCircle2,
-  Activity,
+  Activity, Truck,
 } from 'lucide-react';
 import { ordersService, stockService, customersService, expensesService, activityService } from '../../lib/services';
 import { useRealtimeCollection } from '../../lib/useRealtimeCollection';
@@ -11,11 +11,16 @@ import { formatCurrency, formatDate, formatDateTime, buildCustomerWhatsAppUrl, p
 import type { Order, StockItem, Customer, Expense, AdminAction } from '../../lib/types';
 
 const OVERDUE_DAYS = 3;
+const STUCK_DAYS = 2;   // orders not delivered within this many days are flagged
 const LS_REMINDERS_KEY = 'skc_reminders_sent';
 
 function daysSince(order: { createdAt: string; deliveredAt?: string }): number {
   const from = order.deliveredAt ?? order.createdAt;
   return Math.floor((Date.now() - new Date(from).getTime()) / (1000 * 60 * 60 * 24));
+}
+
+function daysSinceCreated(dateStr: string): number {
+  return Math.floor((Date.now() - new Date(dateStr).getTime()) / (1000 * 60 * 60 * 24));
 }
 
 export default function Dashboard() {
@@ -49,7 +54,7 @@ export default function Dashboard() {
     );
   }
 
-  const { stats, recentOrders, lowStockItems, overdueOrders, allPendingPayment } = useMemo(() => {
+  const { stats, recentOrders, lowStockItems, overdueOrders, allPendingPayment, stuckOrders } = useMemo(() => {
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
     const monthEnd   = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).toISOString();
@@ -58,6 +63,13 @@ export default function Dashboard() {
     const allPendingPay  = orders.filter(o => o.paymentStatus === 'pending' && o.total > 0);
     const overdue        = allPendingPay
       .filter(o => daysSince(o) >= OVERDUE_DAYS)
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    // Orders placed/confirmed but NOT delivered within STUCK_DAYS
+    const stuck = orders
+      .filter(o =>
+        ['pending', 'confirmed', 'out_for_delivery'].includes(o.status) &&
+        daysSinceCreated(o.createdAt) >= STUCK_DAYS
+      )
       .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
     const monthOrders    = orders.filter(o => o.createdAt >= monthStart && o.createdAt <= monthEnd && o.status !== 'cancelled');
     const monthExpenses  = expenses.filter(e => e.date >= monthStart && e.date <= monthEnd);
@@ -78,6 +90,7 @@ export default function Dashboard() {
       lowStockItems:     lowStock,
       overdueOrders:     overdue,
       allPendingPayment: allPendingPay,
+      stuckOrders:       stuck,
     };
   }, [orders, stock, customers, expenses]);
 
@@ -292,45 +305,51 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Recent Admin Actions */}
-      {recentActions.length > 0 && (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-            <h2 className="font-semibold text-gray-800 flex items-center gap-2">
-              <Activity className="w-4 h-4 text-orange-500" />
-              Recent Actions
-            </h2>
-            <span className="text-xs text-gray-400">last {Math.min(recentActions.length, 5)}</span>
+      {/* 🚩 Stuck Orders — placed but not delivered in 2+ days */}
+      {stuckOrders.length > 0 && (
+        <div className="bg-white rounded-xl border border-rose-300 overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 bg-rose-50 border-b border-rose-100">
+            <div className="flex items-center gap-2">
+              <Truck className="w-4 h-4 text-rose-500" />
+              <h2 className="font-semibold text-rose-800 text-sm">
+                🚩 Not Delivered in {STUCK_DAYS}+ Days — {stuckOrders.length} order{stuckOrders.length !== 1 ? 's' : ''}
+              </h2>
+            </div>
           </div>
           <div className="divide-y divide-gray-50">
-            {recentActions.slice(0, 5).map((action, idx) => {
-              const isReminder = action.type === 'payment_reminder_sent';
-              // warn if same entityId appears again in the visible list
-              const isDuplicate = isReminder && recentActions
-                .slice(0, idx)
-                .some(a => a.type === 'payment_reminder_sent' && a.entityId === action.entityId);
+            {stuckOrders.map(order => {
+              const days = daysSinceCreated(order.createdAt);
+              const waUrl = buildCustomerWhatsAppUrl(order.customerWhatsapp,
+                `🙏 *Shri Krishna Condiments*\n\nHi *${order.customerName}*, just checking in on your order *#${order.orderNumber}* placed ${days} day${days !== 1 ? 's' : ''} ago.\n\nWe'll update you shortly on the delivery. Thank you for your patience! 🌿`);
               return (
-                <div key={action.id} className={`flex items-start gap-3 px-4 py-3 ${
-                  isDuplicate ? 'bg-yellow-50' : ''
-                }`}>
-                  <span className="text-lg mt-0.5">
-                    {action.type === 'order_created' ? '🛍️' :
-                     action.type === 'order_status_changed' ? '📦' :
-                     action.type === 'payment_marked' ? '✅' :
-                     action.type === 'order_edited' ? '✏️' :
-                     action.type === 'order_cancelled' ? '❌' :
-                     action.type === 'order_deleted' ? '🗑️' :
-                     action.type === 'payment_reminder_sent' ? '💬' :
-                     action.type === 'stock_updated' ? '📦' :
-                     action.type === 'expense_added' ? '💸' :
-                     action.type === 'batch_recorded' ? '🏭' : '📋'}
-                  </span>
+                <div key={order.id} className="flex items-center gap-3 px-4 py-3">
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm text-gray-800 leading-snug">{action.label}</p>
-                    {isDuplicate && (
-                      <p className="text-xs text-yellow-700 font-semibold mt-0.5">⚠️ Reminder already sent recently!</p>
-                    )}
-                    <p className="text-xs text-gray-400 mt-0.5">{formatDateTime(action.createdAt)}</p>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Link to={`/admin/orders/${order.id}`}
+                        className="text-sm font-semibold text-gray-800 hover:text-orange-500 transition-colors">
+                        #{order.orderNumber}
+                      </Link>
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 font-medium">
+                        {days}d since order
+                      </span>
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${
+                        order.status === 'out_for_delivery' ? 'bg-purple-100 text-purple-700' :
+                        order.status === 'confirmed' ? 'bg-blue-100 text-blue-700' :
+                        'bg-yellow-100 text-yellow-700'
+                      }`}>{order.status.replace('_', ' ')}</span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      {order.customerName} · 📱 {order.customerWhatsapp}
+                      {order.customerPlace ? ` · 📍 ${order.customerPlace}` : ''}
+                    </p>
+                    <p className="text-xs text-gray-400">{formatDateTime(order.createdAt)}</p>
+                  </div>
+                  <div className="text-right flex-shrink-0 space-y-1.5">
+                    <p className="font-bold text-gray-800">{formatCurrency(order.total)}</p>
+                    <a href={waUrl} target="_blank" rel="noreferrer"
+                      className="flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-lg bg-rose-500 text-white hover:bg-rose-600 transition-colors">
+                      <MessageCircle className="w-3 h-3" /> Follow up
+                    </a>
                   </div>
                 </div>
               );
@@ -338,6 +357,53 @@ export default function Dashboard() {
           </div>
         </div>
       )}
+
+      {/* Recent Admin Actions — always visible */}
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+          <h2 className="font-semibold text-gray-800 flex items-center gap-2">
+            <Activity className="w-4 h-4 text-orange-500" />
+            Recent Actions
+          </h2>
+          <span className="text-xs text-gray-400">last {Math.min(recentActions.length, 5)}</span>
+        </div>
+        <div className="divide-y divide-gray-50">
+          {recentActions.length === 0 && (
+            <p className="text-center text-gray-400 py-6 text-sm">No actions recorded yet. Actions will appear here as you use the app.</p>
+          )}
+          {recentActions.slice(0, 5).map((action, idx) => {
+            const isReminder = action.type === 'payment_reminder_sent';
+            const isDuplicate = isReminder && recentActions
+              .slice(0, idx)
+              .some(a => a.type === 'payment_reminder_sent' && a.entityId === action.entityId);
+            return (
+              <div key={action.id} className={`flex items-start gap-3 px-4 py-3 ${
+                isDuplicate ? 'bg-yellow-50' : ''
+              }`}>
+                <span className="text-lg mt-0.5">
+                  {action.type === 'order_created' ? '🛍️' :
+                   action.type === 'order_status_changed' ? '📦' :
+                   action.type === 'payment_marked' ? '✅' :
+                   action.type === 'order_edited' ? '✏️' :
+                   action.type === 'order_cancelled' ? '❌' :
+                   action.type === 'order_deleted' ? '🗑️' :
+                   action.type === 'payment_reminder_sent' ? '💬' :
+                   action.type === 'stock_updated' ? '📦' :
+                   action.type === 'expense_added' ? '💸' :
+                   action.type === 'batch_recorded' ? '🏭' : '📋'}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-gray-800 leading-snug">{action.label}</p>
+                  {isDuplicate && (
+                    <p className="text-xs text-yellow-700 font-semibold mt-0.5">⚠️ Reminder already sent recently!</p>
+                  )}
+                  <p className="text-xs text-gray-400 mt-0.5">{formatDateTime(action.createdAt)}</p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
 
       {/* Recent Orders + Low Stock */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
