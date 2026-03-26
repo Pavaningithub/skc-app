@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Plus, Pencil, AlertTriangle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Portal from '../../components/Portal';
-import { stockService, productsService } from '../../lib/services';
+import { stockService, productsService, activityService } from '../../lib/services';
 import { useRealtimeCollection } from '../../lib/useRealtimeCollection';
 import type { StockItem, Product } from '../../lib/types';
 import type { Unit } from '../../lib/constants';
@@ -55,6 +55,12 @@ export default function StockPage() {
         updatedAt: new Date().toISOString(),
       });
       toast.success('Stock updated');
+      activityService.log(
+        'stock_updated',
+        `Stock ${editItem ? 'updated' : 'added'} for ${product.name}: ${form.quantityAvailable}${product.unit === 'piece' ? ' pcs' : 'g'} (threshold: ${form.lowStockThreshold})`,
+        editItem?.id,
+        product.name,
+      );
       setShowForm(false);
     } finally { setSaving(false); }
   }

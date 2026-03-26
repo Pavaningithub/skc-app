@@ -3,13 +3,15 @@ import { Link } from 'react-router-dom';
 import {
   ShoppingBag, AlertTriangle, CreditCard, TrendingUp, TrendingDown,
   Users, ArrowRight, Clock, MessageCircle, ChevronDown, ChevronUp, CheckCircle2,
+  Activity,
 } from 'lucide-react';
-import { ordersService, stockService, customersService, expensesService } from '../../lib/services';
+import { ordersService, stockService, customersService, expensesService, activityService } from '../../lib/services';
 import { useRealtimeCollection } from '../../lib/useRealtimeCollection';
 import { formatCurrency, formatDate, formatDateTime, buildCustomerWhatsAppUrl, paymentReminderToCustomer } from '../../lib/utils';
-import type { Order, StockItem, Customer, Expense } from '../../lib/types';
+import type { Order, StockItem, Customer, Expense, AdminAction } from '../../lib/types';
 
 const OVERDUE_DAYS = 3;
+const LS_REMINDERS_KEY = 'skc_reminders_sent';
 
 function daysSince(order: { createdAt: string; deliveredAt?: string }): number {
   const from = order.deliveredAt ?? order.createdAt;
@@ -24,7 +26,28 @@ export default function Dashboard() {
   const loading = ordersLoading || stockLoading || customersLoading || expensesLoading;
 
   const [showAllOverdue, setShowAllOverdue] = useState(false);
-  const [reminderSent, setReminderSent] = useState<Set<string>>(new Set());
+
+  // Persist reminder-sent state across sessions via localStorage
+  const [reminderSent, setReminderSent] = useState<Set<string>>(() => {
+    try {
+      const stored = localStorage.getItem(LS_REMINDERS_KEY);
+      return stored ? new Set(JSON.parse(stored)) : new Set();
+    } catch { return new Set(); }
+  });
+
+  const [recentActions] = useRealtimeCollection<AdminAction>(activityService.subscribe.bind(activityService));
+
+  function markReminderSent(orderId: string, order: Order) {
+    const next = new Set(reminderSent).add(orderId);
+    setReminderSent(next);
+    localStorage.setItem(LS_REMINDERS_KEY, JSON.stringify([...next]));
+    activityService.log(
+      'payment_reminder_sent',
+      `Payment reminder sent to ${order.customerName} for #${order.orderNumber} (₹${order.total})`,
+      orderId,
+      order.orderNumber,
+    );
+  }
 
   const { stats, recentOrders, lowStockItems, overdueOrders, allPendingPayment } = useMemo(() => {
     const now = new Date();
@@ -197,7 +220,7 @@ export default function Dashboard() {
                   <div className="text-right flex-shrink-0 space-y-1.5">
                     <p className="font-bold text-gray-800">{formatCurrency(order.total)}</p>
                     <a href={waUrl} target="_blank" rel="noreferrer"
-                      onClick={() => setReminderSent(prev => new Set(prev).add(order.id))}
+                      onClick={() => markReminderSent(order.id, order)}
                       className={`flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors
                         ${sent
                           ? 'bg-green-100 text-green-700 hover:bg-green-200'
@@ -256,7 +279,7 @@ export default function Dashboard() {
                     <div className="flex items-center gap-2 flex-shrink-0">
                       <span className="text-sm font-bold text-gray-800">{formatCurrency(order.total)}</span>
                       <a href={waUrl} target="_blank" rel="noreferrer"
-                        onClick={() => setReminderSent(prev => new Set(prev).add(order.id))}
+                        onClick={() => markReminderSent(order.id, order)}
                         className="border border-green-300 text-green-600 hover:bg-green-50 px-2 py-1 rounded-lg text-xs font-medium transition-colors flex items-center gap-1">
                         <MessageCircle className="w-3 h-3" />
                         {sent ? 'Resend' : 'Remind'}
@@ -265,6 +288,53 @@ export default function Dashboard() {
                   </div>
                 );
               })}
+          </div>
+        </div>
+      )}
+
+      {/* Recent Admin Actions */}
+      {recentActions.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+            <h2 className="font-semibold text-gray-800 flex items-center gap-2">
+              <Activity className="w-4 h-4 text-orange-500" />
+              Recent Actions
+            </h2>
+            <span className="text-xs text-gray-400">last {Math.min(recentActions.length, 5)}</span>
+          </div>
+          <div className="divide-y divide-gray-50">
+            {recentActions.slice(0, 5).map((action, idx) => {
+              const isReminder = action.type === 'payment_reminder_sent';
+              // warn if same entityId appears again in the visible list
+              const isDuplicate = isReminder && recentActions
+                .slice(0, idx)
+                .some(a => a.type === 'payment_reminder_sent' && a.entityId === action.entityId);
+              return (
+                <div key={action.id} className={`flex items-start gap-3 px-4 py-3 ${
+                  isDuplicate ? 'bg-yellow-50' : ''
+                }`}>
+                  <span className="text-lg mt-0.5">
+                    {action.type === 'order_created' ? '🛍️' :
+                     action.type === 'order_status_changed' ? '📦' :
+                     action.type === 'payment_marked' ? '✅' :
+                     action.type === 'order_edited' ? '✏️' :
+                     action.type === 'order_cancelled' ? '❌' :
+                     action.type === 'order_deleted' ? '🗑️' :
+                     action.type === 'payment_reminder_sent' ? '💬' :
+                     action.type === 'stock_updated' ? '📦' :
+                     action.type === 'expense_added' ? '💸' :
+                     action.type === 'batch_recorded' ? '🏭' : '📋'}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-gray-800 leading-snug">{action.label}</p>
+                    {isDuplicate && (
+                      <p className="text-xs text-yellow-700 font-semibold mt-0.5">⚠️ Reminder already sent recently!</p>
+                    )}
+                    <p className="text-xs text-gray-400 mt-0.5">{formatDateTime(action.createdAt)}</p>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
