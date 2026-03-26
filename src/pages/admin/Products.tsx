@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Plus, Pencil, Trash2, ToggleLeft, ToggleRight, Search } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Portal from '../../components/Portal';
 import { productsService } from '../../lib/services';
+import { useRealtimeCollection } from '../../lib/useRealtimeCollection';
 import { formatCurrency } from '../../lib/utils';
 import { UNIT_LABELS } from '../../lib/constants';
 import type { Product } from '../../lib/types';
@@ -17,21 +18,12 @@ const emptyForm: Omit<Product, 'id' | 'createdAt' | 'updatedAt'> = {
 };
 
 export default function Products() {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [products, loading] = useRealtimeCollection(productsService.subscribe.bind(productsService));
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState({ ...emptyForm });
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState('');
-
-  useEffect(() => { load(); }, []);
-
-  async function load() {
-    setLoading(true);
-    try { setProducts(await productsService.getAll()); }
-    finally { setLoading(false); }
-  }
 
   function openAdd() { setForm({ ...emptyForm }); setEditId(null); setShowForm(true); }
   function openEdit(p: Product) {
@@ -59,21 +51,18 @@ export default function Products() {
         toast.success('Product added');
       }
       setShowForm(false);
-      load();
     } finally { setSaving(false); }
   }
 
   async function toggleActive(p: Product) {
     await productsService.update(p.id, { isActive: !p.isActive });
     toast.success(`${p.name} ${p.isActive ? 'deactivated' : 'activated'}`);
-    load();
   }
 
   async function handleDelete(p: Product) {
     if (!confirm(`Delete "${p.name}"? This cannot be undone.`)) return;
     await productsService.delete(p.id);
     toast.success('Product deleted');
-    load();
   }
 
   const filtered = products.filter(p =>

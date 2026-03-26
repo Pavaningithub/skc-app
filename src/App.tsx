@@ -22,6 +22,7 @@ const SubscriptionsPage = lazy(() => import('./pages/admin/SubscriptionsPage'));
 const FeedbackAdmin    = lazy(() => import('./pages/admin/FeedbackAdmin'));
 const BatchesPage      = lazy(() => import('./pages/admin/BatchesPage'));
 const SettingsPage     = lazy(() => import('./pages/admin/SettingsPage'));
+const AnnouncementsPage = lazy(() => import('./pages/admin/AnnouncementsPage'));
 
 function PageLoader() {
   return (
@@ -65,6 +66,7 @@ export default function App() {
             <Route path="customers" element={<CustomersPage />} />
             <Route path="subscriptions" element={<SubscriptionsPage />} />
             <Route path="feedback" element={<FeedbackAdmin />} />
+            <Route path="announcements" element={<AnnouncementsPage />} />
             <Route path="settings" element={<SettingsPage />} />
           </Route>
 

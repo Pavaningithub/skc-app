@@ -1,32 +1,22 @@
-import { useEffect, useState } from 'react';
-import { Plus, Pencil, AlertTriangle, RefreshCw } from 'lucide-react';
+import { useState } from 'react';
+import { Plus, Pencil, AlertTriangle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Portal from '../../components/Portal';
 import { stockService, productsService } from '../../lib/services';
+import { useRealtimeCollection } from '../../lib/useRealtimeCollection';
 import type { StockItem, Product } from '../../lib/types';
 import type { Unit } from '../../lib/constants';
 
 export default function StockPage() {
-  const [stock, setStock] = useState<StockItem[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [stock, stockLoading] = useRealtimeCollection<StockItem>(stockService.subscribe.bind(stockService));
+  const [products, productsLoading] = useRealtimeCollection<Product>(productsService.subscribe.bind(productsService));
+  const loading = stockLoading || productsLoading;
   const [showForm, setShowForm] = useState(false);
   const [editItem, setEditItem] = useState<StockItem | null>(null);
   const [form, setForm] = useState({
     productId: '', quantityAvailable: 0, lowStockThreshold: 500,
   });
   const [saving, setSaving] = useState(false);
-
-  useEffect(() => { load(); }, []);
-
-  async function load() {
-    setLoading(true);
-    try {
-      const [s, p] = await Promise.all([stockService.getAll(), productsService.getAll()]);
-      setStock(s);
-      setProducts(p);
-    } finally { setLoading(false); }
-  }
 
   function openAdd() {
     setEditItem(null);
@@ -56,7 +46,6 @@ export default function StockPage() {
       });
       toast.success('Stock updated');
       setShowForm(false);
-      load();
     } finally { setSaving(false); }
   }
 
@@ -76,9 +65,6 @@ export default function StockPage() {
           <p className="text-sm text-gray-500">{stock.filter(s => isLow(s)).length} low stock alerts</p>
         </div>
         <div className="flex gap-2">
-          <button onClick={load} className="p-2.5 border border-gray-200 rounded-xl hover:bg-gray-50">
-            <RefreshCw className="w-4 h-4 text-gray-500" />
-          </button>
           <button onClick={openAdd}
             className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-xl text-sm font-semibold transition-colors">
             <Plus className="w-4 h-4" /> Add Stock

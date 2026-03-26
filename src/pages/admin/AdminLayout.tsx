@@ -4,7 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import {
   LayoutDashboard, ShoppingBag, Package, BarChart3, Users,
   Receipt, RefreshCw, MessageSquare, Settings, Menu,
-  Leaf, LogOut, FlaskConical, Bell,
+  Leaf, LogOut, FlaskConical, Bell, Megaphone,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { ordersService } from '../../lib/services';
@@ -21,6 +21,7 @@ const navItems = [
   { to: '/admin/customers', icon: Users, label: 'Customers' },
   { to: '/admin/subscriptions', icon: RefreshCw, label: 'Subscriptions' },
   { to: '/admin/feedback', icon: MessageSquare, label: 'Feedback' },
+  { to: '/admin/announcements', icon: Megaphone, label: 'Announce' },
   { to: '/admin/settings', icon: Settings, label: 'Settings' },
 ];
 
