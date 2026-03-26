@@ -9,7 +9,7 @@ import { UNIT_LABELS } from '../../lib/constants';
 import type { Product } from '../../lib/types';
 import type { Unit } from '../../lib/constants';
 
-const CATEGORIES = ['Chutney Powder', 'Masala', 'Health Mix', 'Spices', 'Pickles', 'Other'];
+const CATEGORIES = ['Chutney Powder', 'Masala', 'Health Mix', 'Spices', 'Pickles','Sweets ', 'Other'];
 
 type ProdSort = 'name_asc' | 'price_asc' | 'price_desc' | 'category';
 type ActiveFilter = 'all' | 'active' | 'inactive';
