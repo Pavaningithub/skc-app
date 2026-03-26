@@ -150,6 +150,28 @@ Sorry for the inconvenience. We hope to serve you soon! 🙏
 ${BUSINESS_NAME} — Pure & Healthy 🌿`;
 }
 
+// Friendly payment reminder sent to customer
+export function paymentReminderToCustomer(order: Order): string {
+  const items = order.items
+    .map(i => `  • ${i.productName}: ${formatQuantity(i.quantity, i.unit)} = ₹${i.totalPrice}`)
+    .join('\n');
+  return `🙏 *${BUSINESS_NAME}*
+
+Hi *${order.customerName}*, hope you're enjoying your order! 😊
+
+Just a gentle reminder that payment of *₹${order.total}* is pending for your order *#${order.orderNumber}*.
+
+*Order Summary:*
+${items}${order.discount > 0 ? `\nDiscount: -₹${order.discount}` : ''}
+*Total Due: ₹${order.total}*
+
+You can pay via UPI:
+📲 *${APP_CONFIG.UPI_DISPLAY}*
+
+Thank you so much! 🌿
+_${BUSINESS_NAME} — Pure • Fresh • Handcrafted_`;
+}
+
 // Keep old names as aliases so nothing breaks
 export const orderPlacedMessage = (order: Order) => newOrderAlertToAdmin(order, typeof window !== 'undefined' ? window.location.origin : '');
 export const outForDeliveryMessage = outForDeliveryToCustomer;
