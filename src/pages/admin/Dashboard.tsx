@@ -1,9 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ShoppingBag, AlertTriangle, CreditCard, TrendingUp, TrendingDown,
   Users, ArrowRight, Clock, MessageCircle, ChevronDown, ChevronUp, CheckCircle2,
-  Activity, Truck,
+  Activity, Truck, X, Copy,
 } from 'lucide-react';
 import { ordersService, stockService, customersService, expensesService, activityService } from '../../lib/services';
 import { useRealtimeCollection } from '../../lib/useRealtimeCollection';
@@ -34,6 +34,8 @@ export default function Dashboard() {
   const loading = ordersLoading || stockLoading || customersLoading || expensesLoading;
 
   const [showAllOverdue, setShowAllOverdue] = useState(false);
+  const [notifyModal, setNotifyModal] = useState<{ orderId: string; order: Order; msg: string } | null>(null);
+  const msgRef = useRef<HTMLTextAreaElement>(null);
 
   // Persist reminder-sent state across sessions via localStorage
   const [reminderSent, setReminderSent] = useState<Set<string>>(() => {
@@ -230,14 +232,6 @@ export default function Dashboard() {
               const notified = groupNotified.has(order.id);
               const consoleUrl = typeof window !== 'undefined' ? window.location.origin : 'https://skc-app.vercel.app';
               const alertMsg = newOrderAlertToAdmin(order, consoleUrl);
-              const groupUrl = APP_CONFIG.ORDER_TRACKING_GROUP_LINK;
-
-              async function copyAndOpen() {
-                await navigator.clipboard.writeText(alertMsg);
-                markGroupNotified(order.id, order);
-                window.open(groupUrl, '_blank');
-              }
-
               return (
                 <div key={order.id} className="flex items-center gap-3 px-4 py-3">
                   <div className="flex-1 min-w-0">
@@ -265,9 +259,8 @@ export default function Dashboard() {
                     <p className="font-bold text-gray-800">
                       {order.type === 'sample' ? 'FREE' : formatCurrency(order.total)}
                     </p>
-                    {/* Copies alert message then opens the group — admin just pastes & sends */}
                     <button
-                      onClick={copyAndOpen}
+                      onClick={() => setNotifyModal({ orderId: order.id, order, msg: alertMsg })}
                       className={`flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors ${
                         notified
                           ? 'bg-green-100 text-green-700 hover:bg-green-200'
@@ -562,6 +555,51 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {/* 💬 Notify Group Modal */}
+      {notifyModal && (
+        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/50 px-0 md:px-4"
+          onClick={() => setNotifyModal(null)}>
+          <div className="bg-white w-full md:max-w-lg rounded-t-2xl md:rounded-2xl shadow-2xl overflow-hidden"
+            onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+              <h3 className="font-semibold text-gray-800 text-sm">Notify Order Tracking Group</h3>
+              <button onClick={() => setNotifyModal(null)} className="text-gray-400 hover:text-gray-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-4 space-y-3">
+              <p className="text-xs text-gray-500">Tap <strong>Copy Message</strong>, then tap <strong>Open Group</strong> and paste it there.</p>
+              <textarea
+                ref={msgRef}
+                readOnly
+                value={notifyModal.msg}
+                rows={10}
+                onClick={() => msgRef.current?.select()}
+                className="w-full text-xs font-mono bg-gray-50 border border-gray-200 rounded-xl p-3 resize-none focus:outline-none"
+              />
+              <div className="flex gap-2">
+                <button
+                  onClick={() => { msgRef.current?.select(); document.execCommand('copy'); }}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-semibold bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors">
+                  <Copy className="w-4 h-4" /> Copy Message
+                </button>
+                <a
+                  href={APP_CONFIG.ORDER_TRACKING_GROUP_LINK}
+                  target="_blank" rel="noreferrer"
+                  onClick={() => {
+                    const m = notifyModal;
+                    if (m) { markGroupNotified(m.orderId, m.order); }
+                    setNotifyModal(null);
+                  }}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-semibold bg-green-500 text-white hover:bg-green-600 transition-colors">
+                  <MessageCircle className="w-4 h-4" /> Open Group
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
