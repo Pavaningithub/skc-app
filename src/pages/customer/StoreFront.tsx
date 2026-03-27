@@ -17,6 +17,7 @@ export default function StoreFront() {
   const navigate = useNavigate();
   const [products, setProducts]         = useState<Product[]>([]);
   const [testimonials, setTestimonials] = useState<Feedback[]>([]);
+  const [feedbackStats, setFeedbackStats] = useState<{ total: number; avg: number } | null>(null);
   const [siteStats, setSiteStats]       = useState<{ customers: number; orders: number; holige: number } | null>(null);
   const [cart, setCart]                 = useState<CartItem[]>([]);
   const [loading, setLoading]           = useState(true);
@@ -36,7 +37,12 @@ export default function StoreFront() {
   useEffect(() => {
     return feedbackService.subscribe(all => {
       const pub = all.filter(f => f.isPublic);
-      setTestimonials(pub.slice(0, 8));
+      // already sorted newest-first by service
+      setTestimonials(pub.slice(0, 10));
+      if (pub.length > 0) {
+        const avg = pub.reduce((s, f) => s + f.rating, 0) / pub.length;
+        setFeedbackStats({ total: pub.length, avg: Math.round(avg * 10) / 10 });
+      }
     });
   }, []);
 
@@ -388,8 +394,20 @@ export default function StoreFront() {
       {/* ── Testimonials Marquee ────────────────────────────────────────── */}
       {testimonials.length > 0 && (
         <div className="py-6 overflow-hidden" style={{ background: '#fff4eb', borderTop: '1px solid #f0d9c8' }}>
-          <div className="text-center mb-4">
-            <h2 className="text-base font-bold" style={{ color: '#c45c00', fontFamily: 'Poppins, sans-serif' }}>What Our Customers Say ✨</h2>
+          <div className="text-center mb-4 px-4">
+            <h2 className="text-base font-bold mb-1" style={{ color: '#c45c00', fontFamily: 'Poppins, sans-serif' }}>What Our Customers Say ✨</h2>
+            {feedbackStats && (
+              <div className="flex items-center justify-center gap-3 flex-wrap">
+                <span className="flex items-center gap-1 text-xs font-semibold" style={{ color: '#92400e' }}>
+                  <Star className="w-3.5 h-3.5" style={{ fill: '#f59e0b', color: '#f59e0b' }} />
+                  {feedbackStats.avg} avg rating
+                </span>
+                <span className="text-gray-300 text-xs">•</span>
+                <span className="text-xs font-semibold" style={{ color: '#92400e' }}>
+                  💬 {feedbackStats.total}+ happy reviews
+                </span>
+              </div>
+            )}
           </div>
           {/* Marquee container */}
           <div className="relative">
