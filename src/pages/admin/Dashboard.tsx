@@ -230,8 +230,14 @@ export default function Dashboard() {
               const notified = groupNotified.has(order.id);
               const consoleUrl = typeof window !== 'undefined' ? window.location.origin : 'https://skc-app.vercel.app';
               const alertMsg = newOrderAlertToAdmin(order, consoleUrl);
-              // Opens the group chat with message pre-filled — admin taps Send
-              const waUrl = `https://wa.me/${APP_CONFIG.WHATSAPP_NUMBER}?text=${encodeURIComponent(alertMsg)}`;
+              const groupUrl = APP_CONFIG.ORDER_TRACKING_GROUP_LINK;
+
+              async function copyAndOpen() {
+                await navigator.clipboard.writeText(alertMsg);
+                markGroupNotified(order.id, order);
+                window.open(groupUrl, '_blank');
+              }
+
               return (
                 <div key={order.id} className="flex items-center gap-3 px-4 py-3">
                   <div className="flex-1 min-w-0">
@@ -259,8 +265,9 @@ export default function Dashboard() {
                     <p className="font-bold text-gray-800">
                       {order.type === 'sample' ? 'FREE' : formatCurrency(order.total)}
                     </p>
-                    <a href={waUrl} target="_blank" rel="noreferrer"
-                      onClick={() => markGroupNotified(order.id, order)}
+                    {/* Copies alert message then opens the group — admin just pastes & sends */}
+                    <button
+                      onClick={copyAndOpen}
                       className={`flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors ${
                         notified
                           ? 'bg-green-100 text-green-700 hover:bg-green-200'
@@ -268,7 +275,7 @@ export default function Dashboard() {
                       }`}>
                       <MessageCircle className="w-3 h-3" />
                       {notified ? 'Resend' : 'Notify Group'}
-                    </a>
+                    </button>
                   </div>
                 </div>
               );
