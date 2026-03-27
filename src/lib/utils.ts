@@ -40,8 +40,6 @@ export function orderConfirmedToCustomer(order: Order): string {
     .join('\n');
   return `🙏 *Hare Krishna!* 🪷
 
-*${BUSINESS_NAME}*
-
 Hi *${order.customerName}*, your order is confirmed! 🎉
 
 Order No: *#${order.orderNumber}*
@@ -61,8 +59,6 @@ export function outForDeliveryToCustomer(order: Order): string {
   const upiLink = buildUPILink(order.total, order.orderNumber);
   return `🙏 *Hare Krishna!* 🪷
 
-*${BUSINESS_NAME}*
-
 Hi *${order.customerName}*, your order is on the way! 🚀
 
 Order No: *#${order.orderNumber}*
@@ -79,8 +75,6 @@ _Pure • Fresh • Handcrafted with Love_ 🙏`;
 // Sent TO CUSTOMER after delivery
 export function deliveredToCustomer(order: Order, feedbackUrl: string): string {
   return `🙏 *Hare Krishna!* 🪷
-
-*${BUSINESS_NAME}*
 
 Hi *${order.customerName}*, your order has been delivered! 🎉
 
@@ -166,8 +160,6 @@ export function paymentReminderToCustomer(order: Order): string {
     .join('\n');
   const upiLink = buildUPILink(order.total, order.orderNumber);
   return `🙏 *Hare Krishna!* 🪷
-
-*${BUSINESS_NAME}*
 
 Hi *${order.customerName}*, hope you're enjoying your order! 😊
 
