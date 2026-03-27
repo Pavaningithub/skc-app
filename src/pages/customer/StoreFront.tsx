@@ -17,6 +17,7 @@ export default function StoreFront() {
   const navigate = useNavigate();
   const [products, setProducts]         = useState<Product[]>([]);
   const [testimonials, setTestimonials] = useState<Feedback[]>([]);
+  const [siteStats, setSiteStats]       = useState<{ customers: number; orders: number } | null>(null);
   const [cart, setCart]                 = useState<CartItem[]>([]);
   const [loading, setLoading]           = useState(true);
   const [showCart, setShowCart]         = useState(false);
@@ -34,12 +35,18 @@ export default function StoreFront() {
   async function load() {
     setLoading(true);
     try {
-      const [p, f] = await Promise.all([
+      const [p, f, allOrders, allCustomers] = await Promise.all([
         productsService.getActive(),
         feedbackService.getPublic(),
+        ordersService.getAll(),
+        customersService.getAll(),
       ]);
       setProducts(p);
       setTestimonials(f.slice(0, 6));
+      setSiteStats({
+        orders:    allOrders.filter(o => o.status === 'delivered').length,
+        customers: allCustomers.length,
+      });
     } finally { setLoading(false); }
   }
 
@@ -304,6 +311,29 @@ export default function StoreFront() {
           </div>
         </div>
       </div>
+
+      {/* ── Social Proof Stats Strip ─────────────────────────────────────── */}
+      {siteStats && (
+        <div className="py-5" style={{ background: 'linear-gradient(90deg, #7b1500 0%, #c45c00 50%, #7b1500 100%)' }}>
+          <div className="max-w-5xl mx-auto px-4">
+            <div className="grid grid-cols-3 divide-x divide-white/20">
+              {[
+                { value: siteStats.customers, suffix: '+', label: 'Happy Customers', icon: '😊' },
+                { value: siteStats.orders,    suffix: '+', label: 'Orders Delivered', icon: '📦' },
+                { value: 100,                 suffix: '%', label: 'Home Made',        icon: '🏠' },
+              ].map(stat => (
+                <div key={stat.label} className="flex flex-col items-center py-1 px-2 text-center">
+                  <span className="text-xl mb-0.5">{stat.icon}</span>
+                  <span className="text-2xl md:text-3xl font-bold" style={{ color: '#ffd700', fontFamily: 'Poppins, sans-serif' }}>
+                    {stat.value}{stat.suffix}
+                  </span>
+                  <span className="text-xs text-white/80 font-medium mt-0.5 leading-tight">{stat.label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Testimonials Marquee ────────────────────────────────────────── */}
       {testimonials.length > 0 && (
