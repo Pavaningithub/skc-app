@@ -32,17 +32,23 @@ export default function StoreFront() {
 
   useEffect(() => { load(); }, []);
 
+  // Real-time testimonials — always shows latest public feedback
+  useEffect(() => {
+    return feedbackService.subscribe(all => {
+      const pub = all.filter(f => f.isPublic);
+      setTestimonials(pub.slice(0, 8));
+    });
+  }, []);
+
   async function load() {
     setLoading(true);
     try {
-      const [p, f, allOrders, allCustomers] = await Promise.all([
+      const [p, allOrders, allCustomers] = await Promise.all([
         productsService.getActive(),
-        feedbackService.getPublic(),
         ordersService.getAll(),
         customersService.getAll(),
       ]);
       setProducts(p);
-      setTestimonials(f.slice(0, 6));
       const HOLIGE_BASE = 444;
       const holigeDelivered = allOrders
         .filter(o => o.status === 'delivered')
