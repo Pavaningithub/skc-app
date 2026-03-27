@@ -1,21 +1,18 @@
-import { useMemo, useState, useRef } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ShoppingBag, AlertTriangle, CreditCard, TrendingUp, TrendingDown,
   Users, ArrowRight, Clock, MessageCircle, ChevronDown, ChevronUp, CheckCircle2,
-  Activity, Truck, X, Copy,
+  Activity, Truck,
 } from 'lucide-react';
 import { ordersService, stockService, customersService, expensesService, activityService } from '../../lib/services';
 import { useRealtimeCollection } from '../../lib/useRealtimeCollection';
-import { formatCurrency, formatDate, formatDateTime, buildCustomerWhatsAppUrl, paymentReminderToCustomer, newOrderAlertToAdmin } from '../../lib/utils';
+import { formatCurrency, formatDate, formatDateTime, buildCustomerWhatsAppUrl, paymentReminderToCustomer } from '../../lib/utils';
 import type { Order, StockItem, Customer, Expense, AdminAction } from '../../lib/types';
-import { APP_CONFIG } from '../../config';
 
 const OVERDUE_DAYS = 3;
 const STUCK_DAYS = 2;   // orders not delivered within this many days are flagged
 const LS_REMINDERS_KEY = 'skc_reminders_sent';
-const LS_NOTIFIED_KEY  = 'skc_group_notified';   // orders already notified to WA group
-const NEW_ORDER_HOURS  = 24;                      // show orders placed within this window
 
 function daysSince(order: { createdAt: string; deliveredAt?: string }): number {
   const from = order.deliveredAt ?? order.createdAt;
@@ -34,30 +31,12 @@ export default function Dashboard() {
   const loading = ordersLoading || stockLoading || customersLoading || expensesLoading;
 
   const [showAllOverdue, setShowAllOverdue] = useState(false);
-  const [notifyModal, setNotifyModal] = useState<{ orderId: string; order: Order; msg: string } | null>(null);
-  const msgRef = useRef<HTMLTextAreaElement>(null);
-
-  // Persist reminder-sent state across sessions via localStorage
   const [reminderSent, setReminderSent] = useState<Set<string>>(() => {
     try {
       const stored = localStorage.getItem(LS_REMINDERS_KEY);
       return stored ? new Set(JSON.parse(stored)) : new Set();
     } catch { return new Set(); }
   });
-
-  const [groupNotified, setGroupNotified] = useState<Set<string>>(() => {
-    try {
-      const stored = localStorage.getItem(LS_NOTIFIED_KEY);
-      return stored ? new Set(JSON.parse(stored)) : new Set();
-    } catch { return new Set(); }
-  });
-
-  function markGroupNotified(orderId: string, order: Order) {
-    const next = new Set(groupNotified).add(orderId);
-    setGroupNotified(next);
-    localStorage.setItem(LS_NOTIFIED_KEY, JSON.stringify([...next]));
-    activityService.log('order_created', `Group notified for order #${order.orderNumber} (${order.customerName})`, orderId, order.orderNumber);
-  }
 
   const [recentActions] = useRealtimeCollection<AdminAction>(activityService.subscribe.bind(activityService));
 
@@ -73,7 +52,7 @@ export default function Dashboard() {
     );
   }
 
-  const { stats, recentOrders, lowStockItems, overdueOrders, allPendingPayment, stuckOrders, newOrders } = useMemo(() => {
+  const { stats, recentOrders, lowStockItems, overdueOrders, allPendingPayment, stuckOrders } = useMemo(() => {
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
     const monthEnd   = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).toISOString();
@@ -83,7 +62,6 @@ export default function Dashboard() {
     const overdue        = allPendingPay
       .filter(o => daysSince(o) >= OVERDUE_DAYS)
       .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
-    // Orders placed/confirmed but NOT delivered within STUCK_DAYS
     const stuck = orders
       .filter(o =>
         ['pending', 'confirmed', 'out_for_delivery'].includes(o.status) &&
@@ -93,12 +71,6 @@ export default function Dashboard() {
     const monthOrders    = orders.filter(o => o.createdAt >= monthStart && o.createdAt <= monthEnd && o.status !== 'cancelled');
     const monthExpenses  = expenses.filter(e => e.date >= monthStart && e.date <= monthEnd);
     const lowStock       = stock.filter(s => s.quantityAvailable <= s.lowStockThreshold);
-
-    // Orders placed within the last NEW_ORDER_HOURS hours
-    const cutoff = new Date(Date.now() - NEW_ORDER_HOURS * 60 * 60 * 1000).toISOString();
-    const newOrders = orders
-      .filter(o => o.createdAt >= cutoff && o.status !== 'cancelled' && o.status !== 'delivered')
-      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 
     return {
       stats: {
@@ -116,7 +88,6 @@ export default function Dashboard() {
       overdueOrders:     overdue,
       allPendingPayment: allPendingPay,
       stuckOrders:       stuck,
-      newOrders,
     };
   }, [orders, stock, customers, expenses]);
 
@@ -212,70 +183,6 @@ export default function Dashboard() {
           )}
         </div>
       </div>
-
-      {/* 🆕 New Orders — Notify Group */}
-      {newOrders.length > 0 && (
-        <div className="bg-white rounded-xl border border-green-300 overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-3 bg-green-50 border-b border-green-100">
-            <div className="flex items-center gap-2">
-              <ShoppingBag className="w-4 h-4 text-green-600" />
-              <h2 className="font-semibold text-green-800 text-sm">
-                🆕 New Orders (last {NEW_ORDER_HOURS}h) — {newOrders.length} order{newOrders.length !== 1 ? 's' : ''}
-              </h2>
-            </div>
-            <span className="text-xs text-green-600 font-medium">
-              {newOrders.filter(o => !groupNotified.has(o.id)).length} unnotified
-            </span>
-          </div>
-          <div className="divide-y divide-gray-50">
-            {newOrders.map(order => {
-              const notified = groupNotified.has(order.id);
-              const consoleUrl = typeof window !== 'undefined' ? window.location.origin : 'https://skc-app.vercel.app';
-              const alertMsg = newOrderAlertToAdmin(order, consoleUrl);
-              return (
-                <div key={order.id} className="flex items-center gap-3 px-4 py-3">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <Link to={`/admin/orders/${order.id}`}
-                        className="text-sm font-semibold text-gray-800 hover:text-orange-500 transition-colors">
-                        #{order.orderNumber}
-                      </Link>
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                        order.type === 'sample' ? 'bg-purple-100 text-purple-700' : 'bg-green-100 text-green-700'
-                      }`}>{order.type === 'sample' ? 'Sample' : 'Regular'}</span>
-                      {notified && (
-                        <span className="text-xs text-green-600 flex items-center gap-0.5">
-                          <CheckCircle2 className="w-3 h-3" /> Notified
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      {order.customerName} · 📱 {order.customerWhatsapp}
-                      {order.customerPlace ? ` · 📍 ${order.customerPlace}` : ''}
-                    </p>
-                    <p className="text-xs text-gray-400">{formatDateTime(order.createdAt)}</p>
-                  </div>
-                  <div className="text-right flex-shrink-0 space-y-1.5">
-                    <p className="font-bold text-gray-800">
-                      {order.type === 'sample' ? 'FREE' : formatCurrency(order.total)}
-                    </p>
-                    <button
-                      onClick={() => setNotifyModal({ orderId: order.id, order, msg: alertMsg })}
-                      className={`flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors ${
-                        notified
-                          ? 'bg-green-100 text-green-700 hover:bg-green-200'
-                          : 'bg-green-500 text-white hover:bg-green-600'
-                      }`}>
-                      <MessageCircle className="w-3 h-3" />
-                      {notified ? 'Resend' : 'Notify Group'}
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
 
       {/* Payment Overdue — 3+ days */}
       {overdueOrders.length > 0 && (
@@ -556,50 +463,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* 💬 Notify Group Modal */}
-      {notifyModal && (
-        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/50 px-0 md:px-4"
-          onClick={() => setNotifyModal(null)}>
-          <div className="bg-white w-full md:max-w-lg rounded-t-2xl md:rounded-2xl shadow-2xl overflow-hidden"
-            onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-              <h3 className="font-semibold text-gray-800 text-sm">Notify Order Tracking Group</h3>
-              <button onClick={() => setNotifyModal(null)} className="text-gray-400 hover:text-gray-600">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="p-4 space-y-3">
-              <p className="text-xs text-gray-500">Tap <strong>Copy Message</strong>, then tap <strong>Open Group</strong> and paste it there.</p>
-              <textarea
-                ref={msgRef}
-                readOnly
-                value={notifyModal.msg}
-                rows={10}
-                onClick={() => msgRef.current?.select()}
-                className="w-full text-xs font-mono bg-gray-50 border border-gray-200 rounded-xl p-3 resize-none focus:outline-none"
-              />
-              <div className="flex gap-2">
-                <button
-                  onClick={() => { msgRef.current?.select(); document.execCommand('copy'); }}
-                  className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-semibold bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors">
-                  <Copy className="w-4 h-4" /> Copy Message
-                </button>
-                <a
-                  href={APP_CONFIG.ORDER_TRACKING_GROUP_LINK}
-                  target="_blank" rel="noreferrer"
-                  onClick={() => {
-                    const m = notifyModal;
-                    if (m) { markGroupNotified(m.orderId, m.order); }
-                    setNotifyModal(null);
-                  }}
-                  className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-semibold bg-green-500 text-white hover:bg-green-600 transition-colors">
-                  <MessageCircle className="w-4 h-4" /> Open Group
-                </a>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
