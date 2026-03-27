@@ -7,8 +7,9 @@ import {
 } from 'lucide-react';
 import { ordersService, stockService, customersService, expensesService, activityService } from '../../lib/services';
 import { useRealtimeCollection } from '../../lib/useRealtimeCollection';
-import { formatCurrency, formatDate, formatDateTime, buildCustomerWhatsAppUrl, buildAdminWhatsAppUrl, paymentReminderToCustomer, newOrderAlertToAdmin } from '../../lib/utils';
+import { formatCurrency, formatDate, formatDateTime, buildCustomerWhatsAppUrl, paymentReminderToCustomer, newOrderAlertToAdmin } from '../../lib/utils';
 import type { Order, StockItem, Customer, Expense, AdminAction } from '../../lib/types';
+import { APP_CONFIG } from '../../config';
 
 const OVERDUE_DAYS = 3;
 const STUCK_DAYS = 2;   // orders not delivered within this many days are flagged
@@ -228,7 +229,9 @@ export default function Dashboard() {
             {newOrders.map(order => {
               const notified = groupNotified.has(order.id);
               const consoleUrl = typeof window !== 'undefined' ? window.location.origin : 'https://skc-app.vercel.app';
-              const waUrl = buildAdminWhatsAppUrl(newOrderAlertToAdmin(order, consoleUrl));
+              const alertMsg = newOrderAlertToAdmin(order, consoleUrl);
+              // Opens the group chat with message pre-filled — admin taps Send
+              const waUrl = `https://wa.me/${APP_CONFIG.WHATSAPP_NUMBER}?text=${encodeURIComponent(alertMsg)}`;
               return (
                 <div key={order.id} className="flex items-center gap-3 px-4 py-3">
                   <div className="flex-1 min-w-0">
