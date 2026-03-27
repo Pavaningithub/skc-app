@@ -17,7 +17,7 @@ export default function StoreFront() {
   const navigate = useNavigate();
   const [products, setProducts]         = useState<Product[]>([]);
   const [testimonials, setTestimonials] = useState<Feedback[]>([]);
-  const [siteStats, setSiteStats]       = useState<{ customers: number; orders: number } | null>(null);
+  const [siteStats, setSiteStats]       = useState<{ customers: number; orders: number; holige: number } | null>(null);
   const [cart, setCart]                 = useState<CartItem[]>([]);
   const [loading, setLoading]           = useState(true);
   const [showCart, setShowCart]         = useState(false);
@@ -43,9 +43,16 @@ export default function StoreFront() {
       ]);
       setProducts(p);
       setTestimonials(f.slice(0, 6));
+      const HOLIGE_BASE = 444;
+      const holigeDelivered = allOrders
+        .filter(o => o.status === 'delivered')
+        .flatMap(o => o.items)
+        .filter(i => i.productName.toLowerCase().includes('holige') || i.productName.toLowerCase().includes('obbattu'))
+        .reduce((sum, i) => sum + i.quantity, 0);
       setSiteStats({
-        orders:    allOrders.filter(o => o.status === 'delivered').length,
+        orders:    allOrders.filter(o => o.status !== 'cancelled').length,
         customers: allCustomers.length,
+        holige:    HOLIGE_BASE + holigeDelivered,
       });
     } finally { setLoading(false); }
   }
@@ -318,9 +325,9 @@ export default function StoreFront() {
           <div className="max-w-5xl mx-auto px-4">
             <div className="grid grid-cols-3 divide-x divide-white/20">
               {[
-                { value: siteStats.customers, suffix: '+', label: 'Happy Customers', icon: '😊' },
-                { value: siteStats.orders,    suffix: '+', label: 'Orders Delivered', icon: '📦' },
-                { value: 100,                 suffix: '%', label: 'Home Made',        icon: '🏠' },
+                { value: siteStats.customers,        suffix: '+', label: 'Happy Customers',   icon: '😊' },
+                { value: siteStats.orders,           suffix: '+', label: 'Orders Placed',      icon: '📦' },
+                { value: siteStats.holige,           suffix: '+', label: 'Holige Served 🪔',   icon: '🍯' },
               ].map(stat => (
                 <div key={stat.label} className="flex flex-col items-center py-1 px-2 text-center">
                   <span className="text-xl mb-0.5">{stat.icon}</span>
@@ -331,6 +338,43 @@ export default function StoreFront() {
                 </div>
               ))}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Festival Special: Holige Banner ─────────────────────────────── */}
+      {siteStats && siteStats.holige > 0 && (
+        <div className="mx-4 my-4 rounded-2xl overflow-hidden shadow-md"
+          style={{ background: 'linear-gradient(135deg, #7b1500 0%, #c45c00 50%, #e8a000 100%)', border: '2px solid rgba(255,215,0,0.4)' }}>
+          <div className="px-5 py-4 flex items-center gap-4">
+            <div className="text-4xl flex-shrink-0">🍯</div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1 flex-wrap">
+                <span className="text-xs font-bold px-2 py-0.5 rounded-full"
+                  style={{ background: 'rgba(255,215,0,0.25)', color: '#ffd700', border: '1px solid rgba(255,215,0,0.4)' }}>
+                  🎉 Festival Special
+                </span>
+              </div>
+              <p className="text-white font-bold text-base leading-snug">
+                Holige / Obbattu — Made Fresh! 🪔
+              </p>
+              <p className="text-white/80 text-xs mt-0.5">
+                <span className="font-bold" style={{ color: '#ffd700' }}>{siteStats.holige}+</span> Holige served to happy families &amp; counting!
+              </p>
+              <p className="text-white/70 text-xs mt-1">
+                Authentic Karnataka style · Made with ghee &amp; love · Order now for your family 🙏
+              </p>
+            </div>
+            <button
+              onClick={() => {
+                setActiveCategory('All');
+                setSearchQuery('holige');
+                document.getElementById('products')?.scrollIntoView({ behavior: 'smooth' });
+              }}
+              className="flex-shrink-0 text-xs font-bold px-3 py-2 rounded-xl"
+              style={{ background: '#ffd700', color: '#7b1500' }}>
+              Order Now
+            </button>
           </div>
         </div>
       )}

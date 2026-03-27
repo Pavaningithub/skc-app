@@ -4,24 +4,24 @@
 // ╚══════════════════════════════════════════════════════════════════╝
 
 export const APP_CONFIG = {
-  // ── Business Details ────────────────────────────────────────────
+  // ── Business Details ────────────────────────────────────────
   BUSINESS_NAME:        'Sri Krishna Condiments',
   BUSINESS_TAGLINE:     'Pure, Fresh & Handcrafted',
   BUSINESS_DESCRIPTION: 'Handcrafted health foods — Chutney Powders, Masalas & more. Made fresh in small batches.',
 
-  // ── Contact ─────────────────────────────────────────────────────
-  WHATSAPP_NUMBER:      '919731874874',   // Admin WhatsApp (with country code, no +)
-  WHATSAPP_DISPLAY:     '+91 97318 74874',
-  WHATSAPP_NUMBER2:     '91REDACTED_PHONE',
-  WHATSAPP_DISPLAY2:    '+91 70906 50064',
+  // ── Contact (from env) ─────────────────────────────────────
+  WHATSAPP_NUMBER:      import.meta.env.VITE_WHATSAPP_NUMBER  as string,   // with country code, no +
+  WHATSAPP_DISPLAY:     import.meta.env.VITE_WHATSAPP_DISPLAY  as string,
+  WHATSAPP_NUMBER2:     import.meta.env.VITE_WHATSAPP_NUMBER2  as string,
+  WHATSAPP_DISPLAY2:    import.meta.env.VITE_WHATSAPP_DISPLAY2 as string,
 
-  // ── Payments ────────────────────────────────────────────────────
-  UPI_ID:               '***REMOVED***@upi',
-  UPI_NUMBER:           '***REMOVED***',
-  UPI_DISPLAY:          '***REMOVED*** (GPay / PhonePe / UPI)',
+  // ── Payments (from env) ────────────────────────────────────
+  UPI_ID:               import.meta.env.VITE_UPI_ID      as string,
+  UPI_NUMBER:           import.meta.env.VITE_UPI_NUMBER   as string,
+  UPI_DISPLAY:          import.meta.env.VITE_UPI_DISPLAY  as string,
 
-  // ── Admin Security ───────────────────────────────────────────────
-  DEFAULT_ADMIN_PIN:    '2315',          // Change after first login via Settings
+  // ── Admin Security (from env) ────────────────────────────────
+  DEFAULT_ADMIN_PIN:    import.meta.env.VITE_ADMIN_PIN   as string,
 
   // ── Subscription Discounts ───────────────────────────────────────
   SUBSCRIPTION_3M_DISCOUNT_PCT: 5,      // 5% off for 3-month plan
@@ -35,12 +35,12 @@ export const APP_CONFIG = {
   SAMPLE_SIZE_OPTIONS: ['50g', '100g'],  // Available sample sizes
   SAMPLE_MESSAGE:      'Free sample — no payment required',
 
-  // ── WhatsApp Links ────────────────────────────────────────────
+  // ── WhatsApp Links (from env) ──────────────────────────────────
   SHOW_WHATSAPP_GROUP_LINK:   true,
-  WHATSAPP_GROUP_LINK:        'https://chat.whatsapp.com/***REMOVED***',
-  WHATSAPP_CHANNEL_LINK:      'https://whatsapp.com/channel/0029VbBxnQ8BlHpdsWMhZV2T',
+  WHATSAPP_GROUP_LINK:        import.meta.env.VITE_WA_GROUP_LINK     as string,
+  WHATSAPP_CHANNEL_LINK:      import.meta.env.VITE_WA_CHANNEL_LINK   as string,
   // Internal group for order tracking (admins only)
-  ORDER_TRACKING_GROUP_LINK:  'https://chat.whatsapp.com/***REMOVED***',
+  ORDER_TRACKING_GROUP_LINK:  import.meta.env.VITE_WA_TRACKING_LINK  as string,
   WHATSAPP_GROUP_DISPLAY:     'Join Our WhatsApp Group for Offers & Updates',
   WHATSAPP_CHANNEL_DISPLAY:   'Follow Our WhatsApp Channel',
 
@@ -85,4 +85,4 @@ export const APP_CONFIG = {
   // ── On-Demand Products ───────────────────────────────────────────
   ON_DEMAND_BADGE:     'Made Fresh on Order 🔥',
   ON_DEMAND_NOTE:      'This product is prepared fresh after your order. Delivery may take 1–2 extra days.',
-} as const;
+};
