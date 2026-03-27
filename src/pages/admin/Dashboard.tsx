@@ -97,7 +97,7 @@ export default function Dashboard() {
     // Orders placed within the last NEW_ORDER_HOURS hours
     const cutoff = new Date(Date.now() - NEW_ORDER_HOURS * 60 * 60 * 1000).toISOString();
     const newOrders = orders
-      .filter(o => o.createdAt >= cutoff && o.status !== 'cancelled')
+      .filter(o => o.createdAt >= cutoff && o.status !== 'cancelled' && o.status !== 'delivered')
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 
     return {
