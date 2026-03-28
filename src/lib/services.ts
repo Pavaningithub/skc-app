@@ -90,13 +90,24 @@ export const stockService = {
       }
     }
   },
-  async deduct(productId: string, quantity: number): Promise<void> {
+  async deduct(productId: string, quantity: number, meta?: { productName: string; unit: string }): Promise<void> {
     const snap = await getDocs(query(collection(db, COLLECTIONS.STOCK), where("productId", "==", productId)));
     if (!snap.empty) {
+      // Stock entry exists — deduct (allow going negative so deficit is visible)
       const stockDoc = snap.docs[0];
       const current = (stockDoc.data() as StockItem).quantityAvailable;
       await updateDoc(doc(db, COLLECTIONS.STOCK, stockDoc.id), {
-        quantityAvailable: Math.max(0, current - quantity),
+        quantityAvailable: current - quantity,
+        updatedAt: now(),
+      });
+    } else if (meta) {
+      // No stock entry yet — create one with negative quantity so the deficit is visible
+      await addDoc(collection(db, COLLECTIONS.STOCK), {
+        productId,
+        productName: meta.productName,
+        unit: meta.unit,
+        quantityAvailable: -quantity,
+        lowStockThreshold: 0,
         updatedAt: now(),
       });
     }
