@@ -244,7 +244,7 @@ export default function StoreFront() {
 
       {/* Header */}
       <header className="sticky top-0 z-40 shadow-md" style={{ background: 'linear-gradient(90deg, #3d1c02 0%, #7a4010 50%, #3d1c02 100%)', borderBottom: '2px solid #c8821a' }}>
-        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
+        <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 text-2xl"
               style={{ background: 'rgba(200,130,26,0.25)', border: '2px solid #c8821a' }}>
@@ -289,7 +289,7 @@ export default function StoreFront() {
           ))}
         </div>
 
-        <div className="relative max-w-5xl mx-auto px-4 py-10 md:py-14">
+        <div className="relative max-w-lg mx-auto px-4 py-10 md:py-14">
           {/* Sacred greeting */}
           <div className="text-center mb-6">
             <div className="inline-flex items-center gap-2 rounded-full px-5 py-2 mb-4 text-sm font-semibold"
@@ -342,7 +342,7 @@ export default function StoreFront() {
       {/* ── Social Proof Stats Strip ─────────────────────────────────────── */}
       {siteStats && (
         <div className="py-5" style={{ background: '#3d1c02', borderBottom: '2px solid #c8821a' }}>
-          <div className="max-w-5xl mx-auto px-4">
+          <div className="max-w-lg mx-auto px-4">
             <div className="grid grid-cols-3 divide-x" style={{ borderColor: 'rgba(200,130,26,0.3)' }}>
               {[
                 { value: siteStats.customers, suffix: '+', label: 'Happy Customers', icon: '😊' },
@@ -436,7 +436,7 @@ export default function StoreFront() {
       )}
 
       {/* ── Subscription + WhatsApp ─────────────────────────────────────── */}
-      <div className="max-w-5xl mx-auto px-4 py-6 grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+      <div className="max-w-lg mx-auto px-4 py-6 grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
         {/* Subscription */}
         <SubscriptionBanner healthProducts={products.filter(p => p.category === 'Health Mix')} />
 
@@ -487,7 +487,7 @@ export default function StoreFront() {
       </div>
 
       {/* ── Products Section (scroll target) ─────────────────────────────── */}
-      <div id="products" className="max-w-5xl mx-auto px-4 pt-6 pb-28">
+      <div id="products" className="max-w-lg mx-auto px-4 pt-6 pb-28">
         <div className="flex items-center justify-between mb-1">
           <h2 className="text-xl font-bold" style={{ color: '#3d1c02', fontFamily: 'Georgia, serif' }}>🌿 Our Products</h2>
         </div>
