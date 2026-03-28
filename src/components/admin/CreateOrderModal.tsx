@@ -145,9 +145,9 @@ export default function CreateOrderModal({ onClose, onCreated }: Props) {
 
       const orderId = await ordersService.add(order);
 
-      // Deduct stock
+      // Deduct stock — skip made-fresh (isOnDemand) items
       for (const item of items) {
-        await stockService.deduct(item.productId, item.unit === 'piece' ? item.quantity : item.quantity);
+        if (!item.isOnDemand) await stockService.deduct(item.productId, item.quantity, { productName: item.productName, unit: item.unit });
       }
 
       // Update customer stats
