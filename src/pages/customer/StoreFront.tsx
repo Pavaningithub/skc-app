@@ -413,7 +413,7 @@ export default function StoreFront() {
           <div className="relative">
             <div className="flex gap-4 animate-marquee" style={{ width: 'max-content' }}>
               {[...testimonials, ...testimonials].map((t, i) => (
-                <div key={i} className="bg-white rounded-2xl p-4 shadow-sm flex-shrink-0 w-64"
+                <div key={i} className="bg-white rounded-2xl p-4 shadow-sm flex-shrink-0 w-72"
                   style={{ border: '1px solid #f0d9c8' }}>
                   <div className="flex items-center gap-1 mb-2">
                     {[1,2,3,4,5].map(s => (
@@ -421,7 +421,7 @@ export default function StoreFront() {
                         style={{ fill: s <= t.rating ? '#f59e0b' : '#e5e7eb', color: s <= t.rating ? '#f59e0b' : '#e5e7eb' }} />
                     ))}
                   </div>
-                  <p className="text-xs text-gray-700 italic line-clamp-3">"{t.whatYouLiked}"</p>
+                  <p className="text-xs text-gray-700 italic leading-relaxed">"{t.whatYouLiked}"</p>
                   <p className="text-xs font-semibold mt-2" style={{ color: '#c45c00' }}>— {t.customerName}</p>
                 </div>
               ))}
