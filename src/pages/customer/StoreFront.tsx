@@ -13,6 +13,14 @@ import type { Product, Feedback, OrderItem, Order } from '../../lib/types';
 
 interface CartItem extends OrderItem {}
 
+/** Strip spaces, dashes, +91 country code — return bare 10-digit mobile number */
+function normalizeWhatsapp(raw: string): string {
+  const digits = raw.replace(/\D/g, '');          // remove everything non-digit
+  if (digits.length === 12 && digits.startsWith('91')) return digits.slice(2);  // +91XXXXXXXXXX
+  if (digits.length === 11 && digits.startsWith('0'))  return digits.slice(1);  // 0XXXXXXXXXX
+  return digits;
+}
+
 export default function StoreFront() {
   const navigate = useNavigate();
   const [products, setProducts]         = useState<Product[]>([]);
@@ -143,8 +151,8 @@ export default function StoreFront() {
 
   async function handlePlaceOrder() {
     if (!orderForm.name.trim())  return toast.error('Please enter your name');
-    const wa = orderForm.whatsapp.replace(/\D/g, '');
-    if (wa.length < 10)          return toast.error('Enter a valid WhatsApp number');
+    const wa = normalizeWhatsapp(orderForm.whatsapp);
+    if (wa.length !== 10)        return toast.error('Enter a valid 10-digit WhatsApp number');
     if (cart.length === 0)       return toast.error('Your cart is empty');
     setSubmitting(true);
     try {
@@ -182,8 +190,8 @@ export default function StoreFront() {
 
   async function handleSampleRequest() {
     if (!orderForm.name.trim()) return toast.error('Please enter your name');
-    const wa = orderForm.whatsapp.replace(/\D/g, '');
-    if (wa.length < 10)         return toast.error('Enter a valid WhatsApp number');
+    const wa = normalizeWhatsapp(orderForm.whatsapp);
+    if (wa.length !== 10)       return toast.error('Enter a valid 10-digit WhatsApp number');
     if (sampleSelected.length === 0) return toast.error('Please select at least one product');
     setSubmitting(true);
     try {
@@ -222,41 +230,41 @@ export default function StoreFront() {
   }
 
   if (loading) return (
-    <div className="min-h-screen flex items-center justify-center" style={{ background: 'linear-gradient(160deg, #7b1500 0%, #c45c00 60%, #2e7d32 100%)' }}>
+    <div className="min-h-screen flex items-center justify-center" style={{ background: 'linear-gradient(160deg, #3d1c02 0%, #7a4010 50%, #c8821a 100%)' }}>
       <div className="text-center">
-        <div className="text-5xl mb-4 animate-bounce">🪷</div>
-        <p className="font-bold text-white text-lg mb-1" style={{ fontFamily: 'Poppins, sans-serif' }}>Sri Krishna Condiments</p>
-        <p className="text-sm" style={{ color: '#ffd700' }}>🙏 Hare Krishna…</p>
+        <div className="text-6xl mb-4 animate-bounce">🪈</div>
+        <p className="font-bold text-white text-lg mb-1" style={{ fontFamily: 'Georgia, serif', letterSpacing: '1px' }}>Sri Krishna Condiments</p>
+        <p className="text-sm italic" style={{ color: '#ffd700' }}>Where Taste Meets Tradition…</p>
       </div>
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-white font-sans">
+    <div className="min-h-screen font-sans" style={{ background: '#fdf5e6' }}>
 
       {/* Header */}
-      <header className="sticky top-0 z-40 shadow-sm" style={{ background: 'linear-gradient(90deg, #7b1500 0%, #c45c00 60%, #7b1500 100%)' }}>
+      <header className="sticky top-0 z-40 shadow-md" style={{ background: 'linear-gradient(90deg, #3d1c02 0%, #7a4010 50%, #3d1c02 100%)', borderBottom: '2px solid #c8821a' }}>
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5 min-w-0">
-            {/* Sacred tilak/lotus icon */}
-            <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 text-xl"
-              style={{ background: 'rgba(255,255,255,0.15)', border: '1.5px solid rgba(255,215,0,0.5)' }}>
-              🪷
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 text-2xl"
+              style={{ background: 'rgba(200,130,26,0.25)', border: '2px solid #c8821a' }}>
+              🪈
             </div>
             <div className="min-w-0">
-              <p className="font-bold text-sm leading-tight text-white" style={{ fontFamily: 'Poppins, sans-serif', letterSpacing: '0.3px' }}>
+              <p className="font-bold text-sm leading-tight text-white" style={{ fontFamily: 'Georgia, serif', letterSpacing: '0.5px' }}>
                 Sri Krishna Condiments
               </p>
-              <p className="text-xs leading-tight" style={{ color: '#ffd700', letterSpacing: '0.5px' }}>🙏 Pure · Fresh · Made with Love</p>
+              <p className="text-xs leading-tight italic" style={{ color: '#ffd700' }}>Where Taste Meets Tradition</p>
             </div>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
             <button onClick={() => setShowCart(true)}
               className="relative w-11 h-11 rounded-full flex items-center justify-center"
-              style={{ background: 'rgba(255,255,255,0.15)', border: '1.5px solid rgba(255,215,0,0.4)' }}>
+              style={{ background: 'rgba(200,130,26,0.25)', border: '1.5px solid #c8821a' }}>
               <ShoppingCart className="w-5 h-5 text-white" />
               {cartCount > 0 && (
-                <span className="absolute -top-1 -right-1 w-5 h-5 bg-yellow-400 text-yellow-900 text-xs rounded-full flex items-center justify-center font-bold">
+                <span className="absolute -top-1 -right-1 w-5 h-5 text-xs rounded-full flex items-center justify-center font-bold"
+                  style={{ background: '#c8821a', color: '#3d1c02' }}>
                   {cartCount}
                 </span>
               )}
@@ -266,7 +274,7 @@ export default function StoreFront() {
       </header>
 
       {/* Hero */}
-      <div className="relative overflow-hidden" style={{ background: 'linear-gradient(160deg, #7b1500 0%, #c45c00 40%, #e8762a 70%, #2e7d32 100%)' }}>
+      <div className="relative overflow-hidden" style={{ background: 'linear-gradient(160deg, #3d1c02 0%, #7a4010 40%, #c8821a 75%, #e8a000 100%)' }}>
         {/* Decorative pattern */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
           {/* Lotus petals pattern */}
@@ -289,7 +297,7 @@ export default function StoreFront() {
               🙏 Hare Krishna — Hare Rama 🙏
             </div>
             <h1 className="text-3xl md:text-4xl font-bold text-white mb-1.5"
-              style={{ fontFamily: 'Poppins, sans-serif', textShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>
+              style={{ fontFamily: 'Georgia, serif', textShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>
               ಶ್ರೀ ಕೃಷ್ಣ ಕಾಂಡಿಮೆಂಟ್ಸ್
             </h1>
             <p className="text-white/90 font-medium mb-1" style={{ letterSpacing: '1px' }}>Sri Krishna Condiments</p>
@@ -318,7 +326,7 @@ export default function StoreFront() {
             <button
               onClick={() => document.getElementById('products')?.scrollIntoView({ behavior: 'smooth' })}
               className="font-bold px-7 py-3 rounded-2xl text-sm shadow-lg"
-              style={{ background: '#ffd700', color: '#7b1500', boxShadow: '0 4px 15px rgba(255,215,0,0.4)' }}>
+              style={{ background: '#c8821a', color: '#fff', border: '1.5px solid #e8c87a', boxShadow: '0 4px 15px rgba(200,130,26,0.4)' }}>
               🛍️ Shop Now
             </button>
             <button
@@ -333,20 +341,20 @@ export default function StoreFront() {
 
       {/* ── Social Proof Stats Strip ─────────────────────────────────────── */}
       {siteStats && (
-        <div className="py-5" style={{ background: 'linear-gradient(90deg, #7b1500 0%, #c45c00 50%, #7b1500 100%)' }}>
+        <div className="py-5" style={{ background: '#3d1c02', borderBottom: '2px solid #c8821a' }}>
           <div className="max-w-5xl mx-auto px-4">
-            <div className="grid grid-cols-3 divide-x divide-white/20">
+            <div className="grid grid-cols-3 divide-x" style={{ borderColor: 'rgba(200,130,26,0.3)' }}>
               {[
-                { value: siteStats.customers,        suffix: '+', label: 'Happy Customers',   icon: '😊' },
-                { value: siteStats.orders,           suffix: '+', label: 'Orders Placed',      icon: '📦' },
-                { value: siteStats.holige,           suffix: '+', label: 'Holige Served 🪔',   icon: '🍯' },
+                { value: siteStats.customers, suffix: '+', label: 'Happy Customers', icon: '😊' },
+                { value: siteStats.orders,    suffix: '+', label: 'Orders Served',    icon: '📦' },
+                { value: siteStats.holige,    suffix: '+', label: 'Holige Served 🪔', icon: '🍯' },
               ].map(stat => (
                 <div key={stat.label} className="flex flex-col items-center py-1 px-2 text-center">
                   <span className="text-xl mb-0.5">{stat.icon}</span>
-                  <span className="text-2xl md:text-3xl font-bold" style={{ color: '#ffd700', fontFamily: 'Poppins, sans-serif' }}>
+                  <span className="text-2xl md:text-3xl font-bold" style={{ color: '#c8821a', fontFamily: 'Georgia, serif' }}>
                     {stat.value}{stat.suffix}
                   </span>
-                  <span className="text-xs text-white/80 font-medium mt-0.5 leading-tight">{stat.label}</span>
+                  <span className="text-xs font-medium mt-0.5 leading-tight" style={{ color: 'rgba(255,255,255,0.7)' }}>{stat.label}</span>
                 </div>
               ))}
             </div>
@@ -357,24 +365,22 @@ export default function StoreFront() {
       {/* ── Festival Special: Holige Banner ─────────────────────────────── */}
       {siteStats && siteStats.holige > 0 && (
         <div className="mx-4 my-4 rounded-2xl overflow-hidden shadow-md"
-          style={{ background: 'linear-gradient(135deg, #7b1500 0%, #c45c00 50%, #e8a000 100%)', border: '2px solid rgba(255,215,0,0.4)' }}>
+          style={{ background: 'linear-gradient(135deg, #3d1c02 0%, #7a4010 50%, #c8821a 100%)', border: '2px solid #c8821a' }}>
           <div className="px-5 py-4 flex items-center gap-4">
-            <div className="text-4xl flex-shrink-0">🍯</div>
+            <div className="text-4xl flex-shrink-0">🪘</div>
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1 flex-wrap">
-                <span className="text-xs font-bold px-2 py-0.5 rounded-full"
-                  style={{ background: 'rgba(255,215,0,0.25)', color: '#ffd700', border: '1px solid rgba(255,215,0,0.4)' }}>
-                  🎉 Festival Special
-                </span>
-              </div>
-              <p className="text-white font-bold text-base leading-snug">
-                Holige / Obbattu — Made Fresh! 🪔
+              <span className="text-xs font-bold px-2 py-0.5 rounded-full inline-block mb-1"
+                style={{ background: 'rgba(200,130,26,0.3)', color: '#ffd700', border: '1px solid rgba(200,130,26,0.5)' }}>
+                🎉 Festival Special
+              </span>
+              <p className="text-white font-bold text-base leading-snug" style={{ fontFamily: 'Georgia, serif' }}>
+                Holige / Obbattu — Made Fresh!
               </p>
               <p className="text-white/80 text-xs mt-0.5">
-                <span className="font-bold" style={{ color: '#ffd700' }}>{siteStats.holige}+</span> Holige served to happy families &amp; counting!
+                <span className="font-bold" style={{ color: '#c8821a' }}>{siteStats.holige}+</span> Holige served to happy families &amp; counting!
               </p>
-              <p className="text-white/70 text-xs mt-1">
-                Authentic Karnataka style · Made with ghee &amp; love · Order now for your family 🙏
+              <p className="text-white/60 text-xs mt-1">
+                Authentic Karnataka style · Made with ghee &amp; love 🙏
               </p>
             </div>
             <button
@@ -383,8 +389,8 @@ export default function StoreFront() {
                 setSearchQuery('holige');
                 document.getElementById('products')?.scrollIntoView({ behavior: 'smooth' });
               }}
-              className="flex-shrink-0 text-xs font-bold px-3 py-2 rounded-xl"
-              style={{ background: '#ffd700', color: '#7b1500' }}>
+              className="flex-shrink-0 text-xs font-bold px-4 py-2 rounded-full"
+              style={{ background: '#c8821a', color: '#fff', border: '1.5px solid #ffd700' }}>
               Order Now
             </button>
           </div>
@@ -393,36 +399,35 @@ export default function StoreFront() {
 
       {/* ── Testimonials Marquee ────────────────────────────────────────── */}
       {testimonials.length > 0 && (
-        <div className="py-6 overflow-hidden" style={{ background: '#fff4eb', borderTop: '1px solid #f0d9c8' }}>
+        <div className="py-6 overflow-hidden" style={{ background: '#fdf0d5', borderTop: '2px solid #c8821a', borderBottom: '2px solid #c8821a' }}>
           <div className="text-center mb-4 px-4">
-            <h2 className="text-base font-bold mb-1" style={{ color: '#c45c00', fontFamily: 'Poppins, sans-serif' }}>What Our Customers Say ✨</h2>
+            <h2 className="text-base font-bold mb-1" style={{ color: '#3d1c02', fontFamily: 'Georgia, serif' }}>What Our Customers Say ✨</h2>
             {feedbackStats && (
               <div className="flex items-center justify-center gap-3 flex-wrap">
-                <span className="flex items-center gap-1 text-xs font-semibold" style={{ color: '#92400e' }}>
-                  <Star className="w-3.5 h-3.5" style={{ fill: '#f59e0b', color: '#f59e0b' }} />
+                <span className="flex items-center gap-1 text-xs font-semibold" style={{ color: '#7a4010' }}>
+                  <Star className="w-3.5 h-3.5" style={{ fill: '#c8821a', color: '#c8821a' }} />
                   {feedbackStats.avg} avg rating
                 </span>
-                <span className="text-gray-300 text-xs">•</span>
-                <span className="text-xs font-semibold" style={{ color: '#92400e' }}>
+                <span className="text-xs" style={{ color: '#c8821a' }}>•</span>
+                <span className="text-xs font-semibold" style={{ color: '#7a4010' }}>
                   💬 {feedbackStats.total}+ happy reviews
                 </span>
               </div>
             )}
           </div>
-          {/* Marquee container */}
           <div className="relative">
             <div className="flex gap-4 animate-marquee" style={{ width: 'max-content' }}>
               {[...testimonials, ...testimonials].map((t, i) => (
-                <div key={i} className="bg-white rounded-2xl p-4 shadow-sm flex-shrink-0 w-72"
-                  style={{ border: '1px solid #f0d9c8' }}>
+                <div key={i} className="rounded-2xl p-4 shadow-sm flex-shrink-0 w-72"
+                  style={{ background: '#fff', border: '1.5px solid #e8c87a' }}>
                   <div className="flex items-center gap-1 mb-2">
                     {[1,2,3,4,5].map(s => (
                       <Star key={s} className="w-3.5 h-3.5"
-                        style={{ fill: s <= t.rating ? '#f59e0b' : '#e5e7eb', color: s <= t.rating ? '#f59e0b' : '#e5e7eb' }} />
+                        style={{ fill: s <= t.rating ? '#c8821a' : '#e5e7eb', color: s <= t.rating ? '#c8821a' : '#e5e7eb' }} />
                     ))}
                   </div>
-                  <p className="text-xs text-gray-700 italic leading-relaxed">"{t.whatYouLiked}"</p>
-                  <p className="text-xs font-semibold mt-2" style={{ color: '#c45c00' }}>— {t.customerName}</p>
+                  <p className="text-xs italic leading-relaxed" style={{ color: '#4a2c0a' }}>"{t.whatYouLiked}"</p>
+                  <p className="text-xs font-bold mt-2" style={{ color: '#c8821a' }}>— {t.customerName}</p>
                 </div>
               ))}
             </div>
@@ -437,7 +442,7 @@ export default function StoreFront() {
 
         {/* WhatsApp CTAs */}
         <div className="space-y-3">
-          <h2 className="text-sm font-bold" style={{ color: '#2e7d32' }}>Stay Connected</h2>
+          <h2 className="text-sm font-bold" style={{ color: '#3d1c02' }}>Stay Connected</h2>
           <a href={APP_CONFIG.WHATSAPP_GROUP_LINK} target="_blank" rel="noreferrer"
             className="flex items-center justify-between bg-white rounded-2xl px-4 py-3 shadow-sm"
             style={{ border: '1px solid #c8e6c9' }}>
@@ -469,7 +474,7 @@ export default function StoreFront() {
           {/* Free sample CTA card */}
           <button onClick={openSampleForm}
             className="w-full flex items-center gap-3 bg-white rounded-2xl px-4 py-3 shadow-sm text-left"
-            style={{ border: '1.5px dashed #c45c00' }}>
+            style={{ border: '1.5px dashed #c8821a' }}>
             <div className="w-9 h-9 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
               style={{ background: '#fff4eb' }}>🎁</div>
             <div>
@@ -484,7 +489,7 @@ export default function StoreFront() {
       {/* ── Products Section (scroll target) ─────────────────────────────── */}
       <div id="products" className="max-w-5xl mx-auto px-4 pt-6 pb-28">
         <div className="flex items-center justify-between mb-1">
-          <h2 className="text-xl font-bold" style={{ color: '#7b1500', fontFamily: 'Poppins, sans-serif' }}>🌿 Our Products</h2>
+          <h2 className="text-xl font-bold" style={{ color: '#3d1c02', fontFamily: 'Georgia, serif' }}>🌿 Our Products</h2>
         </div>
         <p className="text-xs text-gray-400 mb-4">Tap any product to add to cart · Made fresh in small batches 🙏</p>
         <div className="relative mb-4">
@@ -512,7 +517,7 @@ export default function StoreFront() {
               <button key={cat} onClick={() => setActiveCategory(cat)}
                 className="flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-medium transition-colors"
                 style={activeCategory === cat
-                  ? { background: '#c45c00', color: '#fff' }
+                  ? { background: '#c8821a', color: '#fff' }
                   : { background: '#f5f5f5', color: '#666' }}>
                 {cat}
               </button>
@@ -556,11 +561,11 @@ export default function StoreFront() {
       </div>
 
       {/* Footer */}
-      <footer className="py-8 text-center" style={{ background: 'linear-gradient(160deg, #7b1500 0%, #2d1a00 100%)' }}>
+      <footer className="py-8 text-center" style={{ background: 'linear-gradient(160deg, #3d1c02 0%, #1a0a00 100%)' }}>
         <div className="max-w-md mx-auto px-4">
           <div className="flex justify-center items-center gap-2 mb-2">
             <span className="text-2xl">🪷</span>
-            <span className="font-bold text-white text-base" style={{ fontFamily: 'Poppins, sans-serif' }}>Sri Krishna Condiments</span>
+            <span className="font-bold text-white text-base" style={{ fontFamily: 'Georgia, serif' }}>Sri Krishna Condiments</span>
           </div>
           <p className="text-xs mb-1" style={{ color: '#ffd700' }}>🙏 Hare Krishna — Pure · Fresh · Made with Devotion 🌿</p>
           <p className="text-xs mt-3" style={{ color: '#d4a574' }}>
@@ -585,7 +590,7 @@ export default function StoreFront() {
           <div className="max-w-lg mx-auto">
             <button onClick={() => setShowCart(true)}
               className="w-full flex items-center justify-between text-white font-bold px-5 py-4 rounded-2xl shadow-2xl"
-              style={{ background: 'linear-gradient(90deg, #7b1500 0%, #c45c00 100%)', boxShadow: '0 8px 24px rgba(196,92,0,0.5)' }}>
+              style={{ background: 'linear-gradient(90deg, #3d1c02 0%, #c8821a 100%)', boxShadow: '0 8px 24px rgba(200,130,26,0.5)' }}>
               <span className="flex items-center gap-2">
                 <span className="bg-yellow-400 text-yellow-900 rounded-xl px-2.5 py-0.5 text-sm font-bold">{cartCount}</span>
                 <span className="text-sm">item{cartCount > 1 ? 's' : ''} in cart</span>
@@ -630,7 +635,7 @@ export default function StoreFront() {
                     )}
                   </div>
                   <div className="flex flex-col items-end gap-2">
-                    <p className="text-sm font-bold" style={{ color: '#c45c00' }}>₹{item.totalPrice.toFixed(0)}</p>
+                    <p className="text-sm font-bold" style={{ color: '#c8821a' }}>₹{item.totalPrice.toFixed(0)}</p>
                     <div className="flex items-center gap-1.5">
                       <button onClick={() => updateCartItem(i, item.quantity - (item.unit === 'piece' ? 1 : 50))}
                         className="w-7 h-7 rounded-lg border flex items-center justify-center bg-white" style={{ borderColor: '#e0e0e0' }}>
@@ -660,12 +665,12 @@ export default function StoreFront() {
                 )}
                 <div className="flex justify-between items-center">
                   <span className="text-gray-600 text-sm">Total ({cartCount} items)</span>
-                  <span className="text-xl font-bold" style={{ color: '#c45c00' }}>{formatCurrency(cartTotal)}</span>
+                  <span className="text-xl font-bold" style={{ color: '#c8821a' }}>{formatCurrency(cartTotal)}</span>
                 </div>
                 <button
                   onClick={() => { setShowCart(false); setShowOrderForm(true); setOrderForm({ name: '', whatsapp: '', place: '', notes: '' }); }}
                   className="w-full text-white font-semibold py-3.5 rounded-2xl text-sm"
-                  style={{ background: '#c45c00' }}>
+                  style={{ background: '#c8821a' }}>
                   Proceed to Order →
                 </button>
               </div>
@@ -889,7 +894,7 @@ function ProductCard({ product, onAddToCart }: {
           {product.description && (
             <p className="text-xs text-gray-400 mt-1 leading-snug line-clamp-2">{product.description}</p>
           )}
-          <p className="font-bold text-sm mt-2" style={{ color: '#c45c00' }}>{priceDisplay}</p>
+          <p className="font-bold text-sm mt-2" style={{ color: '#c8821a' }}>{priceDisplay}</p>
         </div>
 
         {/* Add button */}
@@ -897,7 +902,7 @@ function ProductCard({ product, onAddToCart }: {
           <button
             onClick={e => { e.stopPropagation(); setShowDetail(true); }}
             className="w-full font-bold py-2 rounded-xl text-sm flex items-center justify-center gap-1"
-            style={{ background: '#fff4eb', color: '#c45c00', border: '1.5px solid #e8c4a0' }}>
+            style={{ background: '#fdf5e6', color: '#7a4010', border: '1.5px solid #c8821a' }}>
             <Plus className="w-3.5 h-3.5" /> Add
           </button>
         </div>
@@ -951,7 +956,7 @@ function ProductDetailSheet({ product, qty, setQty, qtyStep, minQty, qtyLabel, p
 
         {/* Badges */}
         <div className="flex gap-2 flex-wrap">
-          <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: '#fff4eb', color: '#c45c00' }}>{product.category}</span>
+          <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: '#fdf5e6', color: '#7a4010' }}>{product.category}</span>
           {isOccasion && <span className="text-xs px-2 py-0.5 rounded-full font-semibold" style={{ background: '#fce7f3', color: '#be185d' }}>🎉 Occasions only</span>}
           {product.isOnDemand && <span className="text-xs px-2 py-0.5 rounded-full font-semibold" style={{ background: '#fff8e1', color: '#b45309' }}>🔥 Made Fresh on Order</span>}
         </div>
@@ -961,7 +966,7 @@ function ProductDetailSheet({ product, qty, setQty, qtyStep, minQty, qtyLabel, p
           <div>
             <p className={`text-sm text-gray-600 leading-relaxed ${showFullDesc ? '' : 'line-clamp-3'}`}>{product.description}</p>
             {descLong && (
-              <button onClick={() => setShowFullDesc(s => !s)} className="text-xs font-medium mt-0.5" style={{ color: '#c45c00' }}>
+              <button onClick={() => setShowFullDesc(s => !s)} className="text-xs font-medium mt-0.5" style={{ color: '#c8821a' }}>
                 {showFullDesc ? 'Show less ▲' : 'Read more ▼'}
               </button>
             )}
@@ -976,7 +981,7 @@ function ProductDetailSheet({ product, qty, setQty, qtyStep, minQty, qtyLabel, p
           </div>
         )}
 
-        <p className="text-2xl font-bold" style={{ color: '#c45c00' }}>
+        <p className="text-2xl font-bold" style={{ color: '#c8821a' }}>
           {priceDisplay}
           {(product.unit === 'gram' || product.unit === 'kg') && (
             <span className="text-sm font-normal text-gray-400 ml-2">= ₹{Math.round(price)} for {qtyLabel}</span>
@@ -1005,7 +1010,7 @@ function ProductDetailSheet({ product, qty, setQty, qtyStep, minQty, qtyLabel, p
         {/* Customization */}
         {product.allowCustomization && (
           <div>
-            <button onClick={() => setShowNote(s => !s)} className="text-xs underline" style={{ color: '#c45c00' }}>
+            <button onClick={() => setShowNote(s => !s)} className="text-xs underline" style={{ color: '#c8821a' }}>
               {showNote ? '− Hide' : '+ Add'} special instructions
             </button>
             {showNote && (
@@ -1021,7 +1026,7 @@ function ProductDetailSheet({ product, qty, setQty, qtyStep, minQty, qtyLabel, p
         <button
           onClick={() => { onAddToCart(product, qty, note); onClose(); }}
           className="w-full flex items-center justify-between text-white font-bold py-3.5 px-5 rounded-2xl text-sm"
-          style={{ background: '#c45c00' }}>
+          style={{ background: '#c8821a' }}>
           <span>Add to Cart</span>
           <span>₹{Math.round(price)}</span>
         </button>
@@ -1094,7 +1099,7 @@ function SampleModal({ products, selected, onToggle, step, setStep, form, setFor
                 <div className="mb-3 flex gap-2 flex-wrap">
                   {selected.map(p => (
                     <span key={p.id} className="text-xs px-2 py-1 rounded-full font-medium flex items-center gap-1"
-                      style={{ background: '#fff4eb', color: '#c45c00' }}>
+                      style={{ background: '#fff4eb', color: '#c8821a' }}>
                       {p.name}
                       <button onClick={() => onToggle(p)} className="ml-1 text-gray-400 hover:text-red-400">×</button>
                     </span>
@@ -1105,7 +1110,7 @@ function SampleModal({ products, selected, onToggle, step, setStep, form, setFor
                 onClick={() => setStep('contact')}
                 disabled={selected.length === 0}
                 className="w-full text-white font-bold py-3.5 rounded-2xl text-sm disabled:opacity-40"
-                style={{ background: '#c45c00' }}>
+                style={{ background: '#c8821a' }}>
                 {selected.length === 0 ? 'Select at least 1 product' : `Next — Enter your details →`}
               </button>
             </div>
@@ -1147,7 +1152,7 @@ function SampleModal({ products, selected, onToggle, step, setStep, form, setFor
             <div className="p-4 border-t flex-shrink-0 space-y-2" style={{ borderColor: '#f0d9c8' }}>
               <button onClick={onSubmit} disabled={submitting}
                 className="w-full text-white font-bold py-3.5 rounded-2xl text-sm disabled:opacity-50"
-                style={{ background: '#c45c00' }}>
+                style={{ background: '#c8821a' }}>
                 {submitting ? 'Sending…' : '🎁 Request Free Sample'}
               </button>
               <button onClick={() => setStep('pick')} className="w-full text-gray-500 text-sm py-1">
@@ -1208,13 +1213,13 @@ function OrderFormModal({
                       ×{item.quantity}{item.unit !== 'piece' ? 'g' : ''}
                     </span>
                   </span>
-                  <span className="font-semibold" style={{ color: '#c45c00' }}>₹{item.totalPrice.toFixed(0)}</span>
+                  <span className="font-semibold" style={{ color: '#c8821a' }}>₹{item.totalPrice.toFixed(0)}</span>
                 </div>
               ))}
               <div className="flex justify-between items-center px-4 py-2.5 font-bold text-sm"
                 style={{ background: '#fff4eb', borderTop: '1px solid #f0d9c8' }}>
                 <span>Total</span>
-                <span style={{ color: '#c45c00' }}>₹{cartTotal}</span>
+                <span style={{ color: '#c8821a' }}>₹{cartTotal}</span>
               </div>
             </div>
           )}
@@ -1259,7 +1264,7 @@ function OrderFormModal({
         <div className="sticky bottom-0 bg-white px-5 pb-6 pt-3 border-t" style={{ borderColor: '#f0d9c8' }}>
           <button onClick={onSubmit} disabled={submitting}
             className="w-full text-white font-bold py-3.5 rounded-2xl text-sm disabled:opacity-50"
-            style={{ background: '#c45c00' }}>
+            style={{ background: '#c8821a' }}>
             {submitting ? 'Sending…' : isSample ? '🎁 Request Sample' : '✅ Place Order'}
           </button>
         </div>
