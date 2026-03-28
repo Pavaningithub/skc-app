@@ -48,7 +48,7 @@ Order No: *#${order.orderNumber}*
 ${items}
 ${order.discount > 0 ? `\nDiscount: -₹${order.discount}` : ''}
 *Total: ₹${order.total}*
-${order.type === 'sample' ? '\n✅ This is a *FREE SAMPLE* — no payment needed.' : `\n💳 Payment of ₹${order.total} due on delivery.`}
+${order.type === 'sample' ? '\n✅ This is a *FREE SAMPLE* — no payment needed.' : ''}
 
 We will keep you updated on your order.
 Thank you for choosing ${BUSINESS_NAME}! 🌿`;
@@ -64,9 +64,9 @@ Hi *${order.customerName}*, your order is on the way! 🚀
 Order No: *#${order.orderNumber}*
 ${order.type === 'sample' ? '\n✅ FREE SAMPLE — no payment needed.' : `\n💳 *Payment Due: ₹${order.total}*
 
-Pay via UPI:
+Pay via GPay / PhonePe / any UPI app:
 📲 UPI ID: \`${APP_CONFIG.UPI_ID}\`
-🔗 Pay directly: ${upiLink}`}
+🔗 Tap to pay (Android): ${upiLink}`}
 
 Thank you for choosing ${BUSINESS_NAME}! 🌿
 _Pure • Fresh • Handcrafted with Love_ 🙏`;
@@ -169,9 +169,9 @@ Just a gentle reminder that payment of *₹${order.total}* is pending for your o
 ${items}${order.discount > 0 ? `\nDiscount: -₹${order.discount}` : ''}
 *Total Due: ₹${order.total}*
 
-You can pay via UPI:
+Pay via GPay / PhonePe / any UPI app:
 📲 UPI ID: \`${APP_CONFIG.UPI_ID}\`
-🔗 Pay directly: ${upiLink}
+🔗 Tap to pay (Android): ${upiLink}
 
 Thank you so much! 🙏
 _${BUSINESS_NAME} — Pure • Fresh • Handcrafted_`;
