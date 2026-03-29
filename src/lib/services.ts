@@ -7,7 +7,7 @@ import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { db } from "./firebase";
 import type {
   Product, StockItem, RawMaterial, RawMaterialPurchase,
-  Batch, Customer, Order, Expense, Subscription, Feedback, AdminAction, AdminActionType,
+  Batch, Customer, Order, Expense, Subscription, Feedback, AdminAction, AdminActionType, AdminUser,
 } from "./types";
 
 // ─── Collection Names ─────────────────────────────────────────────────────────
@@ -24,6 +24,7 @@ export const COLLECTIONS = {
   FEEDBACK:              "feedback",
   SETTINGS:              "settings",
   ADMIN_ACTIVITY:        "adminActivity",
+  ADMIN_USERS:           "adminUsers",
 } as const;
 
 function now() { return new Date().toISOString(); }
@@ -116,6 +117,9 @@ export const stockService = {
     const all = await this.getAll();
     return all.filter(s => s.quantityAvailable <= s.lowStockThreshold);
   },
+  async delete(id: string): Promise<void> {
+    await deleteDoc(doc(db, COLLECTIONS.STOCK, id));
+  },
   subscribe(cb: (items: StockItem[]) => void): Unsubscribe {
     return onSnapshot(collection(db, COLLECTIONS.STOCK), snap => {
       cb(snap.docs.map(d => ({ id: d.id, ...d.data() } as StockItem)));
@@ -175,6 +179,9 @@ export const batchesService = {
   async add(batch: Omit<Batch, "id">): Promise<string> {
     const ref = await addDoc(collection(db, COLLECTIONS.BATCHES), { ...batch, createdAt: now() });
     return ref.id;
+  },
+  async update(id: string, data: Partial<Omit<Batch, 'id'>>): Promise<void> {
+    await updateDoc(doc(db, COLLECTIONS.BATCHES, id), { ...data, updatedAt: now() });
   },
   async delete(id: string): Promise<void> {
     await deleteDoc(doc(db, COLLECTIONS.BATCHES, id));
@@ -385,6 +392,47 @@ export const feedbackService = {
 };
 
 // ─── Settings (PIN) ───────────────────────────────────────────────────────────
+// ─── Admin Users ──────────────────────────────────────────────────────────────
+export const adminUsersService = {
+  async getAll(): Promise<AdminUser[]> {
+    const snap = await getDocs(collection(db, COLLECTIONS.ADMIN_USERS));
+    return snap.docs.map(d => ({ id: d.id, ...d.data() } as AdminUser));
+  },
+  async getByUsername(username: string): Promise<AdminUser | null> {
+    const snap = await getDocs(
+      query(collection(db, COLLECTIONS.ADMIN_USERS), where("username", "==", username.toLowerCase()))
+    );
+    if (snap.empty) return null;
+    return { id: snap.docs[0].id, ...snap.docs[0].data() } as AdminUser;
+  },
+  async verifyPin(username: string, pin: string): Promise<AdminUser | null> {
+    const user = await this.getByUsername(username);
+    if (!user || user.pin !== pin) return null;
+    return user;
+  },
+  async changePin(userId: string, newPin: string): Promise<void> {
+    await updateDoc(doc(db, COLLECTIONS.ADMIN_USERS, userId), {
+      pin: newPin,
+      mustChangePin: false,
+      updatedAt: now(),
+    });
+  },
+  /** Seed initial users if none exist yet — uses fixed doc IDs to prevent duplicates */
+  async seed(defaultPin: string): Promise<void> {
+    const users: Array<Omit<AdminUser, 'id'> & { docId: string }> = [
+      { docId: 'user_pavan',   username: 'pavan',   displayName: 'Pavan',   role: 'owner', pin: defaultPin, mustChangePin: false, createdAt: now(), updatedAt: now() },
+      { docId: 'user_pallavi', username: 'pallavi', displayName: 'Pallavi', role: 'owner', pin: defaultPin, mustChangePin: true,  createdAt: now(), updatedAt: now() },
+    ];
+    for (const { docId, ...data } of users) {
+      const ref = doc(db, COLLECTIONS.ADMIN_USERS, docId);
+      const snap = await getDoc(ref);
+      if (!snap.exists()) {
+        await setDoc(ref, data);
+      }
+    }
+  },
+};
+
 export const settingsService = {
   async getPin(): Promise<string> {
     const docSnap = await getDoc(doc(db, COLLECTIONS.SETTINGS, "admin"));
