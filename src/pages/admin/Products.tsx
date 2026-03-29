@@ -295,16 +295,19 @@ export default function Products() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Minimum Order Quantity
                   <span className="text-gray-400 font-normal ml-1">
-                    ({form.unit === 'piece' ? 'pieces' : 'grams'}) — 0 means no minimum
+                    ({form.unit === 'piece' ? 'pieces' : form.unit === 'kg' ? 'kg — e.g. 0.25 for 250g' : 'grams'}) — 0 means no minimum
                   </span>
                 </label>
                 <input
-                  type="number" min="0" step={form.unit === 'piece' ? 1 : 50}
+                  type="number" min="0" step={form.unit === 'piece' ? 1 : form.unit === 'kg' ? 0.25 : 50}
                   value={form.minOrderQty || ''}
-                  onChange={e => setForm(f => ({ ...f, minOrderQty: parseInt(e.target.value) || 0 }))}
-                  placeholder="0"
+                  onChange={e => setForm(f => ({ ...f, minOrderQty: parseFloat(e.target.value) || 0 }))}
+                  placeholder={form.unit === 'kg' ? '0.25' : '0'}
                   className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-orange-400"
                 />
+                {form.unit === 'kg' && form.minOrderQty > 0 && (
+                  <p className="text-xs text-orange-500 mt-1">= {form.minOrderQty < 1 ? `${Math.round(form.minOrderQty * 1000)}g` : `${form.minOrderQty}kg`} minimum order</p>
+                )}
               </div>
 
               {/* Category */}
