@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Plus, Pencil, Trash2, ToggleLeft, ToggleRight, Search, ArrowUpDown, Filter } from 'lucide-react';
+import { Plus, Pencil, Trash2, ToggleLeft, ToggleRight, Search, ArrowUpDown, Filter, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Portal from '../../components/Portal';
 import { productsService } from '../../lib/services';
@@ -8,6 +8,47 @@ import { formatCurrency } from '../../lib/utils';
 import { UNIT_LABELS } from '../../lib/constants';
 import type { Product } from '../../lib/types';
 import type { Unit } from '../../lib/constants';
+
+// ─── Variants Editor ─────────────────────────────────────────────────────────
+function VariantsEditor({ variants, onChange }: { variants: string[]; onChange: (v: string[]) => void }) {
+  const [input, setInput] = useState('');
+  function add() {
+    const v = input.trim();
+    if (!v || variants.includes(v)) return;
+    onChange([...variants, v]);
+    setInput('');
+  }
+  return (
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1">
+        Variants <span className="text-gray-400 font-normal">(optional — e.g. With Garlic, Without Garlic)</span>
+      </label>
+      <div className="flex flex-wrap gap-2 mb-2">
+        {variants.map(v => (
+          <span key={v} className="flex items-center gap-1 bg-orange-100 text-orange-700 text-xs font-medium px-2.5 py-1 rounded-full">
+            {v}
+            <button onClick={() => onChange(variants.filter(x => x !== v))} className="ml-0.5 text-orange-400 hover:text-red-500">
+              <X className="w-3 h-3" />
+            </button>
+          </span>
+        ))}
+        {variants.length === 0 && <span className="text-xs text-gray-400 italic">No variants — customer won't see a selector</span>}
+      </div>
+      <div className="flex gap-2">
+        <input
+          type="text" value={input} onChange={e => setInput(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); add(); } }}
+          placeholder="Type a variant and press Enter"
+          className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-orange-400"
+        />
+        <button onClick={add}
+          className="px-3 py-2 bg-orange-100 hover:bg-orange-200 text-orange-700 text-sm font-semibold rounded-xl">
+          + Add
+        </button>
+      </div>
+    </div>
+  );
+}
 
 const CATEGORIES = ['Chutney Powder', 'Masala', 'Health Mix', 'Spices', 'Pickles','Sweets ', 'Other'];
 
@@ -25,6 +66,7 @@ const emptyForm: Omit<Product, 'id' | 'createdAt' | 'updatedAt'> = {
   name: '', nameKannada: '', description: '', unit: 'gram', pricePerUnit: 0,
   minOrderQty: 0, category: 'Other', isActive: true,
   isOnDemand: false, isPopular: false, allowCustomization: false, customizationHint: '', sortOrder: 0,
+  variants: [],
 };
 
 export default function Products() {
@@ -48,6 +90,7 @@ export default function Products() {
       isPopular: p.isPopular ?? false,
       allowCustomization: p.allowCustomization ?? false,
       customizationHint: p.customizationHint || '', sortOrder: p.sortOrder ?? 0,
+      variants: p.variants ?? [],
     });
     setEditId(p.id); setShowForm(true);
   }
@@ -342,6 +385,12 @@ export default function Products() {
                   <span className="text-sm text-gray-700">⭐ Popular at SKC <span className="text-gray-400">(shows first in Popular sort)</span></span>
                 </label>
               </div>
+
+              {/* Variants */}
+              <VariantsEditor
+                variants={(form as any).variants ?? []}
+                onChange={v => setForm(f => ({ ...f, variants: v } as any))}
+              />
             </div>
 
             {/* Footer buttons */}

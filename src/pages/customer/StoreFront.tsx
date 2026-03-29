@@ -933,11 +933,25 @@ function ProductDetailSheet({ product, qty, setQty, qtyStep, minQty, qtyLabel, p
   qtyStep: number; minQty: number; qtyLabel: string; price: number; priceDisplay: string;
   onClose: () => void; onAddToCart: (p: Product, qty: number, note?: string) => void;
 }) {
+  const variants = product.variants ?? [];
+  const [selectedVariant, setSelectedVariant] = useState(variants.length === 1 ? variants[0] : '');
   const [note, setNote]   = useState('');
   const [showNote, setShowNote] = useState(false);
   const isOccasion = product.category === 'Sweets';
   const descLong = (product.description?.length ?? 0) > 80;
   const [showFullDesc, setShowFullDesc] = useState(false);
+
+  const variantRequired = variants.length > 0 && !selectedVariant;
+
+  function handleAddToCart() {
+    if (variantRequired) {
+      toast.error('Please select a variant first');
+      return;
+    }
+    const fullNote = [selectedVariant, note].filter(Boolean).join(' · ');
+    onAddToCart(product, qty, fullNote || undefined);
+    onClose();
+  }
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center" onClick={onClose}>
@@ -1011,6 +1025,29 @@ function ProductDetailSheet({ product, qty, setQty, qtyStep, minQty, qtyLabel, p
           <p className="text-xs text-gray-400 text-center -mt-2">Min {minQty < 1 ? `${Math.round(minQty*1000)}g` : `${minQty}kg`} · steps of {qtyStep < 1 ? `${Math.round(qtyStep*1000)}g` : `${qtyStep}kg`}</p>
         )}
 
+        {/* Variant selector */}
+        {variants.length > 0 && (
+          <div>
+            <p className="text-sm font-semibold text-gray-700 mb-2">
+              Choose variant <span className="text-red-500">*</span>
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {variants.map(v => (
+                <button key={v} onClick={() => setSelectedVariant(v)}
+                  className="px-4 py-2 rounded-xl text-sm font-semibold border-2 transition-all"
+                  style={selectedVariant === v
+                    ? { background: '#c8821a', color: '#fff', borderColor: '#c8821a' }
+                    : { background: '#fff', color: '#7a4010', borderColor: '#e0c8a0' }}>
+                  {v}
+                </button>
+              ))}
+            </div>
+            {variantRequired && (
+              <p className="text-xs text-red-400 mt-1">Please select one to continue</p>
+            )}
+          </div>
+        )}
+
         {/* Customization */}
         {product.allowCustomization && (
           <div>
@@ -1028,10 +1065,11 @@ function ProductDetailSheet({ product, qty, setQty, qtyStep, minQty, qtyLabel, p
         )}
 
         <button
-          onClick={() => { onAddToCart(product, qty, note); onClose(); }}
-          className="w-full flex items-center justify-between text-white font-bold py-3.5 px-5 rounded-2xl text-sm"
+          onClick={handleAddToCart}
+          disabled={variantRequired}
+          className="w-full flex items-center justify-between text-white font-bold py-3.5 px-5 rounded-2xl text-sm transition-opacity disabled:opacity-40"
           style={{ background: '#c8821a' }}>
-          <span>Add to Cart</span>
+          <span>Add to Cart{selectedVariant ? ` — ${selectedVariant}` : ''}</span>
           <span>₹{Math.round(price)}</span>
         </button>
       </div>
