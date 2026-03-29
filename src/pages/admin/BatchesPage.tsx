@@ -23,7 +23,6 @@ export default function BatchesPage() {
   const loading = batchLoading || rmLoading || prodLoading;
 
   const [showForm, setShowForm]     = useState(false);
-  const [showRMForm, setShowRMForm] = useState(false);
   const [expanded, setExpanded]     = useState<string | null>(null);
   const [saving, setSaving]         = useState(false);
 
@@ -31,12 +30,13 @@ export default function BatchesPage() {
   const [editingBatchId, setEditingBatchId] = useState<string | null>(null);
   const [batchForm, setBatchForm] = useState(EMPTY_BATCH_FORM);
 
-  // Raw material form — used for both add and edit
+  // Raw material inline table editing state
+  type RMRow = { name: string; unit: 'gram' | 'kg' | 'piece'; costPerUnit: number; currentStock: number; lowStockThreshold: number };
   const [editingRMId, setEditingRMId] = useState<string | null>(null);
-  const [rmForm, setRmForm] = useState({
-    name: '', unit: 'gram' as 'gram' | 'kg' | 'piece',
-    currentStock: 0, costPerUnit: 0, lowStockThreshold: 500,
-  });
+  const [rmRowForm, setRmRowForm] = useState<RMRow>({ name: '', unit: 'gram', costPerUnit: 0, currentStock: 0, lowStockThreshold: 500 });
+  const [addingRM, setAddingRM] = useState(false);
+  const [newRMRow, setNewRMRow] = useState<RMRow>({ name: '', unit: 'gram', costPerUnit: 0, currentStock: 0, lowStockThreshold: 500 });
+  const [rmSaving, setRmSaving] = useState(false);
 
   // Group batches by month
   const batchesByMonth = useMemo(() => {
@@ -137,31 +137,31 @@ export default function BatchesPage() {
     toast.success('Batch deleted');
   }
 
-  function openAddRM() {
-    setEditingRMId(null);
-    setRmForm({ name: '', unit: 'gram', currentStock: 0, costPerUnit: 0, lowStockThreshold: 500 });
-    setShowRMForm(true);
-  }
-
-  function openEditRM(rm: RawMaterial) {
+  function startEditRM(rm: RawMaterial) {
     setEditingRMId(rm.id);
-    setRmForm({ name: rm.name, unit: rm.unit as any, currentStock: rm.currentStock, costPerUnit: rm.costPerUnit, lowStockThreshold: rm.lowStockThreshold });
-    setShowRMForm(true);
+    setRmRowForm({ name: rm.name, unit: rm.unit as 'gram' | 'kg' | 'piece', costPerUnit: rm.costPerUnit, currentStock: rm.currentStock, lowStockThreshold: rm.lowStockThreshold });
   }
 
-  async function handleSaveRM() {
-    if (!rmForm.name.trim()) return toast.error('Name required');
-    setSaving(true);
+  async function saveEditRM() {
+    if (!editingRMId) return;
+    if (!rmRowForm.name.trim()) return toast.error('Name required');
+    setRmSaving(true);
     try {
-      if (editingRMId) {
-        await rawMaterialsService.update(editingRMId, { ...rmForm, updatedAt: new Date().toISOString() });
-        toast.success('Raw material updated');
-      } else {
-        await rawMaterialsService.add({ ...rmForm, updatedAt: new Date().toISOString() });
-        toast.success('Raw material added');
-      }
-      setShowRMForm(false);
-    } finally { setSaving(false); }
+      await rawMaterialsService.update(editingRMId, { ...rmRowForm, updatedAt: new Date().toISOString() });
+      toast.success('Updated');
+      setEditingRMId(null);
+    } finally { setRmSaving(false); }
+  }
+
+  async function saveNewRM() {
+    if (!newRMRow.name.trim()) return toast.error('Name required');
+    setRmSaving(true);
+    try {
+      await rawMaterialsService.add({ ...newRMRow, updatedAt: new Date().toISOString() });
+      toast.success('Raw material added');
+      setNewRMRow({ name: '', unit: 'gram', costPerUnit: 0, currentStock: 0, lowStockThreshold: 500 });
+      setAddingRM(false);
+    } finally { setRmSaving(false); }
   }
 
   async function handleDeleteRM(id: string) {
@@ -198,7 +198,7 @@ export default function BatchesPage() {
           <p className="text-sm text-gray-500">{batches.length} batches recorded</p>
         </div>
         <div className="flex gap-2">
-          <button onClick={openAddRM}
+          <button onClick={() => { setAddingRM(true); setEditingRMId(null); }}
             className="border border-orange-200 text-orange-600 px-3 py-2 rounded-xl text-sm font-medium hover:bg-orange-50">
             + Raw Material
           </button>
@@ -209,29 +209,186 @@ export default function BatchesPage() {
         </div>
       </div>
 
-      {/* Raw Materials list */}
-      <div className="bg-white rounded-xl border border-gray-200 p-4">
-        <h2 className="font-semibold text-gray-700 mb-3 text-sm">Raw Materials</h2>
-        {rawMaterials.length === 0 ? (
-          <p className="text-sm text-gray-400">No raw materials added yet</p>
-        ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-            {rawMaterials.map(rm => (
-              <div key={rm.id} className="bg-orange-50 rounded-lg p-2.5 flex items-start justify-between gap-1">
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-gray-800 truncate">{rm.name}</p>
-                  <p className="text-xs text-orange-600">{rm.currentStock}{rm.unit === 'piece' ? ' pcs' : 'g'} · ₹{rm.costPerUnit}/{rm.unit}</p>
-                </div>
-                <div className="flex gap-1 flex-shrink-0">
-                  <button onClick={() => openEditRM(rm)} className="p-1 hover:bg-orange-100 rounded">
-                    <Pencil className="w-3 h-3 text-orange-400" />
-                  </button>
-                  <button onClick={() => handleDeleteRM(rm.id)} className="p-1 hover:bg-red-50 rounded">
-                    <Trash2 className="w-3 h-3 text-red-400" />
-                  </button>
-                </div>
-              </div>
-            ))}
+      {/* Raw Materials — inline editable spreadsheet */}
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+          <h2 className="font-semibold text-gray-700 text-sm">Raw Materials</h2>
+          <span className="text-xs text-gray-400">{rawMaterials.length} items · click a row to edit</span>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-gray-50 border-b border-gray-100 text-xs font-semibold text-gray-500 uppercase">
+                <th className="text-left px-3 py-2.5">Name</th>
+                <th className="text-left px-3 py-2.5">Unit</th>
+                <th className="text-right px-3 py-2.5">₹ / unit</th>
+                <th className="text-right px-3 py-2.5">Stock</th>
+                <th className="text-right px-3 py-2.5">Alert at</th>
+                <th className="px-3 py-2.5"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {rawMaterials.map((rm, idx) => {
+                const isEditing = editingRMId === rm.id;
+                const isLow = rm.currentStock > 0 && rm.currentStock <= rm.lowStockThreshold;
+                return (
+                  <tr key={rm.id}
+                    className={`border-b border-gray-50 transition-colors ${
+                      isEditing ? 'bg-amber-50' : idx % 2 === 0 ? 'bg-white hover:bg-orange-50/40' : 'bg-gray-50/60 hover:bg-orange-50/40'
+                    }`}>
+                    {/* Name */}
+                    <td className="px-3 py-2">
+                      {isEditing ? (
+                        <input autoFocus type="text" value={rmRowForm.name}
+                          onChange={e => setRmRowForm(f => ({ ...f, name: e.target.value }))}
+                          onKeyDown={e => { if (e.key === 'Enter') saveEditRM(); if (e.key === 'Escape') setEditingRMId(null); }}
+                          className="w-full border border-orange-300 rounded-lg px-2 py-1 text-sm outline-none focus:ring-2 focus:ring-orange-300" />
+                      ) : (
+                        <span className="font-medium text-gray-800 cursor-pointer" onClick={() => startEditRM(rm)}>{rm.name}</span>
+                      )}
+                    </td>
+                    {/* Unit */}
+                    <td className="px-3 py-2">
+                      {isEditing ? (
+                        <select value={rmRowForm.unit}
+                          onChange={e => setRmRowForm(f => ({ ...f, unit: e.target.value as 'gram' | 'kg' | 'piece' }))}
+                          className="border border-orange-300 rounded-lg px-2 py-1 text-sm outline-none focus:ring-2 focus:ring-orange-300 bg-white">
+                          <option value="gram">gram</option>
+                          <option value="kg">kg</option>
+                          <option value="piece">piece</option>
+                        </select>
+                      ) : (
+                        <span className="text-gray-500 cursor-pointer" onClick={() => startEditRM(rm)}>{rm.unit}</span>
+                      )}
+                    </td>
+                    {/* Cost per unit */}
+                    <td className="px-3 py-2 text-right">
+                      {isEditing ? (
+                        <input type="number" min="0" step="0.01" value={rmRowForm.costPerUnit || ''}
+                          onChange={e => setRmRowForm(f => ({ ...f, costPerUnit: parseFloat(e.target.value) || 0 }))}
+                          onKeyDown={e => { if (e.key === 'Enter') saveEditRM(); if (e.key === 'Escape') setEditingRMId(null); }}
+                          className="w-24 border border-orange-300 rounded-lg px-2 py-1 text-sm text-right outline-none focus:ring-2 focus:ring-orange-300" />
+                      ) : (
+                        <span className="text-gray-700 cursor-pointer" onClick={() => startEditRM(rm)}>₹{rm.costPerUnit}</span>
+                      )}
+                    </td>
+                    {/* Current stock */}
+                    <td className="px-3 py-2 text-right">
+                      {isEditing ? (
+                        <input type="number" min="0" value={rmRowForm.currentStock || ''}
+                          onChange={e => setRmRowForm(f => ({ ...f, currentStock: parseFloat(e.target.value) || 0 }))}
+                          onKeyDown={e => { if (e.key === 'Enter') saveEditRM(); if (e.key === 'Escape') setEditingRMId(null); }}
+                          className="w-24 border border-orange-300 rounded-lg px-2 py-1 text-sm text-right outline-none focus:ring-2 focus:ring-orange-300" />
+                      ) : (
+                        <span className={`cursor-pointer font-medium ${isLow ? 'text-red-500' : 'text-gray-700'}`} onClick={() => startEditRM(rm)}>
+                          {rm.currentStock}{rm.unit === 'piece' ? ' pcs' : rm.unit === 'kg' ? ' kg' : 'g'}{isLow ? ' ⚠️' : ''}
+                        </span>
+                      )}
+                    </td>
+                    {/* Low stock threshold */}
+                    <td className="px-3 py-2 text-right">
+                      {isEditing ? (
+                        <input type="number" min="0" value={rmRowForm.lowStockThreshold || ''}
+                          onChange={e => setRmRowForm(f => ({ ...f, lowStockThreshold: parseFloat(e.target.value) || 0 }))}
+                          onKeyDown={e => { if (e.key === 'Enter') saveEditRM(); if (e.key === 'Escape') setEditingRMId(null); }}
+                          className="w-24 border border-orange-300 rounded-lg px-2 py-1 text-sm text-right outline-none focus:ring-2 focus:ring-orange-300" />
+                      ) : (
+                        <span className="text-gray-400 cursor-pointer" onClick={() => startEditRM(rm)}>{rm.lowStockThreshold}</span>
+                      )}
+                    </td>
+                    {/* Actions */}
+                    <td className="px-3 py-2">
+                      <div className="flex gap-1 justify-end">
+                        {isEditing ? (
+                          <>
+                            <button onClick={saveEditRM} disabled={rmSaving}
+                              className="px-2.5 py-1 bg-orange-500 hover:bg-orange-600 text-white text-xs rounded-lg font-semibold disabled:opacity-50">
+                              {rmSaving ? '…' : '✓ Save'}
+                            </button>
+                            <button onClick={() => setEditingRMId(null)}
+                              className="px-2.5 py-1 border border-gray-200 text-gray-500 text-xs rounded-lg hover:bg-gray-50">
+                              ✕
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button onClick={() => startEditRM(rm)} className="p-1.5 hover:bg-orange-100 rounded-lg" title="Edit">
+                              <Pencil className="w-3.5 h-3.5 text-orange-400" />
+                            </button>
+                            <button onClick={() => handleDeleteRM(rm.id)} className="p-1.5 hover:bg-red-50 rounded-lg" title="Delete">
+                              <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+
+              {/* New row input */}
+              {addingRM && (
+                <tr className="border-b border-orange-200 bg-orange-50/60">
+                  <td className="px-3 py-2">
+                    <input autoFocus type="text" placeholder="Name" value={newRMRow.name}
+                      onChange={e => setNewRMRow(f => ({ ...f, name: e.target.value }))}
+                      onKeyDown={e => { if (e.key === 'Enter') saveNewRM(); if (e.key === 'Escape') setAddingRM(false); }}
+                      className="w-full border border-orange-300 rounded-lg px-2 py-1 text-sm outline-none focus:ring-2 focus:ring-orange-300" />
+                  </td>
+                  <td className="px-3 py-2">
+                    <select value={newRMRow.unit}
+                      onChange={e => setNewRMRow(f => ({ ...f, unit: e.target.value as 'gram' | 'kg' | 'piece' }))}
+                      className="border border-orange-300 rounded-lg px-2 py-1 text-sm outline-none focus:ring-2 focus:ring-orange-300 bg-white">
+                      <option value="gram">gram</option>
+                      <option value="kg">kg</option>
+                      <option value="piece">piece</option>
+                    </select>
+                  </td>
+                  <td className="px-3 py-2 text-right">
+                    <input type="number" min="0" step="0.01" placeholder="0" value={newRMRow.costPerUnit || ''}
+                      onChange={e => setNewRMRow(f => ({ ...f, costPerUnit: parseFloat(e.target.value) || 0 }))}
+                      onKeyDown={e => { if (e.key === 'Enter') saveNewRM(); if (e.key === 'Escape') setAddingRM(false); }}
+                      className="w-24 border border-orange-300 rounded-lg px-2 py-1 text-sm text-right outline-none focus:ring-2 focus:ring-orange-300" />
+                  </td>
+                  <td className="px-3 py-2 text-right">
+                    <input type="number" min="0" placeholder="0" value={newRMRow.currentStock || ''}
+                      onChange={e => setNewRMRow(f => ({ ...f, currentStock: parseFloat(e.target.value) || 0 }))}
+                      onKeyDown={e => { if (e.key === 'Enter') saveNewRM(); if (e.key === 'Escape') setAddingRM(false); }}
+                      className="w-24 border border-orange-300 rounded-lg px-2 py-1 text-sm text-right outline-none focus:ring-2 focus:ring-orange-300" />
+                  </td>
+                  <td className="px-3 py-2 text-right">
+                    <input type="number" min="0" placeholder="500" value={newRMRow.lowStockThreshold || ''}
+                      onChange={e => setNewRMRow(f => ({ ...f, lowStockThreshold: parseFloat(e.target.value) || 0 }))}
+                      onKeyDown={e => { if (e.key === 'Enter') saveNewRM(); if (e.key === 'Escape') setAddingRM(false); }}
+                      className="w-24 border border-orange-300 rounded-lg px-2 py-1 text-sm text-right outline-none focus:ring-2 focus:ring-orange-300" />
+                  </td>
+                  <td className="px-3 py-2">
+                    <div className="flex gap-1 justify-end">
+                      <button onClick={saveNewRM} disabled={rmSaving}
+                        className="px-2.5 py-1 bg-orange-500 hover:bg-orange-600 text-white text-xs rounded-lg font-semibold disabled:opacity-50">
+                        {rmSaving ? '…' : '✓ Add'}
+                      </button>
+                      <button onClick={() => setAddingRM(false)}
+                        className="px-2.5 py-1 border border-gray-200 text-gray-500 text-xs rounded-lg hover:bg-gray-50">✕</button>
+                    </div>
+                  </td>
+                </tr>
+              )}
+
+              {/* Empty state or add-row footer */}
+              {rawMaterials.length === 0 && !addingRM && (
+                <tr><td colSpan={6} className="px-4 py-6 text-center text-sm text-gray-400">No raw materials yet — click + Raw Material to add one</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+        {/* Add row button at the bottom */}
+        {!addingRM && (
+          <div className="border-t border-gray-100 px-4 py-2">
+            <button onClick={() => { setNewRMRow({ name: '', unit: 'gram', costPerUnit: 0, currentStock: 0, lowStockThreshold: 500 }); setAddingRM(true); setEditingRMId(null); }}
+              className="text-sm text-orange-500 hover:text-orange-600 font-medium flex items-center gap-1">
+              <Plus className="w-4 h-4" /> Add Row
+            </button>
           </div>
         )}
       </div>
@@ -457,64 +614,6 @@ export default function BatchesPage() {
         </Portal>
       )}
 
-      {/* ── Raw Material Form Modal ──────────────────────────────────────── */}
-      {showRMForm && (
-        <Portal>
-          <div className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center sm:items-center sm:p-4">
-            <div className="bg-white rounded-t-3xl sm:rounded-2xl w-full max-w-md flex flex-col" style={{ maxHeight: '92dvh' }}>
-              <div className="flex-shrink-0 border-b border-gray-100 px-5 py-4 flex items-center justify-between">
-                <h2 className="font-bold text-gray-800">{editingRMId ? 'Edit Raw Material' : 'Add Raw Material'}</h2>
-                <button onClick={() => setShowRMForm(false)} className="text-gray-400 text-xl">×</button>
-              </div>
-              <div className="overflow-y-auto flex-1 p-5 space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
-                  <input type="text" value={rmForm.name} onChange={e => setRmForm(f => ({ ...f, name: e.target.value }))}
-                    placeholder="e.g. Peanuts, Dry Red Chilli"
-                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-orange-400" />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Unit</label>
-                    <select value={rmForm.unit} onChange={e => setRmForm(f => ({ ...f, unit: e.target.value as any }))}
-                      className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-orange-400 bg-white">
-                      <option value="gram">Gram</option>
-                      <option value="kg">Kilogram</option>
-                      <option value="piece">Piece</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Cost per unit (₹)</label>
-                    <input type="number" min="0" step="0.01" value={rmForm.costPerUnit || ''}
-                      onChange={e => setRmForm(f => ({ ...f, costPerUnit: parseFloat(e.target.value) || 0 }))}
-                      className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-orange-400" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Current Stock</label>
-                    <input type="number" min="0" value={rmForm.currentStock || ''}
-                      onChange={e => setRmForm(f => ({ ...f, currentStock: parseFloat(e.target.value) || 0 }))}
-                      className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-orange-400" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Low Stock Alert</label>
-                    <input type="number" min="0" value={rmForm.lowStockThreshold || ''}
-                      onChange={e => setRmForm(f => ({ ...f, lowStockThreshold: parseFloat(e.target.value) || 0 }))}
-                      className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-orange-400" />
-                  </div>
-                </div>
-              </div>
-              <div className="flex-shrink-0 px-5 py-4 border-t border-gray-100 flex gap-3">
-                <button onClick={() => setShowRMForm(false)}
-                  className="flex-1 border border-gray-200 text-gray-600 py-2.5 rounded-xl text-sm">Cancel</button>
-                <button onClick={handleSaveRM} disabled={saving}
-                  className="flex-1 bg-orange-500 hover:bg-orange-600 text-white py-2.5 rounded-xl text-sm font-semibold disabled:opacity-50">
-                  {saving ? 'Saving…' : editingRMId ? 'Save Changes' : 'Add'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </Portal>
-      )}
     </div>
   );
 }
