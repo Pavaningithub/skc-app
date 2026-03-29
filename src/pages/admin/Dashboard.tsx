@@ -58,7 +58,7 @@ export default function Dashboard() {
     const monthEnd   = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).toISOString();
 
     const pendingOrders  = orders.filter(o => ['pending', 'confirmed'].includes(o.status));
-    const allPendingPay  = orders.filter(o => o.paymentStatus === 'pending' && o.total > 0);
+    const allPendingPay  = orders.filter(o => o.paymentStatus === 'pending' && o.total > 0 && o.status === 'delivered');
     const overdue        = allPendingPay
       .filter(o => daysSince(o) >= OVERDUE_DAYS)
       .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
