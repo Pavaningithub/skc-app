@@ -29,6 +29,7 @@ export interface Product {
   isPopular?: boolean;            // show "Popular" badge and rank higher
   allowCustomization: boolean;    // allow customer notes/customization
   customizationHint?: string;     // hint text shown to customer
+  variants?: string[];            // e.g. ['With Garlic', 'Without Garlic']
   stockId?: string;
   sortOrder: number;              // for manual ordering in storefront
   createdAt: string;
