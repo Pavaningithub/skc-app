@@ -838,7 +838,9 @@ function ProductCard({ product, onAddToCart }: {
 }) {
   const isOccasion = product.category === 'Sweets';
   const qtyStep  = product.unit === 'piece' ? 1 : product.unit === 'kg' ? 0.25 : 250;
-  const minQty   = product.minOrderQty && product.minOrderQty > 0 ? product.minOrderQty : qtyStep;
+  // Guard: if unit is 'kg' but minOrderQty looks like it was entered in grams (>= 100), convert it
+  const rawMinQty = product.minOrderQty && product.minOrderQty > 0 ? product.minOrderQty : qtyStep;
+  const minQty    = product.unit === 'kg' && rawMinQty >= 100 ? rawMinQty / 1000 : rawMinQty;
   const [qty, setQty]       = useState(minQty);
   const [showDetail, setShowDetail] = useState(false);
   const price = qty * product.pricePerUnit;
