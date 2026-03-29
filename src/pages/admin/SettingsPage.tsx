@@ -5,7 +5,7 @@ import { Lock, Link as LinkIcon, Leaf } from 'lucide-react';
 import { APP_CONFIG } from '../../config';
 
 export default function SettingsPage() {
-  const { changePin } = useAuth();
+  const { changePinLegacy: changePin } = useAuth();
   const [oldPin, setOldPin] = useState('');
   const [newPin, setNewPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Pencil, AlertTriangle } from 'lucide-react';
+import { Plus, Pencil, AlertTriangle, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Portal from '../../components/Portal';
 import { stockService, productsService, activityService } from '../../lib/services';
@@ -65,6 +65,12 @@ export default function StockPage() {
     } finally { setSaving(false); }
   }
 
+  async function handleDelete(item: StockItem) {
+    if (!confirm(`Delete stock entry for ${item.productName}?`)) return;
+    await stockService.delete(item.id);
+    toast.success('Stock entry deleted');
+  }
+
   const isLow = (item: StockItem) => item.quantityAvailable <= item.lowStockThreshold;
 
   const formatQty = (item: StockItem) => {
@@ -100,28 +106,35 @@ export default function StockPage() {
               <p className="text-sm">Add stock for your products</p>
             </div>
           )}
-          {stock.map(item => (
+          {stock.map(item => {
+            const isNeg = item.quantityAvailable < 0;
+            return (
             <div key={item.id}
               className={`bg-white rounded-xl border p-4 flex items-center gap-4
-                ${isLow(item) ? 'border-red-200 bg-red-50/30' : 'border-gray-200'}`}>
-              {isLow(item) && (
-                <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0" />
+                ${isNeg ? 'border-red-300 bg-red-50/40' : isLow(item) ? 'border-amber-200 bg-amber-50/30' : 'border-gray-200'}`}>
+              {(isNeg || isLow(item)) && (
+                <AlertTriangle className={`w-5 h-5 flex-shrink-0 ${isNeg ? 'text-red-500' : 'text-amber-500'}`} />
               )}
               <div className="flex-1 min-w-0">
                 <p className="font-semibold text-gray-800">{item.productName}</p>
-                <p className="text-xs text-gray-500">Low stock alert at: {item.lowStockThreshold}{item.unit === 'piece' ? ' pcs' : 'g'}</p>
+                <p className="text-xs text-gray-500">Alert at: {item.lowStockThreshold}{item.unit === 'piece' ? ' pcs' : 'g'}</p>
+                {isNeg && <p className="text-xs font-semibold text-red-600">⚠️ Deficit — prepare {Math.abs(item.quantityAvailable)}{item.unit === 'piece' ? ' pcs' : 'g'}</p>}
               </div>
               <div className="text-right">
-                <p className={`text-xl font-bold ${isLow(item) ? 'text-red-600' : 'text-green-600'}`}>
+                <p className={`text-xl font-bold ${isNeg ? 'text-red-600' : isLow(item) ? 'text-amber-600' : 'text-green-600'}`}>
                   {formatQty(item)}
                 </p>
-                <p className="text-xs text-gray-400">available</p>
+                <p className="text-xs text-gray-400">{isNeg ? 'deficit' : 'available'}</p>
               </div>
-              <button onClick={() => openEdit(item)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+              <button onClick={() => openEdit(item)} className="p-2 hover:bg-blue-50 rounded-lg transition-colors" title="Edit">
                 <Pencil className="w-4 h-4 text-blue-500" />
               </button>
+              <button onClick={() => handleDelete(item)} className="p-2 hover:bg-red-50 rounded-lg transition-colors" title="Delete">
+                <Trash2 className="w-4 h-4 text-red-400" />
+              </button>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
 

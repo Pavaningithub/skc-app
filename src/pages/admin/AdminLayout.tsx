@@ -26,7 +26,7 @@ const navItems = [
 ];
 
 export default function AdminLayout() {
-  const { isAdminAuthenticated, logout } = useAuth();
+  const { isAdminAuthenticated, logout, currentUser } = useAuth();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const startTimeRef = useRef(new Date().toISOString());
@@ -121,7 +121,13 @@ export default function AdminLayout() {
         ))}
       </nav>
 
-      <div className="p-3 border-t border-gray-100">
+      <div className="p-3 border-t border-gray-100 space-y-1">
+        {currentUser && (
+          <div className="px-3 py-2 rounded-lg bg-orange-50">
+            <p className="text-xs font-semibold text-orange-700">{currentUser.displayName}</p>
+            <p className="text-xs text-orange-400 capitalize">{currentUser.role}</p>
+          </div>
+        )}
         <button
           onClick={handleLogout}
           className="flex items-center gap-2 w-full px-3 py-2 text-sm text-red-500 hover:bg-red-50 rounded-lg transition-colors"

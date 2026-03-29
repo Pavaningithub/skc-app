@@ -1,55 +1,85 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
-import { settingsService } from '../lib/services';
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import { adminUsersService } from '../lib/services';
 import { DEFAULT_ADMIN_PIN } from '../lib/constants';
+import type { AdminUser } from '../lib/types';
 
 interface AuthContextType {
   isAdminAuthenticated: boolean;
-  login: (pin: string) => Promise<boolean>;
+  currentUser: Pick<AdminUser, 'id' | 'username' | 'displayName' | 'role' | 'mustChangePin'> | null;
+  login: (username: string, pin: string) => Promise<'ok' | 'wrong_pin' | 'no_user'>;
   logout: () => void;
-  changePin: (oldPin: string, newPin: string) => Promise<boolean>;
+  changePin: (userId: string, newPin: string) => Promise<void>;
+  /** Legacy single-PIN change — kept for SettingsPage compatibility */
+  changePinLegacy: (oldPin: string, newPin: string) => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
+const SESSION_KEY = 'skc_auth_user';
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(() => {
-    return sessionStorage.getItem('skc_auth') === 'true';
+  const [currentUser, setCurrentUser] = useState<AuthContextType['currentUser']>(() => {
+    try {
+      const saved = sessionStorage.getItem(SESSION_KEY);
+      return saved ? JSON.parse(saved) : null;
+    } catch { return null; }
   });
 
-  const login = useCallback(async (pin: string): Promise<boolean> => {
+  const isAdminAuthenticated = currentUser !== null;
+
+  // Seed admin users on first app load (runs once)
+  useEffect(() => {
+    adminUsersService.seed(DEFAULT_ADMIN_PIN).catch(() => {/* ignore if offline */});
+  }, []);
+
+  const login = useCallback(async (username: string, pin: string): Promise<'ok' | 'wrong_pin' | 'no_user'> => {
     try {
-      const correctPin = await settingsService.getPin();
-      const valid = pin === correctPin || (correctPin === DEFAULT_ADMIN_PIN && pin === DEFAULT_ADMIN_PIN);
-      if (valid) {
-        setIsAdminAuthenticated(true);
-        sessionStorage.setItem('skc_auth', 'true');
+      const user = await adminUsersService.verifyPin(username, pin);
+      if (!user) {
+        const exists = await adminUsersService.getByUsername(username);
+        return exists ? 'wrong_pin' : 'no_user';
       }
-      return valid;
+      const session = {
+        id: user.id,
+        username: user.username,
+        displayName: user.displayName,
+        role: user.role,
+        mustChangePin: user.mustChangePin,
+      };
+      setCurrentUser(session);
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
+      return 'ok';
     } catch {
-      // Fallback to default PIN if Firebase not configured
-      if (pin === DEFAULT_ADMIN_PIN) {
-        setIsAdminAuthenticated(true);
-        sessionStorage.setItem('skc_auth', 'true');
-        return true;
-      }
-      return false;
+      return 'wrong_pin';
     }
   }, []);
 
   const logout = useCallback(() => {
-    setIsAdminAuthenticated(false);
-    sessionStorage.removeItem('skc_auth');
+    setCurrentUser(null);
+    sessionStorage.removeItem(SESSION_KEY);
+    sessionStorage.removeItem('skc_auth'); // clear legacy key too
   }, []);
 
-  const changePin = useCallback(async (oldPin: string, newPin: string): Promise<boolean> => {
-    const correctPin = await settingsService.getPin();
-    if (oldPin !== correctPin) return false;
-    await settingsService.setPin(newPin);
-    return true;
+  const changePin = useCallback(async (userId: string, newPin: string) => {
+    await adminUsersService.changePin(userId, newPin);
+    setCurrentUser(prev => {
+      if (!prev) return null;
+      const updated = { ...prev, mustChangePin: false };
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify(updated));
+      return updated;
+    });
   }, []);
+
+  const changePinLegacy = useCallback(async (oldPin: string, newPin: string): Promise<boolean> => {
+    if (!currentUser) return false;
+    const valid = await adminUsersService.verifyPin(currentUser.username, oldPin);
+    if (!valid) return false;
+    await adminUsersService.changePin(currentUser.id, newPin);
+    return true;
+  }, [currentUser]);
 
   return (
-    <AuthContext.Provider value={{ isAdminAuthenticated, login, logout, changePin }}>
+    <AuthContext.Provider value={{ isAdminAuthenticated, currentUser, login, logout, changePin, changePinLegacy }}>
       {children}
     </AuthContext.Provider>
   );

@@ -1,5 +1,18 @@
 import type { Unit, OrderStatus, PaymentStatus, OrderType, ExpenseCategory, SubscriptionDuration } from "./constants";
 
+// ─── Admin User ──────────────────────────────────────────────────────────────
+type AdminRole = 'owner' | 'operator';
+export interface AdminUser {
+  id: string;
+  username: string;       // login handle, e.g. "pavan"
+  displayName: string;    // shown in UI, e.g. "Pavan"
+  role: AdminRole;
+  pin: string;            // 4-digit PIN
+  mustChangePin: boolean; // force change on first login
+  createdAt: string;
+  updatedAt: string;
+}
+
 // ─── Product ─────────────────────────────────────────────────────────────────
 export interface Product {
   id: string;
