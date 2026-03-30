@@ -23,6 +23,11 @@ const FeedbackAdmin    = lazy(() => import('./pages/admin/FeedbackAdmin'));
 const BatchesPage      = lazy(() => import('./pages/admin/BatchesPage'));
 const SettingsPage     = lazy(() => import('./pages/admin/SettingsPage'));
 const AnnouncementsPage = lazy(() => import('./pages/admin/AnnouncementsPage'));
+const AgentsPage       = lazy(() => import('./pages/admin/AgentsPage'));
+
+// Agent portal
+const AgentLogin   = lazy(() => import('./pages/agent/AgentLogin'));
+const AgentConsole = lazy(() => import('./pages/agent/AgentConsole'));
 
 function PageLoader() {
   return (
@@ -53,6 +58,10 @@ export default function App() {
           <Route path="/order-confirmation/:orderId" element={<OrderConfirmation />} />
           <Route path="/feedback/:orderId" element={<FeedbackPage />} />
 
+          {/* Agent portal — separate from customer storefront and admin */}
+          <Route path="/agent/login" element={<AgentLogin />} />
+          <Route path="/agent" element={<AgentConsole />} />
+
           <Route path="/admin/login" element={<PinLogin />} />
           <Route path="/admin" element={<AdminLayout />}>
             <Route index element={<Navigate to="/admin/dashboard" replace />} />
@@ -67,6 +76,7 @@ export default function App() {
             <Route path="subscriptions" element={<SubscriptionsPage />} />
             <Route path="feedback" element={<FeedbackAdmin />} />
             <Route path="announcements" element={<AnnouncementsPage />} />
+            <Route path="agents" element={<AgentsPage />} />
             <Route path="settings" element={<SettingsPage />} />
           </Route>
 

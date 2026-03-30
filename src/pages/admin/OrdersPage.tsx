@@ -169,6 +169,9 @@ export default function OrdersPage() {
                     {order.paymentStatus === 'paid' && (
                       <span className="text-xs bg-green-100 text-green-600 px-2 py-0.5 rounded-full">✅ Paid</span>
                     )}
+                    {order.agentId && (
+                      <span className="text-xs bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded-full">🤝 {order.agentName ?? 'Agent'}</span>
+                    )}
                   </div>
                   <p className="text-sm text-gray-600 mt-1">{order.customerName} · {order.customerPlace}</p>
                   <p className="text-xs text-gray-400">{formatDateTime(order.createdAt)}</p>

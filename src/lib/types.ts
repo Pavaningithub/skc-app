@@ -136,6 +136,7 @@ export interface OrderItem {
   isOnDemand?: boolean;           // was it an on-demand product?
   rawMaterialCost?: number;       // for on-demand: actual raw material cost
   profitAmount?: number;          // selling price - raw material cost
+  agentMarkup?: number;           // ₹ markup added by agent on top of SKC base price (per unit)
 }
 
 // ─── Order ───────────────────────────────────────────────────────────────────
@@ -163,6 +164,9 @@ export interface Order {
   referralDiscount: number;       // ₹ discount applied from referral code (0 if none)
   creditUsed: number;             // ₹ referral credit redeemed from customer's balance (0 if none)
   deliveryCharge: number;         // ₹20 flat for orders <₹1000 and distance >10km, else 0
+  agentId?: string;               // set when order placed via Agent Console
+  agentName?: string;             // agent's display name (denormalised)
+  agentCommission?: number;       // ₹ commission due to agent on this order
   createdAt: string;
   updatedAt: string;
   deliveredAt?: string;
@@ -196,6 +200,27 @@ export interface Subscription {
   isActive: boolean;
   paymentStatus: PaymentStatus;
   createdAt: string;
+}
+
+// ─── Agent (Partner / Reseller) ──────────────────────────────────────────────
+export interface Agent {
+  id: string;
+  name: string;                   // e.g. "Ravi Traders"
+  phone: string;                  // 10-digit, used as login username
+  agentCode: string;              // e.g. "AGT-RAVI" — unique, used in URL /agent/AGT-RAVI
+  pin: string;                    // hashed or plain 4-6 digit PIN
+  mustChangePin: boolean;         // force change on first login
+  commissionPercent: number;      // % of SKC price we pay agent (e.g. 10%)
+  savedMarkupType?: 'rupees' | 'percent'; // agent's preferred markup mode
+  savedMarkupValue?: number;       // saved markup value (persisted across orders)
+  totalOrders: number;
+  totalRevenue: number;           // sum of SKC prices on their orders
+  totalCommissionEarned: number;  // sum of commissions on all orders
+  totalCommissionPaid: number;    // sum of payouts already made
+  isActive: boolean;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 // ─── Feedback ────────────────────────────────────────────────────────────────
