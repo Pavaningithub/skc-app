@@ -16,7 +16,7 @@ export default function FeedbackPage() {
   const [hoverRating, setHoverRating] = useState(0);
   const [whatYouLiked, setWhatYouLiked] = useState('');
   const [improvement, setImprovement] = useState('');
-  const [recommend, setRecommend] = useState(true);
+  const [recommend, setRecommend] = useState(false);
 
   useEffect(() => {
     if (!orderId) return;
