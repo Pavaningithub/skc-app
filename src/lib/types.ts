@@ -29,7 +29,7 @@ export interface Product {
   isPopular?: boolean;            // show "Popular" badge and rank higher
   allowCustomization: boolean;    // allow customer notes/customization
   customizationHint?: string;     // hint text shown to customer
-  variants?: string[];            // e.g. ['With Garlic', 'Without Garlic']
+  hasGarlicOption?: boolean;      // show With Garlic / Without Garlic radio
   stockId?: string;
   sortOrder: number;              // for manual ordering in storefront
   createdAt: string;
@@ -116,6 +116,9 @@ export interface Customer {
   pendingAmount: number;
   joinedWhatsappGroup: boolean;
   discountPercent?: number;       // standing discount % for close family/friends (applied to all future orders)
+  referralCode?: string;          // unique code this customer shares to refer others, e.g. SKC-PAVAN3
+  referredBy?: string;            // referral code used when they first ordered
+  referralCredit: number;         // ₹ credit earned by referring others (redeemable on next order)
   createdAt: string;
 }
 
@@ -154,6 +157,10 @@ export interface Order {
   subscriptionDuration?: SubscriptionDuration;
   hasOnDemandItems: boolean;
   totalProfit?: number;           // calculated after delivery
+  referralCodeUsed?: string;      // referral code entered at checkout
+  referralDiscount: number;       // ₹ discount applied from referral code (0 if none)
+  creditUsed: number;             // ₹ referral credit redeemed from customer's balance (0 if none)
+  deliveryCharge: number;         // ₹20 flat for orders <₹1000 and distance >10km, else 0
   createdAt: string;
   updatedAt: string;
   deliveredAt?: string;
@@ -193,6 +200,7 @@ export interface Subscription {
 export interface Feedback {
   id: string;
   orderId: string;
+  orderNumber?: string;           // e.g. SKC-1042 — shown on marquee card
   customerId?: string;
   customerName: string;
   customerWhatsapp: string;

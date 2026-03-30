@@ -32,6 +32,17 @@ export default function OrderDetail() {
   const [addQty, setAddQty] = useState(250);
   const [savingEdit, setSavingEdit] = useState(false);
 
+  // ── Edit order details (name / phone / place / notes / delivery charge / referral) ──
+  const [showEditDetails, setShowEditDetails] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editPhone, setEditPhone] = useState('');
+  const [editPlace, setEditPlace] = useState('');
+  const [editNotes, setEditNotes] = useState('');
+  const [editDelivery, setEditDelivery] = useState(0);
+  const [editReferralCode, setEditReferralCode] = useState('');
+  const [editReferralDiscount, setEditReferralDiscount] = useState(0);
+  const [savingDetails, setSavingDetails] = useState(false);
+
   useEffect(() => { if (orderId) load(); }, [orderId]);
 
   async function load() {
@@ -53,6 +64,56 @@ export default function OrderDetail() {
       if (ps.length > 0) setAddProductId(ps[0].id);
     }
     setShowEdit(true);
+  }
+
+  function openEditDetails() {
+    if (!order) return;
+    setEditName(order.customerName);
+    setEditPhone(order.customerWhatsapp);
+    setEditPlace(order.customerPlace || '');
+    setEditNotes(order.notes || '');
+    setEditDelivery(order.deliveryCharge ?? 0);
+    setEditReferralCode(order.referralCodeUsed || '');
+    setEditReferralDiscount(order.referralDiscount ?? 0);
+    setShowEditDetails(true);
+  }
+
+  async function saveDetails() {
+    if (!order) return;
+    if (!editName.trim()) return toast.error('Name cannot be empty');
+    setSavingDetails(true);
+    try {
+      const referralDiscount = Math.max(0, editReferralDiscount);
+      const deliveryCharge   = Math.max(0, editDelivery);
+      // Recalculate total: subtotal − discount (items) − referralDiscount + deliveryCharge
+      const newTotal = Math.max(0, order.subtotal - (order.discount ?? 0) - referralDiscount + deliveryCharge);
+      const updates: Partial<Order> = {
+        customerName: editName.trim(),
+        customerWhatsapp: editPhone.replace(/\D/g, '').replace(/^(91|0)/, '').slice(0, 10),
+        customerPlace: editPlace.trim(),
+        notes: editNotes.trim(),
+        deliveryCharge,
+        referralCodeUsed: editReferralCode.trim().toUpperCase() || undefined,
+        referralDiscount,
+        total: newTotal,
+        discount: (order.discount ?? 0),  // keep item discount unchanged
+      };
+      await ordersService.update(order.id, updates);
+      // Sync customer name/place
+      if (order.customerId) {
+        await customersService.update(order.customerId, {
+          name: updates.customerName!,
+          whatsapp: updates.customerWhatsapp!,
+          place: updates.customerPlace,
+        });
+      }
+      toast.success('Order details updated ✅');
+      activityService.log('order_edited', `#${order.orderNumber} details updated by admin`, order.id, order.orderNumber);
+      setShowEditDetails(false);
+      load();
+    } catch (e) {
+      toast.error('Failed to save');
+    } finally { setSavingDetails(false); }
   }
 
   function editUpdateQty(idx: number, qty: number) {
@@ -202,6 +263,10 @@ export default function OrderDetail() {
             <Pencil className="w-3.5 h-3.5" /> Edit Order
           </button>
         )}
+        <button onClick={openEditDetails}
+          className="flex items-center gap-1.5 border border-gray-300 text-gray-600 hover:bg-gray-50 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors">
+          <Pencil className="w-3.5 h-3.5" /> Details
+        </button>
       </div>
 
       {/* Status & Actions */}
@@ -299,6 +364,20 @@ export default function OrderDetail() {
           {order.discount > 0 && (
             <div className="flex justify-between text-sm text-green-600">
               <span>Discount</span><span>-{formatCurrency(order.discount)}</span>
+            </div>
+          )}
+          {(order.referralDiscount ?? 0) > 0 && (
+            <div className="flex justify-between text-sm text-purple-600">
+              <span>🎟️ Referral discount
+                {order.referralCodeUsed && <span className="ml-1 font-mono text-xs bg-purple-100 px-1.5 py-0.5 rounded">{order.referralCodeUsed}</span>}
+              </span>
+              <span>-{formatCurrency(order.referralDiscount ?? 0)}</span>
+            </div>
+          )}
+          {(order.deliveryCharge ?? 0) > 0 && (
+            <div className="flex justify-between text-sm text-blue-600">
+              <span>🚚 Delivery charge</span>
+              <span>+{formatCurrency(order.deliveryCharge ?? 0)}</span>
             </div>
           )}
           <div className="flex justify-between font-bold text-gray-800 text-lg pt-1 border-t border-gray-100 mt-1">
@@ -400,6 +479,122 @@ export default function OrderDetail() {
                 </div>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Edit Order Details Panel (name, phone, place, notes, delivery charge) ── */}
+      {showEditDetails && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl">
+            <div className="border-b border-gray-100 px-5 py-4 flex items-center justify-between">
+              <h2 className="font-bold text-gray-800">📝 Order Details — #{order.orderNumber}</h2>
+              <button onClick={() => setShowEditDetails(false)} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">×</button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Customer Name</label>
+                <input value={editName} onChange={e => setEditName(e.target.value)}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-orange-400" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">WhatsApp Number</label>
+                <input value={editPhone} onChange={e => setEditPhone(e.target.value)}
+                  placeholder="10-digit number"
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-orange-400" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Place / Area</label>
+                <input value={editPlace} onChange={e => setEditPlace(e.target.value)}
+                  placeholder="e.g. Bangalore, JP Nagar"
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-orange-400" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Notes / Instructions</label>
+                <textarea value={editNotes} onChange={e => setEditNotes(e.target.value)}
+                  rows={2} placeholder="Delivery notes, special requests…"
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-orange-400 resize-none" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+                  Delivery Charge (₹)
+                  <span className="text-gray-400 font-normal ml-1">0 = free · 20 = standard</span>
+                </label>
+                <div className="flex items-center gap-2">
+                  <input type="number" min="0" step="5" value={editDelivery}
+                    onChange={e => setEditDelivery(Number(e.target.value))}
+                    className="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-orange-400" />
+                  {[0, 20, 30, 50].map(v => (
+                    <button key={v} onClick={() => setEditDelivery(v)}
+                      className={`flex-shrink-0 px-2.5 py-1.5 rounded-lg text-xs border transition-colors ${
+                        editDelivery === v ? 'bg-orange-500 text-white border-orange-500' : 'border-gray-200 text-gray-600 hover:border-orange-300'
+                      }`}>
+                      ₹{v}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Referral — admin can fix code or override discount amount */}
+              <div className="border-t border-gray-100 pt-4">
+                <p className="text-xs font-semibold text-purple-500 uppercase tracking-wide mb-3">🎟️ Referral (override)</p>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Referral Code Used</label>
+                    <input value={editReferralCode}
+                      onChange={e => setEditReferralCode(e.target.value.toUpperCase())}
+                      placeholder="e.g. SKC-PRIYA42 (leave blank to remove)"
+                      className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-purple-400 font-mono tracking-widest" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+                      Referral Discount (₹)
+                      <span className="text-gray-400 font-normal ml-1">subtracted from total</span>
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input type="number" min="0" step="1" value={editReferralDiscount}
+                        onChange={e => setEditReferralDiscount(Math.max(0, Number(e.target.value)))}
+                        className="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-purple-400" />
+                      {[0, 10, 12, 18, 25, 37, 56].map(v => (
+                        <button key={v} onClick={() => setEditReferralDiscount(v)}
+                          className={`flex-shrink-0 px-2 py-1.5 rounded-lg text-xs border transition-colors ${
+                            editReferralDiscount === v ? 'bg-purple-500 text-white border-purple-500' : 'border-gray-200 text-gray-600 hover:border-purple-300'
+                          }`}>
+                          ₹{v}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  {/* Live total preview */}
+                  {(() => {
+                    const newTotal = Math.max(0, (order.subtotal ?? 0) - (order.discount ?? 0) - editReferralDiscount + editDelivery);
+                    return (
+                      <div className="bg-gray-50 rounded-xl px-3 py-2.5 text-xs space-y-0.5">
+                        <div className="flex justify-between text-gray-500">
+                          <span>Subtotal</span><span>₹{order.subtotal}</span>
+                        </div>
+                        {(order.discount ?? 0) > 0 && <div className="flex justify-between text-green-600"><span>Item discount</span><span>-₹{order.discount}</span></div>}
+                        {editReferralDiscount > 0 && <div className="flex justify-between text-purple-600"><span>Referral discount</span><span>-₹{editReferralDiscount}</span></div>}
+                        {editDelivery > 0 && <div className="flex justify-between text-blue-600"><span>Delivery</span><span>+₹{editDelivery}</span></div>}
+                        <div className="flex justify-between font-bold text-gray-800 border-t border-gray-200 pt-1 mt-1">
+                          <span>New Total</span><span className="text-orange-600">₹{newTotal}</span>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+            </div>
+            <div className="border-t border-gray-100 p-5 flex gap-3">
+              <button onClick={() => setShowEditDetails(false)}
+                className="flex-1 border border-gray-200 text-gray-600 py-3 rounded-xl text-sm font-medium hover:bg-gray-50">
+                Cancel
+              </button>
+              <button onClick={saveDetails} disabled={savingDetails}
+                className="flex-1 bg-orange-500 hover:bg-orange-600 text-white py-3 rounded-xl text-sm font-semibold disabled:opacity-50 transition-colors">
+                {savingDetails ? 'Saving…' : '💾 Save Details'}
+              </button>
+            </div>
           </div>
         </div>
       )}

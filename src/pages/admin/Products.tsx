@@ -1,54 +1,15 @@
 import { useState, useMemo } from 'react';
-import { Plus, Pencil, Trash2, ToggleLeft, ToggleRight, Search, ArrowUpDown, Filter, X } from 'lucide-react';
+import { Plus, Pencil, Trash2, ToggleLeft, ToggleRight, Search, ArrowUpDown, Filter, TrendingUp, AlertTriangle, CheckCircle2, X, ChevronDown, ChevronUp } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Portal from '../../components/Portal';
-import { productsService } from '../../lib/services';
+import { productsService, ordersService } from '../../lib/services';
 import { useRealtimeCollection } from '../../lib/useRealtimeCollection';
 import { formatCurrency } from '../../lib/utils';
 import { UNIT_LABELS } from '../../lib/constants';
-import type { Product } from '../../lib/types';
+import type { Product, Order } from '../../lib/types';
 import type { Unit } from '../../lib/constants';
 
-// ─── Variants Editor ─────────────────────────────────────────────────────────
-function VariantsEditor({ variants, onChange }: { variants: string[]; onChange: (v: string[]) => void }) {
-  const [input, setInput] = useState('');
-  function add() {
-    const v = input.trim();
-    if (!v || variants.includes(v)) return;
-    onChange([...variants, v]);
-    setInput('');
-  }
-  return (
-    <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1">
-        Variants <span className="text-gray-400 font-normal">(optional — e.g. With Garlic, Without Garlic)</span>
-      </label>
-      <div className="flex flex-wrap gap-2 mb-2">
-        {variants.map(v => (
-          <span key={v} className="flex items-center gap-1 bg-orange-100 text-orange-700 text-xs font-medium px-2.5 py-1 rounded-full">
-            {v}
-            <button onClick={() => onChange(variants.filter(x => x !== v))} className="ml-0.5 text-orange-400 hover:text-red-500">
-              <X className="w-3 h-3" />
-            </button>
-          </span>
-        ))}
-        {variants.length === 0 && <span className="text-xs text-gray-400 italic">No variants — customer won't see a selector</span>}
-      </div>
-      <div className="flex gap-2">
-        <input
-          type="text" value={input} onChange={e => setInput(e.target.value)}
-          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); add(); } }}
-          placeholder="Type a variant and press Enter"
-          className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-orange-400"
-        />
-        <button onClick={add}
-          className="px-3 py-2 bg-orange-100 hover:bg-orange-200 text-orange-700 text-sm font-semibold rounded-xl">
-          + Add
-        </button>
-      </div>
-    </div>
-  );
-}
+
 
 const CATEGORIES = ['Chutney Powder', 'Masala', 'Health Mix', 'Spices', 'Pickles','Sweets ', 'Other'];
 
@@ -66,7 +27,7 @@ const emptyForm: Omit<Product, 'id' | 'createdAt' | 'updatedAt'> = {
   name: '', nameKannada: '', description: '', unit: 'gram', pricePerUnit: 0,
   minOrderQty: 0, category: 'Other', isActive: true,
   isOnDemand: false, isPopular: false, allowCustomization: false, customizationHint: '', sortOrder: 0,
-  variants: [],
+  hasGarlicOption: false,
 };
 
 export default function Products() {
@@ -90,7 +51,7 @@ export default function Products() {
       isPopular: p.isPopular ?? false,
       allowCustomization: p.allowCustomization ?? false,
       customizationHint: p.customizationHint || '', sortOrder: p.sortOrder ?? 0,
-      variants: p.variants ?? [],
+      hasGarlicOption: p.hasGarlicOption ?? false,
     });
     setEditId(p.id); setShowForm(true);
   }
@@ -160,6 +121,9 @@ export default function Products() {
           <Plus className="w-4 h-4" /> Add Product
         </button>
       </div>
+
+      {/* Price Insights Panel */}
+      <PriceInsightsPanel products={products} />
 
       {/* Search */}
       <div className="relative">
@@ -386,11 +350,13 @@ export default function Products() {
                 </label>
               </div>
 
-              {/* Variants */}
-              <VariantsEditor
-                variants={(form as any).variants ?? []}
-                onChange={v => setForm(f => ({ ...f, variants: v } as any))}
-              />
+              {/* Garlic option */}
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input type="checkbox" checked={(form as any).hasGarlicOption ?? false}
+                  onChange={e => setForm(f => ({ ...f, hasGarlicOption: e.target.checked } as any))}
+                  className="w-4 h-4 accent-orange-500" />
+                <span className="text-sm text-gray-700">🧄 Garlic option <span className="text-gray-400">(customer picks With / Without Garlic)</span></span>
+              </label>
             </div>
 
             {/* Footer buttons */}
@@ -407,6 +373,235 @@ export default function Products() {
           </div>
         </div>
         </Portal>
+      )}
+    </div>
+  );
+}
+
+// ─── Price Insights Panel ─────────────────────────────────────────────────────
+const SIX_MONTHS_MS = 6 * 30 * 24 * 60 * 60 * 1000;
+
+type Insight = {
+  product: Product;
+  ordersLast6m: number;
+  totalQty: number;
+  suggestedIncrease: number;    // % e.g. 3
+  editedIncrease: number;       // what admin typed
+  lastOrderDate: string | null;
+  action: 'increase' | 'inactive_suggest' | 'ok';
+};
+
+function PriceInsightsPanel({ products }: { products: Product[] }) {
+  const [open, setOpen] = useState(false);
+  const [orders, setOrders] = useState<Order[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [edits, setEdits] = useState<Record<string, number>>({});
+  const [applying, setApplying] = useState<string | null>(null);
+  const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+
+  async function load() {
+    if (orders !== null) { setOpen(true); return; }
+    setLoading(true);
+    try {
+      const all = await ordersService.getAll();
+      setOrders(all.filter(o => o.status !== 'cancelled'));
+      setOpen(true);
+    } finally { setLoading(false); }
+  }
+
+  const insights = useMemo<Insight[]>(() => {
+    if (!orders) return [];
+    const now = Date.now();
+    const cutoff = new Date(now - SIX_MONTHS_MS).toISOString();
+
+    return products
+      .filter(p => p.category.trim() !== 'Sweets' && p.isActive) // exclude festival sweets
+      .map(p => {
+        const productOrders = orders.filter(o =>
+          o.items.some(i => i.productId === p.id)
+        );
+        const recent = productOrders.filter(o => o.createdAt >= cutoff);
+        const ordersLast6m = recent.length;
+        const totalQty = recent.flatMap(o => o.items.filter(i => i.productId === p.id))
+          .reduce((s, i) => s + i.quantity, 0);
+
+        const lastOrderDate = productOrders.length > 0
+          ? productOrders.sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0].createdAt
+          : null;
+
+        let suggestedIncrease = 0;
+        let action: Insight['action'] = 'ok';
+
+        if (ordersLast6m === 0) {
+          action = 'inactive_suggest';
+        } else if (ordersLast6m >= 15) {
+          suggestedIncrease = 5; action = 'increase';   // very high demand
+        } else if (ordersLast6m >= 8) {
+          suggestedIncrease = 3; action = 'increase';   // good demand
+        } else if (ordersLast6m >= 3) {
+          suggestedIncrease = 2; action = 'increase';   // moderate
+        }
+
+        return {
+          product: p, ordersLast6m, totalQty,
+          suggestedIncrease, editedIncrease: edits[p.id] ?? suggestedIncrease,
+          lastOrderDate, action,
+        };
+      })
+      .filter(ins => ins.action !== 'ok' && !dismissed.has(ins.product.id))
+      .sort((a, b) => {
+        // inactive first, then by order count desc
+        if (a.action === 'inactive_suggest' && b.action !== 'inactive_suggest') return -1;
+        if (a.action !== 'inactive_suggest' && b.action === 'inactive_suggest') return 1;
+        return b.ordersLast6m - a.ordersLast6m;
+      });
+  }, [orders, products, edits, dismissed]);
+
+  async function applyIncrease(ins: Insight) {
+    const pct = ins.editedIncrease;
+    if (pct <= 0 || pct > 30) return toast.error('Enter a % between 1 and 30');
+    setApplying(ins.product.id);
+    try {
+      const newPrice = parseFloat((ins.product.pricePerUnit * (1 + pct / 100)).toFixed(4));
+      await productsService.update(ins.product.id, { pricePerUnit: newPrice });
+      toast.success(`${ins.product.name} price updated to ₹${newPrice} (+${pct}%)`);
+      setDismissed(d => new Set([...d, ins.product.id]));
+    } finally { setApplying(null); }
+  }
+
+  async function markInactive(productId: string) {
+    await productsService.update(productId, { isActive: false });
+    toast.success('Product marked inactive');
+    setDismissed(d => new Set([...d, productId]));
+  }
+
+  const increaseCount = insights.filter(i => i.action === 'increase').length;
+  const inactiveCount = insights.filter(i => i.action === 'inactive_suggest').length;
+
+  return (
+    <div className="rounded-xl border overflow-hidden"
+      style={{ borderColor: '#f0d9c8', background: '#fff' }}>
+      {/* Header — always visible */}
+      <button
+        onClick={open ? () => setOpen(false) : load}
+        className="w-full flex items-center justify-between px-4 py-3 hover:bg-orange-50/50 transition-colors">
+        <div className="flex items-center gap-2">
+          <TrendingUp className="w-4 h-4 text-orange-500" />
+          <span className="text-sm font-semibold text-gray-800">Price & Activity Insights</span>
+          {!loading && orders !== null && (increaseCount > 0 || inactiveCount > 0) && (
+            <span className="flex items-center gap-1.5 ml-1">
+              {increaseCount > 0 && (
+                <span className="text-xs font-bold px-2 py-0.5 rounded-full"
+                  style={{ background: '#fff3e0', color: '#e65100' }}>
+                  {increaseCount} price {increaseCount === 1 ? 'suggestion' : 'suggestions'}
+                </span>
+              )}
+              {inactiveCount > 0 && (
+                <span className="text-xs font-bold px-2 py-0.5 rounded-full"
+                  style={{ background: '#fce4ec', color: '#c62828' }}>
+                  {inactiveCount} low-activity
+                </span>
+              )}
+            </span>
+          )}
+          {loading && <div className="w-3.5 h-3.5 border-2 border-orange-400 border-t-transparent rounded-full animate-spin ml-1" />}
+        </div>
+        {open ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+      </button>
+
+      {open && (
+        <div className="border-t" style={{ borderColor: '#f0d9c8' }}>
+          {insights.length === 0 ? (
+            <p className="text-sm text-gray-400 px-4 py-4 text-center">
+              {orders === null ? 'Loading…' : '✅ All active products look healthy — no suggestions right now.'}
+            </p>
+          ) : (
+            <div className="divide-y divide-orange-50">
+              {insights.map(ins => (
+                <div key={ins.product.id} className="px-4 py-3 space-y-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-semibold text-sm text-gray-800 truncate">{ins.product.name}</span>
+                        {ins.action === 'inactive_suggest' ? (
+                          <span className="text-xs font-bold px-2 py-0.5 rounded-full flex-shrink-0"
+                            style={{ background: '#fce4ec', color: '#c62828' }}>
+                            ⚠️ No orders in 6 months
+                          </span>
+                        ) : (
+                          <span className="text-xs font-bold px-2 py-0.5 rounded-full flex-shrink-0"
+                            style={{ background: '#e8f5e9', color: '#2e7d32' }}>
+                            🔥 {ins.ordersLast6m} orders in 6 months
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        Current: <strong>{formatCurrency(ins.product.pricePerUnit)}/{ins.product.unit}</strong>
+                        {ins.lastOrderDate && ` · Last order: ${new Date(ins.lastOrderDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}`}
+                        {ins.totalQty > 0 && ` · ${ins.totalQty}${ins.product.unit === 'piece' ? ' pcs' : 'g'} sold`}
+                      </p>
+                    </div>
+                    <button onClick={() => setDismissed(d => new Set([...d, ins.product.id]))}
+                      className="p-1 hover:bg-gray-100 rounded-lg flex-shrink-0" title="Dismiss">
+                      <X className="w-3.5 h-3.5 text-gray-400" />
+                    </button>
+                  </div>
+
+                  {ins.action === 'increase' && (
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <div className="flex items-center gap-1.5 bg-orange-50 rounded-xl px-3 py-2 flex-1 min-w-0">
+                        <TrendingUp className="w-3.5 h-3.5 text-orange-500 flex-shrink-0" />
+                        <span className="text-xs text-gray-600 flex-shrink-0">Suggest increase:</span>
+                        <input
+                          type="number" min={1} max={30} step={0.5}
+                          value={edits[ins.product.id] ?? ins.suggestedIncrease}
+                          onChange={e => setEdits(prev => ({ ...prev, [ins.product.id]: parseFloat(e.target.value) || 0 }))}
+                          className="w-14 text-center border border-orange-300 rounded-lg px-1.5 py-1 text-xs font-bold outline-none focus:ring-2 focus:ring-orange-300"
+                        />
+                        <span className="text-xs text-gray-600 flex-shrink-0">%</span>
+                        {(() => {
+                          const pct = edits[ins.product.id] ?? ins.suggestedIncrease;
+                          const newPrice = parseFloat((ins.product.pricePerUnit * (1 + pct / 100)).toFixed(4));
+                          return <span className="text-xs text-green-700 font-semibold flex-shrink-0">→ ₹{newPrice}</span>;
+                        })()}
+                      </div>
+                      <button
+                        onClick={() => applyIncrease(ins)}
+                        disabled={applying === ins.product.id}
+                        className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-white disabled:opacity-50 flex-shrink-0"
+                        style={{ background: '#c8821a' }}>
+                        {applying === ins.product.id
+                          ? <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          : <CheckCircle2 className="w-3.5 h-3.5" />}
+                        Apply
+                      </button>
+                    </div>
+                  )}
+
+                  {ins.action === 'inactive_suggest' && (
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-xs text-gray-500 flex-1">
+                        No orders since {ins.lastOrderDate
+                          ? new Date(ins.lastOrderDate).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })
+                          : 'ever'}. Consider deactivating to keep the store focused.
+                      </p>
+                      <button
+                        onClick={() => markInactive(ins.product.id)}
+                        className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border flex-shrink-0"
+                        style={{ borderColor: '#ef9a9a', color: '#c62828', background: '#fff5f5' }}>
+                        <AlertTriangle className="w-3.5 h-3.5" />
+                        Mark Inactive
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="px-4 py-2 text-xs text-gray-400 border-t" style={{ borderColor: '#f5f0ec' }}>
+            ℹ️ Suggestions exclude Sweets / festival items. Dismissed items reappear on next refresh.
+          </div>
+        </div>
       )}
     </div>
   );

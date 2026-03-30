@@ -37,6 +37,7 @@ export default function FeedbackPage() {
     try {
       await feedbackService.add({
         orderId: orderId!,
+        orderNumber: order?.orderNumber,
         customerId: order?.customerId,
         customerName: order?.customerName || 'Customer',
         customerWhatsapp: order?.customerWhatsapp || '',
@@ -67,10 +68,8 @@ export default function FeedbackPage() {
           <CheckCircle className="w-9 h-9 text-green-500" />
         </div>
         <h1 className="text-xl font-bold text-gray-800 font-display mb-2">Thank You! 🙏</h1>
-        <p className="text-gray-500 text-sm">Your feedback helps us improve.</p>
-        <a href="/" className="block mt-5 bg-orange-500 hover:bg-orange-600 text-white py-3 rounded-xl text-sm font-semibold transition-colors">
-          Shop Again
-        </a>
+        <p className="text-gray-500 text-sm mb-1">Your feedback has been recorded.</p>
+        <p className="text-gray-400 text-xs">It helps us serve you better next time 🌿</p>
       </div>
     </div>
   );

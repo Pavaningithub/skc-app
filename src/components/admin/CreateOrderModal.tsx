@@ -139,6 +139,9 @@ export default function CreateOrderModal({ onClose, onCreated }: Props) {
         paymentStatus: isSample ? 'na' : paymentStatus,
         notes,
         hasOnDemandItems: items.some(i => i.isOnDemand),
+        referralDiscount: 0,
+        creditUsed: 0,
+        deliveryCharge: 0,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };

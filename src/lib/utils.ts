@@ -215,6 +215,78 @@ export function generateOrderNumber(): string {
   return `SKC${y}${m}${d}${r}`;
 }
 
+/** Generate a unique referral code from customer name, e.g. "Pavan Naik" → SKC-PAVAN47 */
+export function generateReferralCode(name: string): string {
+  const slug = name.trim().split(' ')[0].toUpperCase().replace(/[^A-Z]/g, '').slice(0, 6);
+  const suffix = Math.floor(Math.random() * 90) + 10; // 10–99
+  return `SKC-${slug}${suffix}`;
+}
+
+/**
+ * Compute referral discount with 3 tiers.
+ * Total discount is split: 75% to the referrer (credit added to account), 25% to the new customer (price off).
+ *
+ * Tiers:
+ *   ₹1   – ₹499    → 3%   total, no cap
+ *   ₹500 – ₹999    → 5%   total, max ₹50 total
+ *   ₹1000+          → 7.5% total, max ₹100 total
+ *
+ * Split: referrer gets 75%, new customer gets 25%.
+ * Returns: { total, customerDiscount (25%), referrerCredit (75%) }
+ */
+export function computeReferralDiscount(subtotal: number): {
+  total: number; customerDiscount: number; referrerCredit: number;
+} {
+  if (subtotal <= 0) return { total: 0, customerDiscount: 0, referrerCredit: 0 };
+  let raw: number;
+  if (subtotal < 500) {
+    raw = Math.round(subtotal * 0.03);
+  } else if (subtotal < 1000) {
+    raw = Math.min(Math.round(subtotal * 0.05), 50);
+  } else {
+    raw = Math.min(Math.round(subtotal * 0.075), 100);
+  }
+  const referrerCredit   = Math.round(raw * 0.75);  // referrer gets 75%
+  const customerDiscount = raw - referrerCredit;     // new customer gets 25%, avoids rounding drift
+  return { total: raw, customerDiscount, referrerCredit };
+}
+
+/**
+ * Compute how much referral credit a returning customer can redeem on an order.
+ * Cap: min of (available credit, 10% of subtotal, ₹75 max per order).
+ * This is separate from the referral code discount — only one can apply at a time.
+ */
+export function computeCreditRedemption(availableCredit: number, subtotal: number): number {
+  if (availableCredit <= 0 || subtotal <= 0) return 0;
+  const cap = Math.min(Math.round(subtotal * 0.10), 75);  // max 10% of order or ₹75
+  return Math.min(availableCredit, cap);
+}
+
+/**
+ * WhatsApp message a customer sends to their friends to refer them.
+ * Pre-populates the referral code so the friend just taps the link.
+ */
+export function referralShareMessage(customerName: string, referralCode: string, storeUrl: string): string {
+  const refLink = `${storeUrl}?ref=${referralCode}`;
+  return `🙏 *Hare Krishna!* 🪷
+
+Hi! I've been ordering from *Sri Krishna Condiments* — authentic homemade Karnataka condiments (Chutney Powders, Masalas, Health Mixes).
+
+The taste is amazing and made fresh with love! 🌿
+
+🎁 Use my link — your discount is *auto-applied* at checkout:
+👉 ${refLink}
+
+• Below ₹500 → you save *3% off* your order
+• ₹500–₹999 → you save *5% off* (up to ₹13)
+• ₹1000+ → you save *7.5% off* (up to ₹25)
+
+And I earn credit for referring you — so we both win! 🙌
+I earn ₹37–₹75 in credit when you place a ₹500+ order 😊
+
+Tried by *${customerName}* — highly recommended! 😊`;
+}
+
 export function generateBatchNumber(): string {
   const now = new Date();
   const y = now.getFullYear().toString().slice(2);
