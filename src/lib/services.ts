@@ -9,7 +9,7 @@ import { db } from "./firebase";
 import { generateReferralCode } from "./utils";
 import type {
   Product, StockItem, RawMaterial, RawMaterialPurchase,
-  Batch, Customer, Order, Expense, Subscription, Feedback, AdminAction, AdminActionType, AdminUser,
+  Batch, Customer, Order, Expense, Subscription, Feedback, AdminAction, AdminActionType, AdminUser, Agent,
 } from "./types";
 
 // ─── Collection Names ─────────────────────────────────────────────────────────
@@ -27,6 +27,7 @@ export const COLLECTIONS = {
   SETTINGS:              "settings",
   ADMIN_ACTIVITY:        "adminActivity",
   ADMIN_USERS:           "adminUsers",
+  AGENTS:                "agents",
 } as const;
 
 function now() { return new Date().toISOString(); }
@@ -513,3 +514,90 @@ export const activityService = {
     );
   },
 };
+
+// ─── Agents (Partner / Reseller) ───────────────────────────────────────────────────
+export const agentsService = {
+  async getAll(): Promise<Agent[]> {
+    const snap = await getDocs(collection(db, COLLECTIONS.AGENTS));
+    return snap.docs
+      .map(d => ({ id: d.id, ...d.data() } as Agent))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  },
+
+  async getById(id: string): Promise<Agent | null> {
+    const snap = await getDoc(doc(db, COLLECTIONS.AGENTS, id));
+    if (!snap.exists()) return null;
+    return { id: snap.id, ...snap.data() } as Agent;
+  },
+
+  async getByCode(code: string): Promise<Agent | null> {
+    const snap = await getDocs(query(
+      collection(db, COLLECTIONS.AGENTS),
+      where("agentCode", "==", code.toUpperCase().trim()),
+    ));
+    if (snap.empty) return null;
+    return { id: snap.docs[0].id, ...snap.docs[0].data() } as Agent;
+  },
+
+  /** Verify agent PIN. Returns agent if correct, null if wrong. */
+  async verifyPin(agentCode: string, pin: string): Promise<Agent | null> {
+    const agent = await this.getByCode(agentCode);
+    if (!agent || !agent.isActive) return null;
+    if (agent.pin !== pin) return null;
+    return agent;
+  },
+
+  async add(data: Omit<Agent, 'id' | 'totalOrders' | 'totalRevenue' | 'totalCommissionEarned' | 'totalCommissionPaid' | 'createdAt' | 'updatedAt'>): Promise<string> {
+    const ref = await addDoc(collection(db, COLLECTIONS.AGENTS), {
+      ...data,
+      totalOrders: 0,
+      totalRevenue: 0,
+      totalCommissionEarned: 0,
+      totalCommissionPaid: 0,
+      createdAt: now(),
+      updatedAt: now(),
+    });
+    return ref.id;
+  },
+
+  async update(id: string, data: Partial<Agent>): Promise<void> {
+    await updateDoc(doc(db, COLLECTIONS.AGENTS, id), { ...data, updatedAt: now() });
+  },
+
+  async changePin(id: string, newPin: string): Promise<void> {
+    await updateDoc(doc(db, COLLECTIONS.AGENTS, id), { pin: newPin, mustChangePin: false, updatedAt: now() });
+  },
+
+  /** Save agent's preferred markup type + value so it auto-loads next session. */
+  async saveMarkupPreference(id: string, type: 'rupees' | 'percent', value: number): Promise<void> {
+    await updateDoc(doc(db, COLLECTIONS.AGENTS, id), { savedMarkupType: type, savedMarkupValue: value, updatedAt: now() });
+  },
+
+  /** Called after an agent order is placed. Updates agent totals. */
+  async recordOrder(agentId: string, skcTotal: number, commission: number): Promise<void> {
+    await updateDoc(doc(db, COLLECTIONS.AGENTS, agentId), {
+      totalOrders: increment(1),
+      totalRevenue: increment(skcTotal),
+      totalCommissionEarned: increment(commission),
+      updatedAt: now(),
+    });
+  },
+
+  /** Mark commission as paid. */
+  async markCommissionPaid(agentId: string, amount: number): Promise<void> {
+    await updateDoc(doc(db, COLLECTIONS.AGENTS, agentId), {
+      totalCommissionPaid: increment(amount),
+      updatedAt: now(),
+    });
+  },
+
+  subscribe(cb: (items: Agent[]) => void): Unsubscribe {
+    return onSnapshot(collection(db, COLLECTIONS.AGENTS), snap => {
+      const items = snap.docs
+        .map(d => ({ id: d.id, ...d.data() } as Agent))
+        .sort((a, b) => a.name.localeCompare(b.name));
+      cb(items);
+    });
+  },
+};
+
