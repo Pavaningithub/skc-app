@@ -50,6 +50,7 @@ export default function StoreFront() {
   const [useCredit, setUseCredit] = useState(false);          // customer toggled credit redemption on
   const [referralDiscount, setReferralDiscount] = useState(0);
   const [referralError, setReferralError] = useState('');
+  const [standingDiscount, setStandingDiscount] = useState(0); // auto-applied from customer's discountApplyToNew
 
   useEffect(() => { load(); }, []);
 
@@ -231,7 +232,9 @@ export default function StoreFront() {
         creditUsedAmt = computeCreditRedemption(existing.referralCredit ?? 0, cartTotal);
       }
 
-      const totalDiscountAmt = referralDiscountAmt + creditUsedAmt; // only one can be > 0 at a time
+      // Standing discount takes priority — if active, ignore referral and credit
+      const standingDiscountAmt = standingDiscount > 0 ? Math.round(cartTotal * standingDiscount / 100) : 0;
+      const totalDiscountAmt = standingDiscountAmt > 0 ? standingDiscountAmt : (referralDiscountAmt + creditUsedAmt);
       const finalTotal = Math.max(0, cartTotal - totalDiscountAmt);
       const orderNumber = generateOrderNumber();
       const order: Omit<Order, 'id'> = {
@@ -240,6 +243,7 @@ export default function StoreFront() {
         customerPlace: orderForm.place.trim(),
         items: cart, subtotal: cartTotal,
         discount: totalDiscountAmt, total: finalTotal,
+        ...(standingDiscountAmt > 0 ? { standingDiscountPct: standingDiscount } : {}),
         status: 'pending', paymentStatus: 'pending',
         notes: orderForm.notes,
         hasOnDemandItems: hasOnDemand,
@@ -266,7 +270,7 @@ export default function StoreFront() {
       }
 
       setCart([]); setShowOrderForm(false);
-      setMyReferralCode(null); setIsReturningCustomer(false); setReferralDiscount(0); setReferralError('');
+      setMyReferralCode(null); setIsReturningCustomer(false); setReferralDiscount(0); setReferralError(''); setStandingDiscount(0);
       setOrderForm({ name: '', whatsapp: '', place: '', notes: '', referralCode: '' });
       toast.success('Order placed! 🎉');
       navigate(`/order-confirmation/${orderId}`);
@@ -845,6 +849,8 @@ export default function StoreFront() {
           setReferralDiscount={setReferralDiscount}
           referralError={referralError}
           setReferralError={setReferralError}
+          standingDiscount={standingDiscount}
+          setStandingDiscount={setStandingDiscount}
           onClose={() => setShowOrderForm(false)}
           onSubmit={handlePlaceOrder}
         />
@@ -1370,6 +1376,7 @@ function OrderFormModal({
   availableCredit, setAvailableCredit, useCredit, setUseCredit,
   referralDiscount, setReferralDiscount,
   referralError, setReferralError,
+  standingDiscount, setStandingDiscount,
   onClose, onSubmit
 }: {
   isSample: boolean;
@@ -1390,6 +1397,8 @@ function OrderFormModal({
   setReferralDiscount: (v: number) => void;
   referralError: string;
   setReferralError: (v: string) => void;
+  standingDiscount: number;
+  setStandingDiscount: (v: number) => void;
   onClose: () => void;
   onSubmit: () => void;
 }) {
@@ -1397,7 +1406,10 @@ function OrderFormModal({
   const [lookingUpPhone, setLookingUpPhone] = useState(false);
   const creditDiscount = (isReturningCustomer && useCredit)
     ? computeCreditRedemption(availableCredit, cartTotal) : 0;
-  const finalTotal = Math.max(0, cartTotal - referralDiscount - creditDiscount);
+  const standingDiscountAmt = standingDiscount > 0 ? Math.round(cartTotal * standingDiscount / 100) : 0;
+  const finalTotal = standingDiscountAmt > 0
+    ? Math.max(0, cartTotal - standingDiscountAmt)
+    : Math.max(0, cartTotal - referralDiscount - creditDiscount);
 
   // When phone number reaches 10 digits, look up existing customer to show their referral code
   async function handlePhoneChange(raw: string) {
@@ -1408,6 +1420,13 @@ function OrderFormModal({
       try {
         const existing = await customersService.getByWhatsapp(digits);
         setMyReferralCode(existing?.referralCode ?? null);
+        // Apply standing discount if enabled for new orders
+        if (existing?.discountApplyToNew && (existing?.discountPercent ?? 0) > 0) {
+          setStandingDiscount(existing.discountPercent!);
+          setReferralDiscount(0); setReferralError(''); // clear referral — standing takes priority
+        } else {
+          setStandingDiscount(0);
+        }
         // Mark as returning if they've already ordered — referral code field will be hidden
         const returning = !!existing && ((existing.totalOrders ?? 0) > 0 || !!existing.referredBy);
         setIsReturningCustomer(returning);
@@ -1421,6 +1440,7 @@ function OrderFormModal({
     } else {
       setMyReferralCode(null);
       setIsReturningCustomer(false);
+      setStandingDiscount(0);
     }
   }
 
@@ -1546,8 +1566,19 @@ function OrderFormModal({
               style={{ borderColor: '#e0d0c0' }} />
           </div>
 
-          {/* Referral Code entry — only for real orders, only for first-time customers */}
-          {!isSample && !isReturningCustomer && (
+          {/* Standing discount active — show notice, hide referral code */}
+          {!isSample && standingDiscountAmt > 0 && (
+            <div className="flex items-start gap-2 rounded-xl px-3 py-2.5 text-xs"
+              style={{ background: '#f0fdf4', border: '1px solid #86efac', color: '#166534' }}>
+              <span className="text-base leading-none">🏷️</span>
+              <span>
+                <strong>Special discount active — {standingDiscount}% off applied automatically.</strong> Referral codes are not needed.
+              </span>
+            </div>
+          )}
+
+          {/* Referral Code entry — only for real orders, only for first-time customers, only when no standing discount */}
+          {!isSample && !isReturningCustomer && !standingDiscountAmt && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
                 🎟️ Have a referral code? <span className="text-gray-400 font-normal">(first order only)</span>
@@ -1594,8 +1625,8 @@ function OrderFormModal({
             </div>
           )}
 
-          {/* Credit redemption — only for returning customers who have earned referral credit */}
-          {!isSample && isReturningCustomer && availableCredit > 0 && (
+          {/* Credit redemption — only for returning customers who have earned referral credit, and no standing discount */}
+          {!isSample && isReturningCustomer && availableCredit > 0 && !standingDiscountAmt && (
             <div>
               <div className="rounded-2xl px-4 py-3 flex items-center justify-between gap-3 cursor-pointer"
                 style={{ background: useCredit ? '#f0fdf4' : '#fdf5e6', border: `1px solid ${useCredit ? '#86efac' : '#f0d9c8'}` }}
@@ -1632,19 +1663,25 @@ function OrderFormModal({
           )}
 
           {/* Updated total showing any active discount */}
-          {!isSample && (referralDiscount > 0 || (useCredit && creditDiscount > 0)) && (
+          {!isSample && (standingDiscountAmt > 0 || referralDiscount > 0 || (useCredit && creditDiscount > 0)) && (
             <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid #86efac', background: '#f0fdf4' }}>
               <div className="flex justify-between items-center px-4 py-2.5 text-sm border-b" style={{ borderColor: '#bbf7d0' }}>
                 <span className="text-gray-500">Subtotal</span>
                 <span className="font-medium">₹{cartTotal}</span>
               </div>
-              {referralDiscount > 0 && (
+              {standingDiscountAmt > 0 && (
+                <div className="flex justify-between items-center px-4 py-2.5 text-sm border-b" style={{ borderColor: '#bbf7d0' }}>
+                  <span className="text-green-600">🏷️ Your special discount ({standingDiscount}%)</span>
+                  <span className="font-semibold text-green-600">−₹{standingDiscountAmt}</span>
+                </div>
+              )}
+              {!standingDiscountAmt && referralDiscount > 0 && (
                 <div className="flex justify-between items-center px-4 py-2.5 text-sm border-b" style={{ borderColor: '#bbf7d0' }}>
                   <span className="text-green-600">🎟️ Referral discount</span>
                   <span className="font-semibold text-green-600">−₹{referralDiscount}</span>
                 </div>
               )}
-              {useCredit && creditDiscount > 0 && (
+              {!standingDiscountAmt && useCredit && creditDiscount > 0 && (
                 <div className="flex justify-between items-center px-4 py-2.5 text-sm border-b" style={{ borderColor: '#bbf7d0' }}>
                   <span className="text-green-600">💰 Credit redeemed</span>
                   <span className="font-semibold text-green-600">−₹{creditDiscount}</span>
@@ -1668,7 +1705,7 @@ function OrderFormModal({
           <button onClick={onSubmit} disabled={submitting}
             className="w-full text-white font-bold py-3.5 rounded-2xl text-sm disabled:opacity-50"
             style={{ background: '#c8821a' }}>
-            {submitting ? 'Sending…' : isSample ? '🎁 Request Sample' : `✅ Place Order${(referralDiscount > 0 || (useCredit && creditDiscount > 0)) ? ` · ₹${finalTotal}` : ''}`}
+            {submitting ? 'Sending…' : isSample ? '🎁 Request Sample' : `✅ Place Order${(standingDiscountAmt > 0 || referralDiscount > 0 || (useCredit && creditDiscount > 0)) ? ` · ₹${finalTotal}` : ''}`}
           </button>
         </div>
       </div>
