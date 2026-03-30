@@ -36,10 +36,9 @@ export default function CustomersPage() {
   const [sortKey, setSortKey] = useState<CustSort>('name_asc');
 
   async function loadOrders(customerId: string) {
-    if (customerOrders[customerId]) return;
-    const all = await ordersService.getAll();
-    const filtered = all.filter(o => o.customerId === customerId);
-    setCustomerOrders(prev => ({ ...prev, [customerId]: filtered }));
+    // Always re-fetch — no cache, so payment status changes are immediately visible
+    const orders = await ordersService.getByCustomerId(customerId);
+    setCustomerOrders(prev => ({ ...prev, [customerId]: orders }));
   }
 
   async function toggleExpand(id: string) {
@@ -66,8 +65,6 @@ export default function CustomersPage() {
     setSyncing(c.id);
     try {
       await customersService.adjustAfterOrderEdit(c.id, 0, 0, 'pending');
-      // Refresh displayed orders
-      setCustomerOrders(prev => { const next = { ...prev }; delete next[c.id]; return next; });
       await loadOrders(c.id);
     } finally {
       setSyncing(null);
@@ -81,8 +78,6 @@ export default function CustomersPage() {
       const orders = customerOrders[c.id] || [];
       const pendingOrders = orders.filter(o => o.paymentStatus === 'pending');
       await Promise.all(pendingOrders.map(o => ordersService.updatePayment(o.id, 'paid')));
-      // Refresh orders list
-      setCustomerOrders(prev => { const next = { ...prev }; delete next[c.id]; return next; });
       await loadOrders(c.id);
     } finally {
       setMarkingPaid(null);
