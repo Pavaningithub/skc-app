@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ShoppingCart, Star, Plus, Minus,
   Trash2, X, MessageCircle, Users, ChevronRight, Flame,
@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { productsService, feedbackService, ordersService, customersService, stockService } from '../../lib/services';
-import { generateOrderNumber, formatCurrency } from '../../lib/utils';
+import { generateOrderNumber, formatCurrency, computeReferralDiscount, computeCreditRedemption } from '../../lib/utils';
 import { APP_CONFIG } from '../../config';
 import type { Product, Feedback, OrderItem, Order } from '../../lib/types';
 
@@ -23,6 +23,10 @@ function normalizeWhatsapp(raw: string): string {
 
 export default function StoreFront() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  // ?ref=SKC-XXXXX pre-filled from the share link
+  const urlRefCode = (searchParams.get('ref') || '').toUpperCase().trim();
+
   const [products, setProducts]         = useState<Product[]>([]);
   const [testimonials, setTestimonials] = useState<Feedback[]>([]);
   const [feedbackStats, setFeedbackStats] = useState<{ total: number; avg: number } | null>(null);
@@ -37,9 +41,35 @@ export default function StoreFront() {
   const [submitting, setSubmitting]     = useState(false);
   // Sample: max 2 products, only powders + Dry Fruit Laddu
   const [sampleSelected, setSampleSelected] = useState<Product[]>([]);
-  const [sampleStep, setSampleStep]     = useState<'pick' | 'contact'>('pick');  const [orderForm, setOrderForm] = useState({ name: '', whatsapp: '', place: '', notes: '' });
+  const [sampleStep, setSampleStep]     = useState<'pick' | 'contact'>('pick');
+  const [orderForm, setOrderForm] = useState({ name: '', whatsapp: '', place: '', notes: '', referralCode: urlRefCode });
+  // Referral: customer's own code shown after phone lookup, and validated referrer
+  const [myReferralCode, setMyReferralCode] = useState<string | null>(null);
+  const [isReturningCustomer, setIsReturningCustomer] = useState(false); // true = has prior orders, referral code blocked
+  const [availableCredit, setAvailableCredit] = useState(0);  // ₹ credit balance from referring others
+  const [useCredit, setUseCredit] = useState(false);          // customer toggled credit redemption on
+  const [referralDiscount, setReferralDiscount] = useState(0);
+  const [referralError, setReferralError] = useState('');
 
   useEffect(() => { load(); }, []);
+
+  // When the order form opens and there's a URL ref code, auto-validate it
+  useEffect(() => {
+    if (!showOrderForm || !urlRefCode) return;
+    (async () => {
+      try {
+        const referrer = await customersService.getByReferralCode(urlRefCode);
+        if (referrer) {
+          const disc = computeReferralDiscount(cartTotal);
+          setReferralDiscount(disc.customerDiscount);
+          setReferralError('');
+        } else {
+          setReferralError('Referral code in link is invalid');
+        }
+      } catch { /* silent */ }
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showOrderForm]);
 
   // Real-time testimonials — always shows latest public feedback
   useEffect(() => {
@@ -145,7 +175,7 @@ export default function StoreFront() {
   function openSampleForm() {
     setSampleSelected([]);
     setSampleStep('pick');
-    setOrderForm({ name: '', whatsapp: '', place: '', notes: '' });
+    setOrderForm({ name: '', whatsapp: '', place: '', notes: '', referralCode: '' });
     setShowSampleForm(true);
   }
 
@@ -165,15 +195,58 @@ export default function StoreFront() {
         createdAt: new Date().toISOString(),
       });
 
+      // Referral code discount (first order only) — mutually exclusive with credit redemption
+      let referralCodeUsed: string | undefined;
+      let referralDiscountAmt = 0;
+      let referrerCreditAmt = 0;
+      let referrerId: string | undefined;
+      let creditUsedAmt = 0;
+
+      const enteredCode = orderForm.referralCode.trim().toUpperCase();
+      if (enteredCode) {
+        // Block returning customers — referral benefit is for first-time orders only
+        if (existing && (existing.totalOrders > 0 || existing.referredBy)) {
+          setReferralError('Referral codes are only valid on your first order');
+          setSubmitting(false);
+          return;
+        }
+        const referrer = await customersService.getByReferralCode(enteredCode);
+        if (!referrer) {
+          setReferralError('Invalid referral code — please check and try again');
+          setSubmitting(false);
+          return;
+        }
+        if (referrer.id === customerId) {
+          setReferralError("You can't use your own referral code");
+          setSubmitting(false);
+          return;
+        }
+        referralCodeUsed = enteredCode;
+        const split = computeReferralDiscount(cartTotal);
+        referralDiscountAmt = split.customerDiscount;  // new customer gets 25% off
+        referrerId = referrer.id;
+        referrerCreditAmt = split.referrerCredit;       // referrer earns 75% as credit
+      } else if (useCredit && existing && (existing.referralCredit ?? 0) > 0) {
+        // Credit redemption — returning customers only, capped to 10% of order or ₹75 max
+        creditUsedAmt = computeCreditRedemption(existing.referralCredit ?? 0, cartTotal);
+      }
+
+      const totalDiscountAmt = referralDiscountAmt + creditUsedAmt; // only one can be > 0 at a time
+      const finalTotal = Math.max(0, cartTotal - totalDiscountAmt);
       const orderNumber = generateOrderNumber();
       const order: Omit<Order, 'id'> = {
         orderNumber, type: 'regular', customerId,
         customerName: orderForm.name.trim(), customerWhatsapp: wa,
         customerPlace: orderForm.place.trim(),
-        items: cart, subtotal: cartTotal, discount: 0, total: cartTotal,
+        items: cart, subtotal: cartTotal,
+        discount: totalDiscountAmt, total: finalTotal,
         status: 'pending', paymentStatus: 'pending',
         notes: orderForm.notes,
         hasOnDemandItems: hasOnDemand,
+        referralCodeUsed,
+        referralDiscount: referralDiscountAmt,
+        creditUsed: creditUsedAmt,
+        deliveryCharge: 0,
         createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
       };
 
@@ -181,9 +254,20 @@ export default function StoreFront() {
       for (const item of cart) {
         if (!item.isOnDemand) await stockService.deduct(item.productId, item.quantity, { productName: item.productName, unit: item.unit });
       }
-      if (customerId) await customersService.updateAfterOrder(customerId, cartTotal, 'pending');
+      if (customerId) await customersService.updateAfterOrder(customerId, finalTotal, 'pending');
+
+      // Credit the referrer with 75% share and lock in this customer's referredBy
+      if (referrerId && referrerCreditAmt > 0) {
+        await customersService.addReferralCredit(referrerId, referrerCreditAmt);
+      }
+      if (customerId && referralCodeUsed) {
+        // Mark this customer as "referred by X" so they can't use another code later
+        await customersService.update(customerId, { referredBy: referralCodeUsed });
+      }
 
       setCart([]); setShowOrderForm(false);
+      setMyReferralCode(null); setIsReturningCustomer(false); setReferralDiscount(0); setReferralError('');
+      setOrderForm({ name: '', whatsapp: '', place: '', notes: '', referralCode: '' });
       toast.success('Order placed! 🎉');
       navigate(`/order-confirmation/${orderId}`);
     } catch (err) { console.error('Order error:', err); toast.error('Something went wrong: ' + (err instanceof Error ? err.message : String(err))); }
@@ -221,6 +305,9 @@ export default function StoreFront() {
         status: 'pending', paymentStatus: 'na',
         notes: `Sample request: ${sampleSelected.map(p => p.name).join(', ')}${orderForm.notes ? '. ' + orderForm.notes : ''}`,
         hasOnDemandItems: false,
+        referralDiscount: 0,
+        creditUsed: 0,
+        deliveryCharge: 0,
         createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
       };
       const orderId = await ordersService.add(order);
@@ -399,39 +486,79 @@ export default function StoreFront() {
         </div>
       )}
 
-      {/* ── Testimonials Marquee ────────────────────────────────────────── */}
+      {/* ── Testimonials Marquee — WhatsApp style ───────────────────── */}
       {testimonials.length > 0 && (
-        <div className="py-6 overflow-hidden" style={{ background: '#fdf0d5', borderTop: '2px solid #c8821a', borderBottom: '2px solid #c8821a' }}>
-          <div className="text-center mb-4 px-4">
-            <h2 className="text-base font-bold mb-1" style={{ color: '#3d1c02', fontFamily: 'Georgia, serif' }}>What Our Customers Say ✨</h2>
-            {feedbackStats && (
-              <div className="flex items-center justify-center gap-3 flex-wrap">
-                <span className="flex items-center gap-1 text-xs font-semibold" style={{ color: '#7a4010' }}>
-                  <Star className="w-3.5 h-3.5" style={{ fill: '#c8821a', color: '#c8821a' }} />
-                  {feedbackStats.avg} avg rating
-                </span>
-                <span className="text-xs" style={{ color: '#c8821a' }}>•</span>
-                <span className="text-xs font-semibold" style={{ color: '#7a4010' }}>
-                  💬 {feedbackStats.total}+ happy reviews
-                </span>
-              </div>
-            )}
+        <div className="py-5 overflow-hidden" style={{ background: '#e5ddd5' }}>
+          {/* WhatsApp-like chat header */}
+          <div className="flex items-center gap-3 px-4 pb-4 border-b mb-4" style={{ borderColor: '#d1c4b8' }}>
+            <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0"
+              style={{ background: '#c8821a' }}>
+              <span className="text-white text-sm font-bold">SKC</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-bold" style={{ color: '#1a1a1a' }}>Sri Krishna Condiments</p>
+              <p className="text-xs" style={{ color: '#667781' }}>
+                {feedbackStats
+                  ? `${feedbackStats.total} verified reviews · ⭐ ${feedbackStats.avg} avg`
+                  : 'Customer Reviews'}
+              </p>
+            </div>
+            <span className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold flex-shrink-0"
+              style={{ background: '#25d366', color: '#fff' }}>
+              <Star className="w-3 h-3" style={{ fill: '#fff', color: '#fff' }} /> Verified
+            </span>
           </div>
+
+          {/* Scrolling chat bubbles */}
           <div className="relative">
-            <div className="flex gap-4 animate-marquee" style={{ width: 'max-content' }}>
-              {[...testimonials, ...testimonials].map((t, i) => (
-                <div key={i} className="rounded-2xl p-4 shadow-sm flex-shrink-0 w-72"
-                  style={{ background: '#fff', border: '1.5px solid #e8c87a' }}>
-                  <div className="flex items-center gap-1 mb-2">
-                    {[1,2,3,4,5].map(s => (
-                      <Star key={s} className="w-3.5 h-3.5"
-                        style={{ fill: s <= t.rating ? '#c8821a' : '#e5e7eb', color: s <= t.rating ? '#c8821a' : '#e5e7eb' }} />
-                    ))}
+            <div className="flex gap-4 px-4 animate-marquee" style={{ width: 'max-content' }}>
+              {[...testimonials, ...testimonials].map((t, i) => {
+                const initials = t.customerName.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase();
+                const avatarColors = ['#128c7e', '#075e54', '#c8821a', '#7a4010', '#34b7f1', '#9c27b0'];
+                const avatarBg = avatarColors[i % avatarColors.length];
+                const timeStr = new Date(t.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+                return (
+                  <div key={i} className="flex items-end gap-2 flex-shrink-0" style={{ maxWidth: 280 }}>
+                    {/* Avatar */}
+                    <div className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center mb-0.5"
+                      style={{ background: avatarBg }}>
+                      <span className="text-white text-xs font-bold">{initials}</span>
+                    </div>
+                    {/* Bubble */}
+                    <div className="relative rounded-2xl rounded-bl-sm px-3 py-2 shadow-sm"
+                      style={{ background: '#fff', minWidth: 190, maxWidth: 265 }}>
+                      {/* Sender name + verified order badge */}
+                      <div className="flex items-center justify-between gap-2 mb-1 flex-wrap">
+                        <span className="text-xs font-bold" style={{ color: '#075e54' }}>{t.customerName}</span>
+                        {t.orderNumber && (
+                          <span className="text-xs px-1.5 py-0.5 rounded-full flex-shrink-0"
+                            style={{ background: '#e8f5e9', color: '#256029', fontSize: '9px', fontWeight: 700 }}>
+                            ✓ Order #{t.orderNumber}
+                          </span>
+                        )}
+                      </div>
+                      {/* Stars */}
+                      <div className="flex gap-0.5 mb-1">
+                        {[1,2,3,4,5].map(s => (
+                          <Star key={s} className="w-3 h-3"
+                            style={{ fill: s <= t.rating ? '#f59e0b' : '#e5e7eb', color: s <= t.rating ? '#f59e0b' : '#e5e7eb' }} />
+                        ))}
+                      </div>
+                      {/* Message */}
+                      <p className="text-sm leading-snug" style={{ color: '#1a1a1a' }}>"{t.whatYouLiked}"</p>
+                      {/* Timestamp + double blue ticks */}
+                      <div className="flex items-center justify-end gap-1 mt-1.5">
+                        <span className="text-xs" style={{ color: '#667781', fontSize: '10px' }}>{timeStr}</span>
+                        <svg className="w-3.5 h-2.5 flex-shrink-0" viewBox="0 0 18 11" fill="none">
+                          <path d="M1 5.5L5.5 10L12 1" stroke="#53bdeb" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                          <path d="M7 10L17 1" stroke="#53bdeb" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                          <path d="M5 10L15 1" stroke="#53bdeb" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      </div>
+                    </div>
                   </div>
-                  <p className="text-xs italic leading-relaxed" style={{ color: '#4a2c0a' }}>"{t.whatYouLiked}"</p>
-                  <p className="text-xs font-bold mt-2" style={{ color: '#c8821a' }}>— {t.customerName}</p>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>
@@ -494,6 +621,22 @@ export default function StoreFront() {
           <h2 className="text-xl font-bold" style={{ color: '#3d1c02', fontFamily: 'Georgia, serif' }}>🌿 Our Products</h2>
         </div>
         <p className="text-xs text-gray-400 mb-4">Tap any product to add to cart · Made fresh in small batches 🙏</p>
+
+        {/* Referral auto-apply banner — shown when page opened via a referral link */}
+        {urlRefCode && (
+          <div className="mb-4 flex items-center gap-3 rounded-2xl px-4 py-3"
+            style={{ background: 'linear-gradient(135deg, #f0fdf4, #dcfce7)', border: '1px solid #86efac' }}>
+            <span className="text-2xl">🎁</span>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-bold text-green-800">Referral discount ready!</p>
+              <p className="text-xs text-green-700 mt-0.5">
+                Code <span className="font-mono font-bold tracking-widest">{urlRefCode}</span> will be auto-applied at checkout.
+                Add items to your cart and place your order!
+              </p>
+            </div>
+            <span className="text-green-500 text-xl">✓</span>
+          </div>
+        )}
         <div className="relative mb-4">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
@@ -670,7 +813,7 @@ export default function StoreFront() {
                   <span className="text-xl font-bold" style={{ color: '#c8821a' }}>{formatCurrency(cartTotal)}</span>
                 </div>
                 <button
-                  onClick={() => { setShowCart(false); setShowOrderForm(true); setOrderForm({ name: '', whatsapp: '', place: '', notes: '' }); }}
+                  onClick={() => { setShowCart(false); setShowOrderForm(true); setOrderForm({ name: '', whatsapp: '', place: '', notes: '', referralCode: '' }); }}
                   className="w-full text-white font-semibold py-3.5 rounded-2xl text-sm"
                   style={{ background: '#c8821a' }}>
                   Proceed to Order →
@@ -690,6 +833,18 @@ export default function StoreFront() {
           form={orderForm}
           setForm={setOrderForm}
           submitting={submitting}
+          myReferralCode={myReferralCode}
+          setMyReferralCode={setMyReferralCode}
+          isReturningCustomer={isReturningCustomer}
+          setIsReturningCustomer={setIsReturningCustomer}
+          availableCredit={availableCredit}
+          setAvailableCredit={setAvailableCredit}
+          useCredit={useCredit}
+          setUseCredit={setUseCredit}
+          referralDiscount={referralDiscount}
+          setReferralDiscount={setReferralDiscount}
+          referralError={referralError}
+          setReferralError={setReferralError}
           onClose={() => setShowOrderForm(false)}
           onSubmit={handlePlaceOrder}
         />
@@ -933,22 +1088,22 @@ function ProductDetailSheet({ product, qty, setQty, qtyStep, minQty, qtyLabel, p
   qtyStep: number; minQty: number; qtyLabel: string; price: number; priceDisplay: string;
   onClose: () => void; onAddToCart: (p: Product, qty: number, note?: string) => void;
 }) {
-  const variants = product.variants ?? [];
-  const [selectedVariant, setSelectedVariant] = useState(variants.length === 1 ? variants[0] : '');
+  const [garlic, setGarlic] = useState<'with' | 'without' | ''>('');
   const [note, setNote]   = useState('');
   const [showNote, setShowNote] = useState(false);
   const isOccasion = product.category === 'Sweets';
   const descLong = (product.description?.length ?? 0) > 80;
   const [showFullDesc, setShowFullDesc] = useState(false);
 
-  const variantRequired = variants.length > 0 && !selectedVariant;
+  const garlicRequired = !!product.hasGarlicOption && !garlic;
 
   function handleAddToCart() {
-    if (variantRequired) {
-      toast.error('Please select a variant first');
+    if (garlicRequired) {
+      toast.error('Please choose With or Without Garlic');
       return;
     }
-    const fullNote = [selectedVariant, note].filter(Boolean).join(' · ');
+    const garlicLabel = garlic === 'with' ? 'With Garlic' : garlic === 'without' ? 'Without Garlic' : '';
+    const fullNote = [garlicLabel, note].filter(Boolean).join(' · ');
     onAddToCart(product, qty, fullNote || undefined);
     onClose();
   }
@@ -1025,25 +1180,24 @@ function ProductDetailSheet({ product, qty, setQty, qtyStep, minQty, qtyLabel, p
           <p className="text-xs text-gray-400 text-center -mt-2">Min {minQty < 1 ? `${Math.round(minQty*1000)}g` : `${minQty}kg`} · steps of {qtyStep < 1 ? `${Math.round(qtyStep*1000)}g` : `${qtyStep}kg`}</p>
         )}
 
-        {/* Variant selector */}
-        {variants.length > 0 && (
-          <div>
-            <p className="text-sm font-semibold text-gray-700 mb-2">
-              Choose variant <span className="text-red-500">*</span>
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {variants.map(v => (
-                <button key={v} onClick={() => setSelectedVariant(v)}
-                  className="px-4 py-2 rounded-xl text-sm font-semibold border-2 transition-all"
-                  style={selectedVariant === v
-                    ? { background: '#c8821a', color: '#fff', borderColor: '#c8821a' }
-                    : { background: '#fff', color: '#7a4010', borderColor: '#e0c8a0' }}>
-                  {v}
-                </button>
+        {/* Garlic option */}
+        {product.hasGarlicOption && (
+          <div className="rounded-xl p-3" style={{ background: '#fdf5e6', border: '1px solid #e8d5b0' }}>
+            <p className="text-sm font-semibold text-gray-700 mb-2">🧄 Garlic preference <span className="text-red-500">*</span></p>
+            <div className="flex gap-3">
+              {(['with', 'without'] as const).map(opt => (
+                <label key={opt} className="flex items-center gap-2 cursor-pointer">
+                  <input type="radio" name={`garlic-${product.id}`} value={opt}
+                    checked={garlic === opt} onChange={() => setGarlic(opt)}
+                    className="accent-orange-500 w-4 h-4" />
+                  <span className="text-sm font-medium text-gray-700">
+                    {opt === 'with' ? '🧄 With Garlic' : '🚫 Without Garlic'}
+                  </span>
+                </label>
               ))}
             </div>
-            {variantRequired && (
-              <p className="text-xs text-red-400 mt-1">Please select one to continue</p>
+            {garlicRequired && (
+              <p className="text-xs text-red-400 mt-1.5">Please choose one to continue</p>
             )}
           </div>
         )}
@@ -1066,10 +1220,10 @@ function ProductDetailSheet({ product, qty, setQty, qtyStep, minQty, qtyLabel, p
 
         <button
           onClick={handleAddToCart}
-          disabled={variantRequired}
+          disabled={garlicRequired}
           className="w-full flex items-center justify-between text-white font-bold py-3.5 px-5 rounded-2xl text-sm transition-opacity disabled:opacity-40"
           style={{ background: '#c8821a' }}>
-          <span>Add to Cart{selectedVariant ? ` — ${selectedVariant}` : ''}</span>
+          <span>Add to Cart{garlic ? ` — ${garlic === 'with' ? 'With Garlic' : 'Without Garlic'}` : ''}</span>
           <span>₹{Math.round(price)}</span>
         </button>
       </div>
@@ -1082,8 +1236,8 @@ function SampleModal({ products, selected, onToggle, step, setStep, form, setFor
   products: Product[]; selected: Product[];
   onToggle: (p: Product) => void;
   step: 'pick' | 'contact'; setStep: (s: 'pick' | 'contact') => void;
-  form: { name: string; whatsapp: string; place: string; notes: string };
-  setForm: React.Dispatch<React.SetStateAction<{ name: string; whatsapp: string; place: string; notes: string }>>;
+  form: { name: string; whatsapp: string; place: string; notes: string; referralCode: string };
+  setForm: React.Dispatch<React.SetStateAction<{ name: string; whatsapp: string; place: string; notes: string; referralCode: string }>>;
   submitting: boolean; onClose: () => void; onSubmit: () => void;
 }) {
   return (
@@ -1210,17 +1364,96 @@ function SampleModal({ products, selected, onToggle, step, setStep, form, setFor
 
 // ─── Order Form Modal ─────────────────────────────────────────────────────────
 function OrderFormModal({
-  isSample, cart, cartTotal, form, setForm, submitting, onClose, onSubmit
+  isSample, cart, cartTotal, form, setForm, submitting,
+  myReferralCode, setMyReferralCode,
+  isReturningCustomer, setIsReturningCustomer,
+  availableCredit, setAvailableCredit, useCredit, setUseCredit,
+  referralDiscount, setReferralDiscount,
+  referralError, setReferralError,
+  onClose, onSubmit
 }: {
   isSample: boolean;
   cart: CartItem[];
   cartTotal: number;
-  form: { name: string; whatsapp: string; place: string; notes: string };
-  setForm: React.Dispatch<React.SetStateAction<{ name: string; whatsapp: string; place: string; notes: string }>>;
+  form: { name: string; whatsapp: string; place: string; notes: string; referralCode: string };
+  setForm: React.Dispatch<React.SetStateAction<{ name: string; whatsapp: string; place: string; notes: string; referralCode: string }>>;
   submitting: boolean;
+  myReferralCode: string | null;
+  setMyReferralCode: (v: string | null) => void;
+  isReturningCustomer: boolean;
+  setIsReturningCustomer: (v: boolean) => void;
+  availableCredit: number;
+  setAvailableCredit: (v: number) => void;
+  useCredit: boolean;
+  setUseCredit: (v: boolean) => void;
+  referralDiscount: number;
+  setReferralDiscount: (v: number) => void;
+  referralError: string;
+  setReferralError: (v: string) => void;
   onClose: () => void;
   onSubmit: () => void;
 }) {
+  const [validatingReferral, setValidatingReferral] = useState(false);
+  const [lookingUpPhone, setLookingUpPhone] = useState(false);
+  const creditDiscount = (isReturningCustomer && useCredit)
+    ? computeCreditRedemption(availableCredit, cartTotal) : 0;
+  const finalTotal = Math.max(0, cartTotal - referralDiscount - creditDiscount);
+
+  // When phone number reaches 10 digits, look up existing customer to show their referral code
+  async function handlePhoneChange(raw: string) {
+    setForm(f => ({ ...f, whatsapp: raw }));
+    const digits = raw.replace(/\D/g, '').replace(/^(91|0)/, '').slice(0, 10);
+    if (digits.length === 10 && !isSample) {
+      setLookingUpPhone(true);
+      try {
+        const existing = await customersService.getByWhatsapp(digits);
+        setMyReferralCode(existing?.referralCode ?? null);
+        // Mark as returning if they've already ordered — referral code field will be hidden
+        const returning = !!existing && ((existing.totalOrders ?? 0) > 0 || !!existing.referredBy);
+        setIsReturningCustomer(returning);
+        if (returning) {
+          setAvailableCredit(existing?.referralCredit ?? 0);
+          setReferralDiscount(0); setReferralError('');
+        } else {
+          setAvailableCredit(0);
+        }
+      } finally { setLookingUpPhone(false); }
+    } else {
+      setMyReferralCode(null);
+      setIsReturningCustomer(false);
+    }
+  }
+
+  // Validate referral code on blur / when user finishes typing
+  async function handleReferralCodeBlur() {
+    const code = form.referralCode.trim().toUpperCase();
+    if (!code) { setReferralDiscount(0); setReferralError(''); return; }
+    // Returning customers can't use a referral code
+    if (isReturningCustomer) {
+      setReferralError('Referral codes are only valid on your first order');
+      setReferralDiscount(0);
+      return;
+    }
+    setValidatingReferral(true);
+    try {
+      const referrer = await customersService.getByReferralCode(code);
+      if (!referrer) {
+        setReferralError('Code not found — check and try again');
+        setReferralDiscount(0);
+        return;
+      }
+      // Don't let them use their own code (best-effort check using phone)
+      const myDigits = form.whatsapp.replace(/\D/g, '').replace(/^(91|0)/, '').slice(0, 10);
+      if (referrer.whatsapp === myDigits) {
+        setReferralError("You can't use your own referral code");
+        setReferralDiscount(0);
+        return;
+      }
+      const disc = computeReferralDiscount(cartTotal);
+      setReferralDiscount(disc.customerDiscount);  // fix: was passing whole object
+      setReferralError('');
+    } finally { setValidatingReferral(false); }
+  }
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
       <div className="bg-white rounded-t-3xl sm:rounded-2xl w-full max-w-md max-h-[95vh] overflow-y-auto flex flex-col">
@@ -1277,9 +1510,24 @@ function OrderFormModal({
             <label className="block text-sm font-medium text-gray-700 mb-1.5">
               WhatsApp Number <span className="text-red-400">*</span>
             </label>
-            <input type="tel" value={form.whatsapp} onChange={e => setForm(f => ({ ...f, whatsapp: e.target.value }))}
-              placeholder="10-digit number"
-              className="w-full border rounded-xl px-4 py-3 text-sm outline-none" style={{ borderColor: '#e0d0c0' }} />
+            <div className="relative">
+              <input type="tel" value={form.whatsapp} onChange={e => handlePhoneChange(e.target.value)}
+                placeholder="10-digit number"
+                className="w-full border rounded-xl px-4 py-3 text-sm outline-none pr-10" style={{ borderColor: '#e0d0c0' }} />
+              {lookingUpPhone && (
+                <div className="absolute right-3 top-3.5 w-4 h-4 border-2 border-orange-400 border-t-transparent rounded-full animate-spin" />
+              )}
+            </div>
+            {/* Show customer's own referral code after phone lookup */}
+            {!isSample && myReferralCode && (
+              <div className="mt-2 flex items-center gap-2 rounded-xl px-3 py-2.5"
+                style={{ background: '#e8f5e9', border: '1px solid #a5d6a7' }}>
+                <span className="text-xs text-green-700 flex-1">
+                  🎁 <strong>Your referral code:</strong> <span className="font-mono font-bold tracking-widest">{myReferralCode}</span>
+                  <br /><span className="text-green-600">Share this with friends — you both get a discount on their order!</span>
+                </span>
+              </div>
+            )}
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">Your Area / Place</label>
@@ -1297,9 +1545,122 @@ function OrderFormModal({
               className="w-full border rounded-xl px-4 py-3 text-sm outline-none resize-none"
               style={{ borderColor: '#e0d0c0' }} />
           </div>
+
+          {/* Referral Code entry — only for real orders, only for first-time customers */}
+          {!isSample && !isReturningCustomer && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                🎟️ Have a referral code? <span className="text-gray-400 font-normal">(first order only)</span>
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  value={form.referralCode}
+                  onChange={e => {
+                    setForm(f => ({ ...f, referralCode: e.target.value.toUpperCase() }));
+                    setReferralError('');
+                    setReferralDiscount(0);
+                  }}
+                  onBlur={handleReferralCodeBlur}
+                  placeholder="e.g. SKC-PAVAN47"
+                  maxLength={14}
+                  className="w-full border rounded-xl px-4 py-3 text-sm outline-none font-mono tracking-widest uppercase pr-10"
+                  style={{ borderColor: referralError ? '#ef4444' : referralDiscount > 0 ? '#22c55e' : '#e0d0c0' }}
+                />
+                {validatingReferral && (
+                  <div className="absolute right-3 top-3.5 w-4 h-4 border-2 border-orange-400 border-t-transparent rounded-full animate-spin" />
+                )}
+                {!validatingReferral && referralDiscount > 0 && (
+                  <span className="absolute right-3 top-3 text-green-500 text-lg">✓</span>
+                )}
+              </div>
+              {referralError && <p className="text-xs text-red-500 mt-1">{referralError}</p>}
+              {referralDiscount > 0 && !referralError && (
+                <div className="mt-2 rounded-xl px-3 py-2.5 flex items-center justify-between"
+                  style={{ background: '#f0fdf4', border: '1px solid #86efac' }}>
+                  <span className="text-xs text-green-700 font-medium">🎉 Referral discount applied!</span>
+                  <span className="text-sm font-bold text-green-700">−₹{referralDiscount}</span>
+                </div>
+              )}
+              {/* Info box about how referral works */}
+              <div className="mt-2 rounded-xl px-3 py-2.5 text-xs" style={{ background: '#fdf5e6', color: '#7a4010' }}>
+                <p className="font-semibold mb-1">How referral discounts work:</p>
+                <p className="mb-0.5">• ₹1–₹499 → <strong>3% total</strong> — you save 25%, they earn 75% as credit</p>
+                <p className="mb-0.5">• ₹500–₹999 → <strong>5% total</strong> (max ₹50) — you save up to ₹13, they earn up to ₹37</p>
+                <p className="mb-1">• ₹1000+ → <strong>7.5% total</strong> (max ₹100) — you save up to ₹25, they earn up to ₹75</p>
+                <p className="mb-0.5" style={{ color: '#c8821a' }}>🎟️ <strong>First order only</strong> — discount applies once per customer.</p>
+                <p style={{ color: '#7a4010' }}>💡 Your friend earns credit every time <em>they</em> refer someone new — redeemable on future orders!</p>
+              </div>
+            </div>
+          )}
+
+          {/* Credit redemption — only for returning customers who have earned referral credit */}
+          {!isSample && isReturningCustomer && availableCredit > 0 && (
+            <div>
+              <div className="rounded-2xl px-4 py-3 flex items-center justify-between gap-3 cursor-pointer"
+                style={{ background: useCredit ? '#f0fdf4' : '#fdf5e6', border: `1px solid ${useCredit ? '#86efac' : '#f0d9c8'}` }}
+                onClick={() => setUseCredit(!useCredit)}>
+                <div className="flex-1">
+                  <p className="text-sm font-semibold" style={{ color: useCredit ? '#166534' : '#7a4010' }}>
+                    💰 Use my referral credit
+                  </p>
+                  <p className="text-xs mt-0.5" style={{ color: useCredit ? '#15803d' : '#a06030' }}>
+                    You have <strong>₹{availableCredit}</strong> credit —
+                    save up to <strong>₹{computeCreditRedemption(availableCredit, cartTotal)}</strong> on this order
+                    <span className="text-gray-400 ml-1">(max 10% of order or ₹75)</span>
+                  </p>
+                </div>
+                <div className={`w-11 h-6 rounded-full transition-colors flex-shrink-0 relative ${useCredit ? 'bg-green-500' : 'bg-gray-300'}`}>
+                  <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${useCredit ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                </div>
+              </div>
+              {useCredit && (
+                <div className="mt-1.5 rounded-xl px-3 py-2 text-xs" style={{ background: '#f0fdf4', border: '1px solid #86efac' }}>
+                  <p className="text-green-700">✅ <strong>₹{computeCreditRedemption(availableCredit, cartTotal)}</strong> credit will be deducted from your balance after order is placed.</p>
+                  <p className="text-green-600 mt-0.5">Remaining balance: ₹{Math.max(0, availableCredit - computeCreditRedemption(availableCredit, cartTotal))}</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Returning customer with no credit — show their referral code to keep sharing */}
+          {!isSample && isReturningCustomer && availableCredit === 0 && myReferralCode && (
+            <div className="rounded-xl px-3 py-2.5 text-xs" style={{ background: '#fdf5e6', color: '#7a4010' }}>
+              <p className="font-semibold mb-0.5">💡 Earn store credit!</p>
+              <p>Share your code <span className="font-mono font-bold">{myReferralCode}</span> with friends. You earn <strong>75% of the discount</strong> as credit every time someone new orders using your link!</p>
+            </div>
+          )}
+
+          {/* Updated total showing any active discount */}
+          {!isSample && (referralDiscount > 0 || (useCredit && creditDiscount > 0)) && (
+            <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid #86efac', background: '#f0fdf4' }}>
+              <div className="flex justify-between items-center px-4 py-2.5 text-sm border-b" style={{ borderColor: '#bbf7d0' }}>
+                <span className="text-gray-500">Subtotal</span>
+                <span className="font-medium">₹{cartTotal}</span>
+              </div>
+              {referralDiscount > 0 && (
+                <div className="flex justify-between items-center px-4 py-2.5 text-sm border-b" style={{ borderColor: '#bbf7d0' }}>
+                  <span className="text-green-600">🎟️ Referral discount</span>
+                  <span className="font-semibold text-green-600">−₹{referralDiscount}</span>
+                </div>
+              )}
+              {useCredit && creditDiscount > 0 && (
+                <div className="flex justify-between items-center px-4 py-2.5 text-sm border-b" style={{ borderColor: '#bbf7d0' }}>
+                  <span className="text-green-600">💰 Credit redeemed</span>
+                  <span className="font-semibold text-green-600">−₹{creditDiscount}</span>
+                </div>
+              )}
+              <div className="flex justify-between items-center px-4 py-2.5 font-bold text-sm">
+                <span>You pay</span>
+                <span style={{ color: '#c8821a' }}>₹{finalTotal}</span>
+              </div>
+            </div>
+          )}
+
           <div className="text-xs rounded-xl px-4 py-3" style={{ background: '#f5f5f5', color: '#666' }}>
             📱 Order updates will be sent on WhatsApp.<br />
             {!isSample && <>💳 Pay via GPay / PhonePe / UPI after confirmation.<br /></>}
+            {!isSample && <>🚚 <strong>₹20 delivery charge</strong> for orders below ₹1000 or delivery beyond 10 km — charged after delivery, we'll inform you in advance.<br /></>}
             🔒 We never share your number with anyone.
           </div>
         </div>
@@ -1307,7 +1668,7 @@ function OrderFormModal({
           <button onClick={onSubmit} disabled={submitting}
             className="w-full text-white font-bold py-3.5 rounded-2xl text-sm disabled:opacity-50"
             style={{ background: '#c8821a' }}>
-            {submitting ? 'Sending…' : isSample ? '🎁 Request Sample' : '✅ Place Order'}
+            {submitting ? 'Sending…' : isSample ? '🎁 Request Sample' : `✅ Place Order${(referralDiscount > 0 || (useCredit && creditDiscount > 0)) ? ` · ₹${finalTotal}` : ''}`}
           </button>
         </div>
       </div>

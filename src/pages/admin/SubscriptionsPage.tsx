@@ -101,6 +101,9 @@ export default function SubscriptionsPage() {
         subscriptionId: subId,
         subscriptionDuration: form.duration,
         hasOnDemandItems: false,
+        referralDiscount: 0,
+        creditUsed: 0,
+        deliveryCharge: 0,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       });

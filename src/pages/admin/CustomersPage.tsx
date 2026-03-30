@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Search, ChevronDown, ChevronUp, Tag, ArrowUpDown } from 'lucide-react';
+import { Search, ChevronDown, ChevronUp, Tag, ArrowUpDown, RefreshCw } from 'lucide-react';
 import { customersService, ordersService } from '../../lib/services';
 import { useRealtimeCollection } from '../../lib/useRealtimeCollection';
 import { formatCurrency, formatDate } from '../../lib/utils';
@@ -30,6 +30,8 @@ export default function CustomersPage() {
   const [customerOrders, setCustomerOrders] = useState<Record<string, Order[]>>({});
   const [discountEdit, setDiscountEdit] = useState<Record<string, string>>({}); // customerId -> draft string
   const [savingDiscount, setSavingDiscount] = useState<string | null>(null);
+  const [markingPaid, setMarkingPaid] = useState<string | null>(null);   // customerId being processed
+  const [syncing, setSyncing] = useState<string | null>(null);            // customerId being synced
   const [custFilter, setCustFilter] = useState<CustFilter>('all');
   const [sortKey, setSortKey] = useState<CustSort>('name_asc');
 
@@ -56,6 +58,34 @@ export default function CustomersPage() {
       setDiscountEdit(prev => ({ ...prev, [c.id]: String(pct) }));
     } finally {
       setSavingDiscount(null);
+    }
+  }
+
+  /** Recalculate totalSpent, totalOrders, pendingAmount from scratch for this customer */
+  async function syncTotals(c: Customer) {
+    setSyncing(c.id);
+    try {
+      await customersService.adjustAfterOrderEdit(c.id, 0, 0, 'pending');
+      // Refresh displayed orders
+      setCustomerOrders(prev => { const next = { ...prev }; delete next[c.id]; return next; });
+      await loadOrders(c.id);
+    } finally {
+      setSyncing(null);
+    }
+  }
+
+  /** Mark ALL pending orders for this customer as paid, then recalculate */
+  async function markAllPaid(c: Customer) {
+    setMarkingPaid(c.id);
+    try {
+      const orders = customerOrders[c.id] || [];
+      const pendingOrders = orders.filter(o => o.paymentStatus === 'pending');
+      await Promise.all(pendingOrders.map(o => ordersService.updatePayment(o.id, 'paid')));
+      // Refresh orders list
+      setCustomerOrders(prev => { const next = { ...prev }; delete next[c.id]; return next; });
+      await loadOrders(c.id);
+    } finally {
+      setMarkingPaid(null);
     }
   }
 
@@ -173,11 +203,21 @@ export default function CustomersPage() {
                   ) : (
                     <div className="space-y-1">
                       {(customerOrders[c.id] || []).map(o => (
-                        <div key={o.id} className="flex justify-between text-xs bg-white rounded-lg px-3 py-2 border border-gray-100">
+                        <div key={o.id} className="flex justify-between items-center text-xs bg-white rounded-lg px-3 py-2 border border-gray-100">
                           <span className="text-gray-700">#{o.orderNumber} · {formatDate(o.createdAt)}</span>
-                          <span className={`font-medium ${o.status === 'delivered' ? 'text-green-600' : 'text-orange-600'}`}>
-                            {formatCurrency(o.total)} · {o.status}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className={`font-medium ${
+                              o.status === 'delivered' ? 'text-green-600' :
+                              o.status === 'cancelled' ? 'text-red-400' : 'text-orange-600'
+                            }`}>{formatCurrency(o.total)}</span>
+                            <span className={`px-1.5 py-0.5 rounded-full font-medium ${
+                              o.paymentStatus === 'paid' ? 'bg-green-100 text-green-700' :
+                              o.paymentStatus === 'na'   ? 'bg-gray-100 text-gray-500'  :
+                                                           'bg-red-100 text-red-600'
+                            }`}>
+                              {o.paymentStatus === 'paid' ? '✅ Paid' : o.paymentStatus === 'na' ? 'N/A' : '⏳ Pending'}
+                            </span>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -212,18 +252,26 @@ export default function CustomersPage() {
                     )}
                   </div>
 
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 flex-wrap">
                     <a href={`https://wa.me/91${c.whatsapp}`} target="_blank" rel="noreferrer"
                       className="text-xs bg-green-500 text-white px-3 py-1.5 rounded-lg hover:bg-green-600 transition-colors">
                       📱 WhatsApp
                     </a>
                     {c.pendingAmount > 0 && (
-                      <button onClick={async () => {
-                        await customersService.update(c.id, { pendingAmount: 0 });
-                      }} className="text-xs bg-blue-500 text-white px-3 py-1.5 rounded-lg hover:bg-blue-600 transition-colors">
-                        Clear Pending
+                      <button
+                        onClick={() => markAllPaid(c)}
+                        disabled={markingPaid === c.id}
+                        className="text-xs bg-blue-500 text-white px-3 py-1.5 rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50">
+                        {markingPaid === c.id ? 'Marking…' : `✅ Mark All Paid (₹${c.pendingAmount})`}
                       </button>
                     )}
+                    <button
+                      onClick={() => syncTotals(c)}
+                      disabled={syncing === c.id}
+                      className="text-xs border border-gray-300 text-gray-600 px-3 py-1.5 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50 flex items-center gap-1">
+                      <RefreshCw className={`w-3 h-3 ${syncing === c.id ? 'animate-spin' : ''}`} />
+                      {syncing === c.id ? 'Syncing…' : 'Sync Totals'}
+                    </button>
                   </div>
                 </div>
               )}

@@ -1,10 +1,12 @@
 import {
   collection, doc, addDoc, updateDoc, deleteDoc,
   getDocs, getDoc, query, where, setDoc, onSnapshot,
+  increment,
   type Unsubscribe,
 } from "firebase/firestore";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { db } from "./firebase";
+import { generateReferralCode } from "./utils";
 import type {
   Product, StockItem, RawMaterial, RawMaterialPurchase,
   Batch, Customer, Order, Expense, Subscription, Feedback, AdminAction, AdminActionType, AdminUser,
@@ -206,15 +208,30 @@ export const customersService = {
     if (snap.empty) return null;
     return { id: snap.docs[0].id, ...snap.docs[0].data() } as Customer;
   },
-  async upsert(data: Omit<Customer, "id" | "totalOrders" | "totalSpent" | "pendingAmount">, id?: string): Promise<string> {
+  async upsert(data: Omit<Customer, "id" | "totalOrders" | "totalSpent" | "pendingAmount" | "referralCredit">, id?: string): Promise<string> {
     if (id) {
       await updateDoc(doc(db, COLLECTIONS.CUSTOMERS, id), data);
       return id;
     }
+    // Auto-generate a unique referral code for every new customer
+    const referralCode = data.referralCode || generateReferralCode(data.name);
     const ref = await addDoc(collection(db, COLLECTIONS.CUSTOMERS), {
-      ...data, totalOrders: 0, totalSpent: 0, pendingAmount: 0, createdAt: now(),
+      ...data, referralCode, totalOrders: 0, totalSpent: 0, pendingAmount: 0, referralCredit: 0, createdAt: now(),
     });
     return ref.id;
+  },
+  async getByReferralCode(code: string): Promise<Customer | null> {
+    const snap = await getDocs(query(collection(db, COLLECTIONS.CUSTOMERS), where("referralCode", "==", code.toUpperCase().trim())));
+    if (snap.empty) return null;
+    return { id: snap.docs[0].id, ...snap.docs[0].data() } as Customer;
+  },
+  /** Add ₹ referral credit to a customer (called when someone they referred places an order) */
+  async addReferralCredit(customerId: string, amount: number): Promise<void> {
+    await updateDoc(doc(db, COLLECTIONS.CUSTOMERS, customerId), { referralCredit: increment(amount) });
+  },
+  /** Deduct ₹ referral credit when customer redeems it on an order */
+  async deductReferralCredit(customerId: string, amount: number): Promise<void> {
+    await updateDoc(doc(db, COLLECTIONS.CUSTOMERS, customerId), { referralCredit: increment(-amount) });
   },
   async update(id: string, data: Partial<Customer>): Promise<void> {
     await updateDoc(doc(db, COLLECTIONS.CUSTOMERS, id), data);
@@ -279,6 +296,21 @@ export const ordersService = {
   },
   async updatePayment(id: string, paymentStatus: Order["paymentStatus"]): Promise<void> {
     await updateDoc(doc(db, COLLECTIONS.ORDERS, id), { paymentStatus, updatedAt: now() });
+    // Recalculate customer's pendingAmount from all orders so it stays in sync
+    const orderSnap = await getDoc(doc(db, COLLECTIONS.ORDERS, id));
+    const customerId = orderSnap.exists() ? (orderSnap.data() as Order).customerId : undefined;
+    if (customerId) {
+      const ordersSnap = await getDocs(
+        query(collection(db, COLLECTIONS.ORDERS), where('customerId', '==', customerId))
+      );
+      const orders = ordersSnap.docs.map(d => d.data() as Order);
+      const pendingAmount = orders
+        .filter(o => o.paymentStatus === 'pending')
+        .reduce((s, o) => s + (o.total || 0), 0);
+      await updateDoc(doc(db, COLLECTIONS.CUSTOMERS, customerId), {
+        pendingAmount: Math.max(0, pendingAmount),
+      });
+    }
   },
   async update(id: string, data: Partial<Order>): Promise<void> {
     await updateDoc(doc(db, COLLECTIONS.ORDERS, id), { ...data, updatedAt: now() });
