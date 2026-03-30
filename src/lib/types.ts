@@ -211,6 +211,8 @@ export interface Agent {
   pin: string;                    // hashed or plain 4-6 digit PIN
   mustChangePin: boolean;         // force change on first login
   commissionPercent: number;      // % of SKC price we pay agent (e.g. 10%)
+  adminMarkupType?: 'rupees' | 'percent'; // markup type locked by admin
+  adminMarkupValue?: number;       // if set, agent cannot change markup
   savedMarkupType?: 'rupees' | 'percent'; // agent's preferred markup mode
   savedMarkupValue?: number;       // saved markup value (persisted across orders)
   totalOrders: number;

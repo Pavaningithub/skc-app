@@ -29,6 +29,11 @@ export default function AgentsPage() {
   const [editingCommission, setEditingCommission] = useState<string | null>(null);
   const [commissionDraft, setCommissionDraft] = useState('');
 
+  // Edit admin markup
+  const [editingMarkup, setEditingMarkup] = useState<string | null>(null);
+  const [markupTypeDraft, setMarkupTypeDraft] = useState<'rupees' | 'percent'>('percent');
+  const [markupValueDraft, setMarkupValueDraft] = useState('');
+
   // Pay commission
   const [payingAgent, setPayingAgent] = useState<string | null>(null);
 
@@ -94,6 +99,19 @@ export default function AgentsPage() {
       await agentsService.markCommissionPaid(agent.id, pending);
       toast.success(`₹${pending} commission marked as paid to ${agent.name}`);
     } finally { setPayingAgent(null); }
+  }
+
+  async function saveAdminMarkup(agent: Agent) {
+    const val = Number(markupValueDraft);
+    if (isNaN(val) || val < 0) return toast.error('Enter a valid value');
+    await agentsService.update(agent.id, { adminMarkupType: markupTypeDraft, adminMarkupValue: val });
+    setEditingMarkup(null);
+    toast.success('Markup locked for agent');
+  }
+
+  async function clearAdminMarkup(agent: Agent) {
+    await agentsService.update(agent.id, { adminMarkupType: undefined, adminMarkupValue: undefined });
+    toast.success('Markup unlocked — agent can set their own');
   }
 
   return (
@@ -255,6 +273,60 @@ export default function AgentsPage() {
                     <>
                       <span className="text-sm font-bold text-gray-700">{agent.commissionPercent}%</span>
                       <button onClick={() => { setEditingCommission(agent.id); setCommissionDraft(String(agent.commissionPercent)); }}
+                        className="p-1 text-gray-400 hover:text-orange-500">
+                        <Edit2 className="w-3.5 h-3.5" />
+                      </button>
+                    </>
+                  )}
+                </div>
+
+                {/* Admin markup lock */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs text-gray-500 font-medium">Markup (agent-facing):</span>
+                  {editingMarkup === agent.id ? (
+                    <>
+                      <div className="flex rounded-lg overflow-hidden border border-gray-200">
+                        <button
+                          onClick={() => setMarkupTypeDraft('rupees')}
+                          className={`px-2.5 py-1 text-xs font-bold transition-colors ${markupTypeDraft === 'rupees' ? 'text-white' : 'text-gray-500'}`}
+                          style={markupTypeDraft === 'rupees' ? { background: '#3d1c02' } : {}}>₹</button>
+                        <button
+                          onClick={() => setMarkupTypeDraft('percent')}
+                          className={`px-2.5 py-1 text-xs font-bold transition-colors ${markupTypeDraft === 'percent' ? 'text-white' : 'text-gray-500'}`}
+                          style={markupTypeDraft === 'percent' ? { background: '#3d1c02' } : {}}>%</button>
+                      </div>
+                      <input type="number" min="0" step="0.5"
+                        value={markupValueDraft}
+                        onChange={e => setMarkupValueDraft(e.target.value)}
+                        placeholder="0"
+                        className="w-20 border border-orange-300 rounded-lg px-2 py-1 text-sm outline-none text-center"
+                      />
+                      <button onClick={() => saveAdminMarkup(agent)} className="p-1.5 bg-green-500 text-white rounded-lg">
+                        <Check className="w-3.5 h-3.5" />
+                      </button>
+                      <button onClick={() => setEditingMarkup(null)} className="p-1.5 bg-gray-100 rounded-lg">
+                        <X className="w-3.5 h-3.5 text-gray-500" />
+                      </button>
+                    </>
+                  ) : agent.adminMarkupValue != null && agent.adminMarkupValue > 0 ? (
+                    <>
+                      <span className="text-sm font-bold text-orange-700">
+                        {agent.adminMarkupType === 'percent' ? `${agent.adminMarkupValue}%` : `₹${agent.adminMarkupValue}`}
+                        <span className="text-xs font-normal text-gray-400 ml-1">(locked)</span>
+                      </span>
+                      <button onClick={() => { setEditingMarkup(agent.id); setMarkupTypeDraft(agent.adminMarkupType ?? 'percent'); setMarkupValueDraft(String(agent.adminMarkupValue)); }}
+                        className="p-1 text-gray-400 hover:text-orange-500">
+                        <Edit2 className="w-3.5 h-3.5" />
+                      </button>
+                      <button onClick={() => clearAdminMarkup(agent)}
+                        className="text-xs text-red-500 hover:text-red-700 px-2 py-1 rounded-lg border border-red-200 hover:bg-red-50">
+                        Unlock
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-xs text-gray-400">None — agent sets their own</span>
+                      <button onClick={() => { setEditingMarkup(agent.id); setMarkupTypeDraft('percent'); setMarkupValueDraft(''); }}
                         className="p-1 text-gray-400 hover:text-orange-500">
                         <Edit2 className="w-3.5 h-3.5" />
                       </button>

@@ -12,6 +12,7 @@ export function getAgentSession() {
       id: string; name: string; phone: string; agentCode: string;
       commissionPercent: number; mustChangePin: boolean;
       savedMarkupType: 'rupees' | 'percent'; savedMarkupValue: number;
+      adminMarkupType?: 'rupees' | 'percent'; adminMarkupValue?: number;
     } : null;
   } catch { return null; }
 }
@@ -28,7 +29,7 @@ export default function AgentLogin() {
 
   // Change PIN flow
   const [changingPin, setChangingPin] = useState(false);
-  const [pendingAgent, setPendingAgent] = useState<{ id: string; name: string; phone: string; agentCode: string; commissionPercent: number; savedMarkupType: 'rupees' | 'percent'; savedMarkupValue: number } | null>(null);
+  const [pendingAgent, setPendingAgent] = useState<{ id: string; name: string; phone: string; agentCode: string; commissionPercent: number; savedMarkupType: 'rupees' | 'percent'; savedMarkupValue: number; adminMarkupType?: 'rupees' | 'percent'; adminMarkupValue?: number } | null>(null);
   const [newPin, setNewPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
 
@@ -43,11 +44,11 @@ export default function AgentLogin() {
         return;
       }
       if (agent.mustChangePin) {
-        setPendingAgent({ id: agent.id, name: agent.name, phone: agent.phone, agentCode: agent.agentCode, commissionPercent: agent.commissionPercent, savedMarkupType: agent.savedMarkupType ?? 'rupees', savedMarkupValue: agent.savedMarkupValue ?? 0 });
+        setPendingAgent({ id: agent.id, name: agent.name, phone: agent.phone, agentCode: agent.agentCode, commissionPercent: agent.commissionPercent, savedMarkupType: agent.savedMarkupType ?? 'rupees', savedMarkupValue: agent.savedMarkupValue ?? 0, adminMarkupType: agent.adminMarkupType, adminMarkupValue: agent.adminMarkupValue });
         setChangingPin(true);
         return;
       }
-      const session = { id: agent.id, name: agent.name, phone: agent.phone, agentCode: agent.agentCode, commissionPercent: agent.commissionPercent, mustChangePin: false, savedMarkupType: agent.savedMarkupType ?? 'rupees', savedMarkupValue: agent.savedMarkupValue ?? 0 };
+      const session = { id: agent.id, name: agent.name, phone: agent.phone, agentCode: agent.agentCode, commissionPercent: agent.commissionPercent, mustChangePin: false, savedMarkupType: agent.savedMarkupType ?? 'rupees', savedMarkupValue: agent.savedMarkupValue ?? 0, adminMarkupType: agent.adminMarkupType, adminMarkupValue: agent.adminMarkupValue };
       sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
       navigate('/agent');
     } finally {
@@ -63,7 +64,7 @@ export default function AgentLogin() {
     setLoading(true);
     try {
       await agentsService.changePin(pendingAgent.id, newPin);
-      const session = { id: pendingAgent.id, name: pendingAgent.name, phone: pendingAgent.phone, agentCode: pendingAgent.agentCode, commissionPercent: pendingAgent.commissionPercent, mustChangePin: false, savedMarkupType: pendingAgent.savedMarkupType, savedMarkupValue: pendingAgent.savedMarkupValue };
+      const session = { id: pendingAgent.id, name: pendingAgent.name, phone: pendingAgent.phone, agentCode: pendingAgent.agentCode, commissionPercent: pendingAgent.commissionPercent, mustChangePin: false, savedMarkupType: pendingAgent.savedMarkupType, savedMarkupValue: pendingAgent.savedMarkupValue, adminMarkupType: pendingAgent.adminMarkupType, adminMarkupValue: pendingAgent.adminMarkupValue };
       sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
       toast.success('PIN set! Welcome, ' + pendingAgent.name);
       navigate('/agent');
