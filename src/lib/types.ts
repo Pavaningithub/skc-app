@@ -115,7 +115,9 @@ export interface Customer {
   totalSpent: number;
   pendingAmount: number;
   joinedWhatsappGroup: boolean;
-  discountPercent?: number;       // standing discount % for close family/friends (applied to all future orders)
+  discountPercent?: number;       // standing discount % for close family/friends
+  discountApplyToNew?: boolean;   // apply standing discount to new orders automatically
+  discountApplyToExisting?: boolean; // (UI flag) last used to apply to existing pending orders
   referralCode?: string;          // unique code this customer shares to refer others, e.g. SKC-PAVAN3
   referredBy?: string;            // referral code used when they first ordered
   referralCredit: number;         // ₹ credit earned by referring others (redeemable on next order)

@@ -207,73 +207,109 @@ export default function CustomersPage() {
 
                     return (
                       <>
-                        {/* Discount panel — only when there are unpaid orders */}
-                        {hasPending && (
-                          <div className="bg-white rounded-xl border border-orange-200 p-3 space-y-3">
-                            <div>
-                              <p className="text-xs font-semibold text-gray-700 flex items-center gap-1 mb-0.5">
-                                <Tag className="w-3.5 h-3.5 text-orange-500" /> Discount on Pending Orders
-                              </p>
-                              <p className="text-xs text-gray-400">
-                                Outstanding: <strong className="text-red-500">₹{livePending}</strong>
-                                {discountAmt > 0 && (
-                                  <span className="ml-2 text-green-600 font-medium">
-                                    → after {pctVal}% discount: <strong>₹{amountAfter}</strong> (saving ₹{discountAmt})
-                                  </span>
-                                )}
-                              </p>
+                        {/* Discount panel — always visible when expanded */}
+                        <div className="bg-white rounded-xl border border-gray-200 p-3 space-y-3">
+                          <p className="text-xs font-semibold text-gray-700 flex items-center gap-1">
+                            <Tag className="w-3.5 h-3.5 text-orange-500" /> Standing Discount
+                          </p>
+
+                          {/* % input + quick shortcuts */}
+                          <div className="flex items-center gap-2">
+                            <div className="relative flex-1">
+                              <input
+                                type="number" min="0" max="100" step="0.5"
+                                value={pctDraft}
+                                onChange={e => setDiscountEdit(prev => ({ ...prev, [c.id]: e.target.value }))}
+                                placeholder={c.discountPercent ? String(c.discountPercent) : 'e.g. 10'}
+                                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400 pr-7"
+                              />
+                              <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-sm text-gray-400">%</span>
                             </div>
-                            <div className="flex items-center gap-2">
-                              <div className="relative flex-1">
-                                <input
-                                  type="number" min="0" max="100" step="0.5"
-                                  value={pctDraft}
-                                  onChange={e => setDiscountEdit(prev => ({ ...prev, [c.id]: e.target.value }))}
-                                  placeholder="e.g. 10"
-                                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-orange-400 pr-7"
-                                />
-                                <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-sm text-gray-400">%</span>
-                              </div>
-                              <button
-                                onClick={async () => {
-                                  if (pctVal <= 0) return;
-                                  setSavingDiscount(c.id);
-                                  try {
-                                    // Apply discount to each pending order by updating its total
-                                    await Promise.all(pendingOrders.map(async o => {
-                                      const newDiscount = Math.round(o.total * pctVal / 100);
-                                      const newTotal = o.total - newDiscount;
-                                      await ordersService.update(o.id, {
-                                        discount: (o.discount || 0) + newDiscount,
-                                        total: newTotal,
-                                      });
-                                    }));
-                                    // Recalculate customer totals
-                                    await customersService.adjustAfterOrderEdit(c.id, 0, 0, 'pending');
-                                    await loadOrders(c.id);
-                                    setDiscountEdit(prev => ({ ...prev, [c.id]: '' }));
-                                  } finally { setSavingDiscount(null); }
-                                }}
-                                disabled={savingDiscount === c.id || pctVal <= 0}
-                                className="bg-orange-500 hover:bg-orange-600 text-white px-3 py-2 rounded-lg text-xs font-semibold disabled:opacity-40 transition-colors whitespace-nowrap">
-                                {savingDiscount === c.id ? 'Applying…' : '✂️ Apply to Orders'}
-                              </button>
-                            </div>
-                            {/* Quick % shortcuts */}
-                            <div className="flex gap-1.5 flex-wrap">
+                            <div className="flex gap-1 flex-shrink-0">
                               {[5, 10, 15, 20].map(p => (
                                 <button key={p}
                                   onClick={() => setDiscountEdit(prev => ({ ...prev, [c.id]: String(p) }))}
-                                  className={`text-xs px-2 py-1 rounded-lg border transition-colors ${
-                                    pctVal === p ? 'bg-orange-500 text-white border-orange-500' : 'border-gray-200 text-gray-600 hover:border-orange-300'
-                                  }`}>
-                                  {p}%
-                                </button>
+                                  className={`text-xs px-2 py-1.5 rounded-lg border transition-colors ${
+                                    pctVal === p ? 'bg-orange-500 text-white border-orange-500' : 'border-gray-200 text-gray-500 hover:border-orange-300'
+                                  }`}>{p}%</button>
                               ))}
-                              <span className="text-xs text-gray-300 self-center ml-1">or type custom %</span>
                             </div>
                           </div>
-                        )}
+
+                          {/* Two checkboxes — scope of discount */}
+                          <div className="space-y-2 pt-1">
+                            <label className="flex items-start gap-2.5 cursor-pointer group">
+                              <input
+                                type="checkbox"
+                                checked={c.discountApplyToNew ?? false}
+                                onChange={async e => {
+                                  const pct = pctVal > 0 ? pctVal : (c.discountPercent ?? 0);
+                                  await customersService.update(c.id, {
+                                    discountPercent: pct,
+                                    discountApplyToNew: e.target.checked,
+                                  });
+                                }}
+                                className="mt-0.5 w-4 h-4 accent-orange-500 cursor-pointer"
+                              />
+                              <div>
+                                <p className="text-xs font-semibold text-gray-700 group-hover:text-orange-600 transition-colors">
+                                  Apply to new orders
+                                </p>
+                                <p className="text-xs text-gray-400">
+                                  When admin places a new order for this customer, the discount auto-applies and overrides referral / subscription prices.
+                                  {(c.discountApplyToNew && (c.discountPercent ?? 0) > 0) && (
+                                    <span className="text-green-600 font-medium ml-1">✓ Active — {c.discountPercent}% on new orders</span>
+                                  )}
+                                </p>
+                              </div>
+                            </label>
+
+                            {hasPending && (
+                              <label className="flex items-start gap-2.5 cursor-pointer group">
+                                <input
+                                  type="checkbox"
+                                  checked={false}
+                                  onChange={async e => {
+                                    if (!e.target.checked || pctVal <= 0) return;
+                                    setSavingDiscount(c.id);
+                                    try {
+                                      await Promise.all(pendingOrders.map(async o => {
+                                        const newDiscount = Math.round(o.total * pctVal / 100);
+                                        await ordersService.update(o.id, {
+                                          discount: (o.discount || 0) + newDiscount,
+                                          total: o.total - newDiscount,
+                                        });
+                                      }));
+                                      await customersService.adjustAfterOrderEdit(c.id, 0, 0, 'pending');
+                                      await loadOrders(c.id);
+                                      setDiscountEdit(prev => ({ ...prev, [c.id]: '' }));
+                                    } finally { setSavingDiscount(null); }
+                                  }}
+                                  className="mt-0.5 w-4 h-4 accent-orange-500 cursor-pointer"
+                                  disabled={savingDiscount === c.id || pctVal <= 0}
+                                />
+                                <div>
+                                  <p className="text-xs font-semibold text-gray-700 group-hover:text-orange-600 transition-colors">
+                                    Apply to existing pending orders {pctVal > 0 && <span className="text-orange-500">(tick to apply {pctVal}% now)</span>}
+                                  </p>
+                                  <p className="text-xs text-gray-400">
+                                    Outstanding: <strong className="text-red-500">₹{livePending}</strong>
+                                    {pctVal > 0 && (
+                                      <span className="text-green-600 font-medium ml-1">
+                                        → ₹{amountAfter} after {pctVal}% off (saves ₹{discountAmt})
+                                      </span>
+                                    )}
+                                    {pctVal <= 0 && <span className="ml-1">— enter a % above first</span>}
+                                  </p>
+                                </div>
+                              </label>
+                            )}
+                          </div>
+
+                          {savingDiscount === c.id && (
+                            <p className="text-xs text-orange-500 animate-pulse">Applying discount to orders…</p>
+                          )}
+                        </div>
 
                         <div className="flex gap-2 flex-wrap">
                           <a href={`https://wa.me/91${c.whatsapp}`} target="_blank" rel="noreferrer"

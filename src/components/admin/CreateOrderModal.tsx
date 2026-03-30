@@ -27,6 +27,7 @@ export default function CreateOrderModal({ onClose, onCreated }: Props) {
   const [discountPercent, setDiscountPercent] = useState(0); // from customer standing discount
   const [manualDiscount, setManualDiscount] = useState(0);   // overridden manually
   const [customerDiscountLabel, setCustomerDiscountLabel] = useState(''); // label shown when auto-applied
+  const [standingDiscountActive, setStandingDiscountActive] = useState(false); // locks out manual/referral discounts
 
   useEffect(() => {
     productsService.getActive().then(p => {
@@ -40,17 +41,22 @@ export default function CreateOrderModal({ onClose, onCreated }: Props) {
     const digits = customerWhatsapp.replace(/\D/g, '');
     if (digits.length < 10) {
       setCustomerDiscountLabel('');
+      setStandingDiscountActive(false);
+      setDiscountPercent(0);
       return;
     }
     customersService.getByWhatsapp(digits).then(c => {
-      if (!c) { setCustomerDiscountLabel(''); return; }
+      if (!c) { setCustomerDiscountLabel(''); setStandingDiscountActive(false); setDiscountPercent(0); return; }
       if (!customerName) setCustomerName(c.name);
       if (!customerPlace && c.place) setCustomerPlace(c.place);
-      if (c.discountPercent && c.discountPercent > 0) {
+      if (c.discountApplyToNew && c.discountPercent && c.discountPercent > 0) {
         setDiscountPercent(c.discountPercent);
-        setCustomerDiscountLabel(`${c.discountPercent}% standing discount for ${c.name}`);
+        setManualDiscount(0);
+        setStandingDiscountActive(true);
+        setCustomerDiscountLabel(`${c.discountPercent}% standing discount for ${c.name} — referral & manual discounts disabled`);
       } else {
         setDiscountPercent(0);
+        setStandingDiscountActive(false);
         setCustomerDiscountLabel('');
       }
     });
@@ -304,20 +310,26 @@ export default function CreateOrderModal({ onClose, onCreated }: Props) {
             </div>
           )}
 
-          {/* Manual discount override */}
-          {!isSample && items.length > 0 && (
+          {/* Manual discount override — hidden when a standing discount is active */}
+          {!isSample && items.length > 0 && !standingDiscountActive && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1">
                 <Tag className="w-3.5 h-3.5 text-green-600" /> Manual Discount (₹)
-                {discountPercent > 0 && manualDiscount === 0 && (
-                  <span className="text-xs text-green-600 ml-1">(auto: {discountPercent}% = ₹{Math.round(subtotal * discountPercent / 100)})</span>
-                )}
               </label>
               <input type="number" min="0" step="1"
                 value={manualDiscount || ''}
                 onChange={e => setManualDiscount(Math.max(0, Number(e.target.value)))}
-                placeholder={discountPercent > 0 ? `Leave blank for ${discountPercent}% auto-discount` : 'e.g. 50'}
+                placeholder="e.g. 50"
                 className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-orange-400" />
+            </div>
+          )}
+          {/* Standing discount active notice */}
+          {standingDiscountActive && !isSample && items.length > 0 && (
+            <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5 text-xs text-amber-800">
+              <Tag className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-amber-600" />
+              <span>
+                <strong>Standing discount active ({discountPercent}%).</strong> Manual discount and referral/subscription discounts are disabled for this customer.
+              </span>
             </div>
           )}
 
