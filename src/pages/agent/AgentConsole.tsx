@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Plus, Minus, Trash2, LogOut, ShoppingBag, Package,
-  RefreshCw, UserPlus, ChevronDown, ChevronUp,
+  RefreshCw, UserPlus, ChevronDown, ChevronUp, Search,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { productsService, ordersService, stockService, agentsService } from '../../lib/services';
@@ -476,10 +476,16 @@ function CustomerCard({
   const custTotal = cartCustomerTotal(cust.cart);
   const highMargin = skc > 0 && margin / skc > 0.15;
 
+  const [productSearch, setProductSearch] = useState('');
+
   const defaultProductId = products.length > 0 ? products[0].id : '';
   const currentProductId = addState?.productId || defaultProductId;
   const currentProduct = products.find(p => p.id === currentProductId);
   const currentQty = addState?.qty ?? (currentProduct ? defaultMinQty(currentProduct) : 1);
+
+  const filteredProducts = productSearch.trim()
+    ? products.filter(p => p.name.toLowerCase().includes(productSearch.trim().toLowerCase()))
+    : products;
 
   function setProduct(productId: string) {
     const p = products.find(x => x.id === productId);
@@ -539,9 +545,24 @@ function CustomerCard({
           <div className="space-y-2">
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Add Products</p>
 
+            {/* Search */}
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+              <input
+                type="text"
+                value={productSearch}
+                onChange={e => setProductSearch(e.target.value)}
+                placeholder="Search products…"
+                className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-xl outline-none focus:border-orange-400"
+              />
+            </div>
+
             {/* Clickable product grid */}
             <div className="grid grid-cols-2 gap-1.5 max-h-52 overflow-y-auto">
-              {products.map(p => {
+              {filteredProducts.length === 0 && (
+                <p className="col-span-2 text-center text-xs text-gray-400 py-4">No products match "{productSearch}"</p>
+              )}
+              {filteredProducts.map(p => {
                 const inCart = cust.cart.find(i => i.productId === p.id);
                 const isSelected = currentProductId === p.id;
                 return (
