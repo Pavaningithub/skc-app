@@ -31,6 +31,7 @@ export default function OrderDetail() {
   const [products, setProducts] = useState<Product[]>([]);
   const [addProductId, setAddProductId] = useState('');
   const [addQty, setAddQty] = useState(250);
+  const [addGarlic, setAddGarlic] = useState<'with' | 'without'>('without');
   const [savingEdit, setSavingEdit] = useState(false);
 
   // ── Edit order details (name / phone / place / notes / delivery charge / referral) ──
@@ -134,7 +135,10 @@ export default function OrderDetail() {
     if (!product) return;
     const qty = Number(addQty);
     if (qty <= 0) return toast.error('Enter a valid quantity');
-    const existing = editItems.findIndex(i => i.productId === product.id);
+    const garlicNote = product.hasGarlicOption
+      ? (addGarlic === 'with' ? 'With Garlic' : 'Without Garlic')
+      : undefined;
+    const existing = editItems.findIndex(i => i.productId === product.id && i.customizationNote === (garlicNote ?? ''));
     if (existing >= 0) {
       setEditItems(prev => prev.map((item, i) =>
         i === existing
@@ -150,6 +154,7 @@ export default function OrderDetail() {
         pricePerUnit: product.pricePerUnit,
         totalPrice: Math.ceil(qty * product.pricePerUnit / 10) * 10,
         isOnDemand: product.isOnDemand,
+        ...(garlicNote ? { customizationNote: garlicNote } : {}),
       }]);
     }
   }
@@ -356,6 +361,9 @@ export default function OrderDetail() {
             <div>
               <p className="text-sm font-medium text-gray-800">{item.productName}</p>
               <p className="text-xs text-gray-500">{formatQuantity(item.quantity, item.unit)} × ₹{item.pricePerUnit}/{item.unit}</p>
+              {item.customizationNote && (
+                <p className="text-xs font-medium text-amber-700">{item.customizationNote}</p>
+              )}
             </div>
             <p className="font-semibold text-gray-800">{formatCurrency(item.totalPrice)}</p>
           </div>
@@ -655,7 +663,7 @@ export default function OrderDetail() {
                 <div>
                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Add Product</p>
                   <div className="flex gap-2">
-                    <select value={addProductId} onChange={e => setAddProductId(e.target.value)}
+                    <select value={addProductId} onChange={e => { setAddProductId(e.target.value); setAddGarlic('without'); }}
                       className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-orange-400 bg-white">
                       {products.map(p => (
                         <option key={p.id} value={p.id}>{p.name} — ₹{p.pricePerUnit}/{p.unit}</option>
@@ -668,6 +676,20 @@ export default function OrderDetail() {
                       <Plus className="w-5 h-5" />
                     </button>
                   </div>
+                  {products.find(p => p.id === addProductId)?.hasGarlicOption && (
+                    <div className="flex items-center gap-4 mt-1.5 px-1">
+                      <span className="text-xs font-medium text-gray-600">🧄 Garlic:</span>
+                      {(['without', 'with'] as const).map(opt => (
+                        <label key={opt} className="flex items-center gap-1.5 cursor-pointer">
+                          <input type="radio" name="edit-garlic" value={opt}
+                            checked={addGarlic === opt}
+                            onChange={() => setAddGarlic(opt)}
+                            className="accent-orange-500 w-3.5 h-3.5" />
+                          <span className="text-xs text-gray-700">{opt === 'with' ? '🧄 With Garlic' : '🚫 Without Garlic'}</span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 

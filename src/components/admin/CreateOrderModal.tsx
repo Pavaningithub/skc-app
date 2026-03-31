@@ -23,6 +23,7 @@ export default function CreateOrderModal({ onClose, onCreated }: Props) {
   const [saving, setSaving] = useState(false);
   const [selectedProductId, setSelectedProductId] = useState('');
   const [selectedQty, setSelectedQty] = useState(100);
+  const [addGarlic, setAddGarlic] = useState<'with' | 'without'>('without');
   // discount
   const [discountPercent, setDiscountPercent] = useState(0); // from customer standing discount
   const [manualDiscount, setManualDiscount] = useState(0);   // overridden manually
@@ -36,6 +37,9 @@ export default function CreateOrderModal({ onClose, onCreated }: Props) {
       if (p.length > 0) setSelectedProductId(p[0].id);
     });
   }, []);
+
+  // Reset garlic to 'without' whenever product changes
+  useEffect(() => { setAddGarlic('without'); }, [selectedProductId]);
 
   // Auto-fill customer details + apply standing discount when a known WA number is entered
   useEffect(() => {
@@ -68,8 +72,11 @@ export default function CreateOrderModal({ onClose, onCreated }: Props) {
     if (!product) return;
     const qty = Number(selectedQty);
     if (qty <= 0) return toast.error('Enter a valid quantity');
+    const garlicNote = product.hasGarlicOption
+      ? (addGarlic === 'with' ? 'With Garlic' : 'Without Garlic')
+      : undefined;
 
-    const existing = items.findIndex(i => i.productId === product.id);
+    const existing = items.findIndex(i => i.productId === product.id && i.customizationNote === (garlicNote ?? ''));
     if (existing >= 0) {
       const updated = [...items];
       updated[existing].quantity += qty;
@@ -83,6 +90,7 @@ export default function CreateOrderModal({ onClose, onCreated }: Props) {
         quantity: qty,
         pricePerUnit: product.pricePerUnit,
         totalPrice: Math.ceil(qty * product.pricePerUnit / 10) * 10,
+        ...(garlicNote ? { customizationNote: garlicNote } : {}),
       }]);
     }
   }
@@ -261,6 +269,20 @@ export default function CreateOrderModal({ onClose, onCreated }: Props) {
                 Unit: {selectedProduct.unit} · ₹{selectedProduct.pricePerUnit} per {selectedProduct.unit}
               </p>
             )}
+            {selectedProduct?.hasGarlicOption && (
+              <div className="flex items-center gap-4 mt-2 px-1">
+                <span className="text-xs font-medium text-gray-600">🧄 Garlic:</span>
+                {(['without', 'with'] as const).map(opt => (
+                  <label key={opt} className="flex items-center gap-1.5 cursor-pointer">
+                    <input type="radio" name="modal-garlic" value={opt}
+                      checked={addGarlic === opt}
+                      onChange={() => setAddGarlic(opt)}
+                      className="accent-orange-500 w-3.5 h-3.5" />
+                    <span className="text-xs text-gray-700">{opt === 'with' ? '🧄 With Garlic' : '🚫 Without Garlic'}</span>
+                  </label>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Items List */}
@@ -271,6 +293,9 @@ export default function CreateOrderModal({ onClose, onCreated }: Props) {
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-gray-800 truncate">{item.productName}</p>
                     <p className="text-xs text-gray-500">₹{item.pricePerUnit}/{item.unit}</p>
+                    {item.customizationNote && (
+                      <p className="text-xs text-amber-700 font-medium">{item.customizationNote}</p>
+                    )}
                   </div>
                   <div className="flex items-center gap-2">
                     <button onClick={() => updateQty(i, item.quantity - (item.unit === 'piece' ? 1 : 50))}
