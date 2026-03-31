@@ -7,7 +7,7 @@ import type { Customer, Order } from '../../lib/types';
 import toast from 'react-hot-toast';
 
 type CustSort = 'name_asc' | 'spent_desc' | 'orders_desc' | 'pending_desc';
-type CustFilter = 'all' | 'has_discount' | 'has_pending' | 'in_wa_group' | 'not_in_wa_group';
+type CustFilter = 'all' | 'has_discount' | 'has_pending';
 
 const CUST_SORT_LABELS: Record<CustSort, string> = {
   name_asc:     'Name A–Z',
@@ -20,8 +20,6 @@ const CUST_FILTER_LABELS: Record<CustFilter, string> = {
   all:              'All',
   has_discount:     '🏷️ Discounted',
   has_pending:      '💰 Pending payment',
-  in_wa_group:      '✅ In WA group',
-  not_in_wa_group:  '❌ Not in WA group',
 };
 
 export default function CustomersPage() {
@@ -71,9 +69,7 @@ export default function CustomersPage() {
       const matchFilter =
         custFilter === 'all'             ? true :
         custFilter === 'has_discount'    ? (c.discountPercent ?? 0) > 0 :
-        custFilter === 'has_pending'     ? c.pendingAmount > 0 :
-        custFilter === 'in_wa_group'     ? c.joinedWhatsappGroup :
-        /* not_in_wa_group */              !c.joinedWhatsappGroup;
+        /* has_pending */                  c.pendingAmount > 0;
       return matchSearch && matchFilter;
     });
     result = [...result].sort((a, b) => {
@@ -149,7 +145,14 @@ export default function CustomersPage() {
                       </span>
                     ) : null}
                   </div>
-                  <p className="text-xs text-gray-500">📱 {c.whatsapp} · 📍 {c.place}</p>
+                  <div className="flex items-center gap-1">
+                    <p className="text-xs text-gray-500">📱 {c.whatsapp} · 📍 {c.place}</p>
+                    <button
+                      onClick={e => { e.stopPropagation(); navigator.clipboard.writeText(c.whatsapp); toast.success('Phone copied'); }}
+                      className="text-gray-300 hover:text-gray-500 transition-colors flex-shrink-0" title="Copy phone">
+                      <Copy className="w-3 h-3" />
+                    </button>
+                  </div>
                 </div>
                 <div className="text-right flex-shrink-0">
                   <p className="text-sm font-bold text-gray-800">{formatCurrency(c.totalSpent)}</p>
@@ -164,9 +167,6 @@ export default function CustomersPage() {
               {expanded === c.id && (
                 <div className="border-t border-gray-100 bg-gray-50 p-4 space-y-3">
                   <div className="flex gap-3 flex-wrap text-xs">
-                    <span className={`px-2 py-1 rounded-full ${c.joinedWhatsappGroup ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-                      {c.joinedWhatsappGroup ? '✅ In WA Group' : '❌ Not in WA Group'}
-                    </span>
                     <span className="px-2 py-1 bg-blue-50 text-blue-600 rounded-full">
                       Member since {formatDate(c.createdAt)}
                     </span>
