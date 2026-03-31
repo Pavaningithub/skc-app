@@ -138,13 +138,15 @@ export default function AgentConsole() {
         });
         return { ...c, cart: newCart };
       }
+      const skcTotal = Math.ceil(qty * product.pricePerUnit / 10) * 10;
+      const sellTotal = Math.ceil(qty * (product.pricePerUnit + markup) / 10) * 10;
       const newItem: AgentCartItem = {
         productId: product.id, productName: product.name,
         unit: product.unit, quantity: qty,
-        pricePerUnit: product.pricePerUnit, totalPrice: Math.ceil(qty * product.pricePerUnit / 10) * 10,
+        pricePerUnit: product.pricePerUnit, totalPrice: skcTotal,
         isOnDemand: product.isOnDemand,
         agentMarkup: markup, markupPerUnit: markup,
-        sellingPrice: product.pricePerUnit + markup,
+        sellingPrice: sellTotal / qty,  // store per-unit so qty * sellingPrice = sellTotal
       };
       return { ...c, cart: [...c.cart, newItem] };
     }));
@@ -332,9 +334,20 @@ export default function AgentConsole() {
             <div key={o.id} className="bg-white rounded-xl border border-gray-100 px-4 py-3 space-y-1.5">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-mono text-gray-400">#{o.orderNumber}</span>
-                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${o.paymentStatus === 'paid' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
-                  {o.paymentStatus}
-                </span>
+                <div className="flex items-center gap-1.5">
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                    o.status === 'delivered'        ? 'bg-green-100 text-green-700' :
+                    o.status === 'confirmed'        ? 'bg-blue-100 text-blue-700' :
+                    o.status === 'out_for_delivery' ? 'bg-purple-100 text-purple-700' :
+                    o.status === 'cancelled'        ? 'bg-red-100 text-red-500' :
+                                                     'bg-amber-100 text-amber-700'
+                  }`}>
+                    {o.status === 'out_for_delivery' ? 'Out for delivery' : o.status}
+                  </span>
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${o.paymentStatus === 'paid' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                    {o.paymentStatus === 'paid' ? '✅ Paid' : '⏳ Unpaid'}
+                  </span>
+                </div>
               </div>
               <p className="text-sm font-semibold text-gray-800">
                 {o.customerName}
@@ -344,9 +357,9 @@ export default function AgentConsole() {
                 {o.items.map(i => `${i.productName} ${formatQty(i.quantity, i.unit)}`).join(', ')}
               </p>
               <div className="flex justify-between text-xs text-gray-500 pt-1 border-t border-gray-50">
-                <span>SKC: <strong className="text-gray-700">₹{o.total}</strong></span>
+                <span>SKC cost: <strong className="text-gray-700">₹{o.total}</strong></span>
                 {(o.agentCommission ?? 0) > 0 && (
-                  <span className="text-green-600">Commission: <strong>₹{o.agentCommission}</strong></span>
+                  <span className="text-green-600">Your commission: <strong>₹{o.agentCommission}</strong></span>
                 )}
                 <span>{new Date(o.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' })}</span>
               </div>
