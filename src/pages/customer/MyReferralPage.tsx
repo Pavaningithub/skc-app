@@ -3,6 +3,7 @@ import { Search, Copy, Share2, Leaf, ArrowLeft } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { customersService } from '../../lib/services';
 import { referralShareMessage, normalizeWhatsapp } from '../../lib/utils';
+import { APP_CONFIG } from '../../config';
 import toast from 'react-hot-toast';
 
 export default function MyReferralPage() {
@@ -100,16 +101,35 @@ export default function MyReferralPage() {
 
         {/* Not found */}
         {notFound && (
-          <div className="rounded-xl px-4 py-3 bg-red-50 border border-red-200 text-sm text-red-700">
-            😕 No account found for this number. Place your first order on the{' '}
-            <Link to="/" className="underline font-semibold">storefront</Link> — your referral code will be ready after ordering.
+          <div className="rounded-xl px-4 py-4 bg-amber-50 border border-amber-200 space-y-2">
+            <p className="text-sm font-semibold text-amber-800">📱 Number not registered yet</p>
+            <p className="text-sm text-amber-700">
+              We don't have an account for <strong>{phone}</strong> in our system.
+            </p>
+            <p className="text-sm text-amber-700">
+              👉 <Link to="/" className="underline font-semibold text-amber-900">Place your first order</Link> on the storefront — your personal referral code will be created automatically once your order is confirmed.
+            </p>
+            <p className="text-xs text-amber-600 mt-1">
+              Already ordered? Make sure you enter the same number you used during checkout.
+            </p>
           </div>
         )}
 
         {/* Found but no code yet */}
         {noCode && (
-          <div className="rounded-xl px-4 py-3 bg-amber-50 border border-amber-200 text-sm text-amber-800">
-            👋 Hi <strong>{customerName}</strong>! Your referral code is being generated — it's usually ready after your first order is confirmed. Please check back soon or contact us on WhatsApp.
+          <div className="rounded-xl px-4 py-4 bg-blue-50 border border-blue-200 space-y-2">
+            <p className="text-sm font-semibold text-blue-800">👋 Hi {customerName}! Almost there.</p>
+            <p className="text-sm text-blue-700">
+              Your account exists but your referral code hasn't been generated yet.
+            </p>
+            <p className="text-sm text-blue-700">
+              This usually happens automatically after your first order is <strong>confirmed</strong>. If you've already ordered, please wait a few minutes or{' '}
+              <a
+                href={`https://wa.me/91${APP_CONFIG.WHATSAPP_NUMBER}?text=${encodeURIComponent('Hi, I placed an order and need my referral code. My number is ' + phone)}`}
+                target="_blank" rel="noreferrer"
+                className="underline font-semibold text-blue-900"
+              >contact us on WhatsApp</a>.
+            </p>
           </div>
         )}
 

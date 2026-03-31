@@ -53,8 +53,15 @@ jobs:
                   VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
               run: |
                   npm i -g vercel
-                  # Deploy the pre-built dist folder directly as a static preview
-                  PREVIEW_URL=$(vercel deploy dist --token=$VERCEL_TOKEN --yes)
+
+                  # Wrap the Vite dist into Vercel Build Output API format
+                  mkdir -p .vercel/output/static
+                  cp -r dist/. .vercel/output/static/
+
+                  # config.json — tells Vercel this is a static site with SPA fallback
+                  printf '{"version":3,"routes":[{"handle":"filesystem"},{"src":"/(.*)","dest":"/index.html"}]}' > .vercel/output/config.json
+
+                  PREVIEW_URL=$(vercel deploy --prebuilt --token=$VERCEL_TOKEN)
                   echo "preview_url=$PREVIEW_URL" >> $GITHUB_OUTPUT
                   echo "### 🔵 Staging deployed" >> $GITHUB_STEP_SUMMARY
                   echo "**URL:** $PREVIEW_URL" >> $GITHUB_STEP_SUMMARY
