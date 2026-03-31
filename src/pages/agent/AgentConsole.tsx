@@ -72,9 +72,7 @@ export default function AgentConsole() {
   // ── Multi-customer ────────────────────────────────────────────────────
   const [customers, setCustomers] = useState<AgentCustomer[]>([newCustomer()]);
   // Per-customer add-product UI: cid → { productId, qty }
-  const [addState, setAddState] = useState<Record<string, { productId: string; qty: number }>>({});
-
-  // ── Recent Orders ──────────────────────────────────────────────────────
+  const [addState, setAddState] = useState<Record<string, { productId: string; qty: number; garlicPref?: 'with' | 'without' }>>({});   // ── Recent Orders ──────────────────────────────────────────────────────
   const [showOrders, setShowOrders] = useState(false);
   const [recentOrders, setRecentOrders] = useState<Order[]>([]);
   const [loadingOrders] = useState(false);
@@ -129,16 +127,19 @@ export default function AgentConsole() {
     const minQ = defaultMinQty(product);
     if (qty < minQ) { toast.error(`Minimum order is ${formatQty(minQ, product.unit)}`); return; }
 
+    const garlicNote = product.hasGarlicOption
+      ? ((state?.garlicPref ?? 'without') === 'with' ? 'With Garlic' : 'Without Garlic')
+      : undefined;
+
     setCustomers(prev => prev.map(c => {
       if (c.id !== cid) return c;
       const markup = markupForProduct(product);
-      const existing = c.cart.findIndex(i => i.productId === product.id);
+      const existing = c.cart.findIndex(i => i.productId === product.id && i.customizationNote === (garlicNote ?? ''));
       if (existing >= 0) {
         const newCart = c.cart.map((item, i) => {
           if (i !== existing) return item;
           const newQty = item.quantity + qty;
           return { ...item, quantity: newQty, totalPrice: Math.ceil(newQty * item.pricePerUnit / 10) * 10,
-            // preserve per-unit sellingPrice/markup — only qty changes
             sellingPrice: item.sellingPrice, markupPerUnit: item.markupPerUnit };
         });
         return { ...c, cart: newCart };
@@ -151,7 +152,8 @@ export default function AgentConsole() {
         pricePerUnit: product.pricePerUnit, totalPrice: skcTotal,
         isOnDemand: product.isOnDemand,
         agentMarkup: markup, markupPerUnit: markup,
-        sellingPrice: sellTotal / qty,  // store per-unit so qty * sellingPrice = sellTotal
+        sellingPrice: sellTotal / qty,
+        ...(garlicNote ? { customizationNote: garlicNote } : {}),
       };
       return { ...c, cart: [...c.cart, newItem] };
     }));
@@ -233,6 +235,7 @@ export default function AgentConsole() {
           quantity: i.quantity, pricePerUnit: i.pricePerUnit, totalPrice: i.totalPrice,
           isOnDemand: i.isOnDemand,
           // agentMarkup intentionally omitted — admin should not see agent's margin
+          ...(i.customizationNote ? { customizationNote: i.customizationNote } : {}),
         }));
         const order: Omit<Order, 'id'> = {
           orderNumber: generateOrderNumber(), type: 'regular',
@@ -483,10 +486,10 @@ interface CustomerCardProps {
   cust: AgentCustomer;
   cidx: number;
   products: Product[];
-  addState?: { productId: string; qty: number };
+  addState?: { productId: string; qty: number; garlicPref?: 'with' | 'without' };
   onUpdateCustomer: (u: Partial<AgentCustomer>) => void;
   onRemoveCustomer: () => void;
-  onAddStateChange: (s: { productId: string; qty: number }) => void;
+  onAddStateChange: (s: { productId: string; qty: number; garlicPref?: 'with' | 'without' }) => void;
   onAddToCart: () => void;
   onRemoveCartItem: (idx: number) => void;
   onUpdateCartQty: (idx: number, qty: number) => void;
@@ -507,22 +510,27 @@ function CustomerCard({
   const highMargin = skc > 0 && margin / skc > 0.15;
 
   const [productSearch, setProductSearch] = useState('');
+  const [garlicOnly, setGarlicOnly] = useState(false);
 
   const defaultProductId = products.length > 0 ? products[0].id : '';
   const currentProductId = addState?.productId || defaultProductId;
   const currentProduct = products.find(p => p.id === currentProductId);
   const currentQty = addState?.qty ?? (currentProduct ? defaultMinQty(currentProduct) : 1);
 
-  const filteredProducts = productSearch.trim()
-    ? products.filter(p => p.name.toLowerCase().includes(productSearch.trim().toLowerCase()))
-    : products;
+  const filteredProducts = products
+    .filter(p => !productSearch.trim() || p.name.toLowerCase().includes(productSearch.trim().toLowerCase()))
+    .filter(p => !garlicOnly || !!p.hasGarlicOption);
 
   function setProduct(productId: string) {
     const p = products.find(x => x.id === productId);
-    onAddStateChange({ productId, qty: p ? defaultMinQty(p) : 1 });
+    // reset garlicPref to 'without' when product changes
+    onAddStateChange({ productId, qty: p ? defaultMinQty(p) : 1, garlicPref: 'without' });
   }
   function setQty(qty: number) {
-    onAddStateChange({ productId: currentProductId, qty });
+    onAddStateChange({ productId: currentProductId, qty, garlicPref: addState?.garlicPref ?? 'without' });
+  }
+  function setGarlicPref(pref: 'with' | 'without') {
+    onAddStateChange({ productId: currentProductId, qty: currentQty, garlicPref: pref });
   }
 
   return (
@@ -575,16 +583,26 @@ function CustomerCard({
           <div className="space-y-2">
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Add Products</p>
 
-            {/* Search */}
-            <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
-              <input
-                type="text"
-                value={productSearch}
-                onChange={e => setProductSearch(e.target.value)}
-                placeholder="Search products…"
-                className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-xl outline-none focus:border-orange-400"
-              />
+            {/* Search + Garlic filter */}
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+                <input
+                  type="text"
+                  value={productSearch}
+                  onChange={e => setProductSearch(e.target.value)}
+                  placeholder="Search products…"
+                  className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-xl outline-none focus:border-orange-400"
+                />
+              </div>
+              <button
+                onClick={() => setGarlicOnly(v => !v)}
+                title={garlicOnly ? 'Show all products' : 'Show With/Without Garlic products only'}
+                className={`px-2.5 py-2 rounded-xl text-xs border transition-colors flex-shrink-0 ${
+                  garlicOnly ? 'bg-amber-100 border-amber-300 text-amber-800 font-medium' : 'bg-white border-gray-200 text-gray-500 hover:border-amber-300'
+                }`}>
+                🧄 Garlic
+              </button>
             </div>
 
             {/* Clickable product grid */}
@@ -603,6 +621,7 @@ function CustomerCard({
                     <p className="font-semibold text-gray-800 truncate">{p.name}</p>
                     <p className="text-gray-500">₹{p.pricePerUnit}/{p.unit}</p>
                     <p className="text-gray-400">min {formatQty(defaultMinQty(p), p.unit)}</p>
+                    {p.hasGarlicOption && <p className="text-amber-700 text-xs font-medium">🧄 w/wo garlic</p>}
                     {inCart && <p className="text-green-600 font-medium mt-0.5">✓ {formatQty(inCart.quantity, p.unit)}</p>}
                   </button>
                 );
@@ -611,42 +630,58 @@ function CustomerCard({
 
             {/* Qty stepper + add button */}
             {currentProduct && (
-              <div className="flex gap-2 items-end">
-                <div className="flex-1">
-                  <p className="text-xs font-medium text-gray-700 mb-1">
-                    {currentProduct.name}
-                    <span className="text-gray-400 ml-1">(min {formatQty(defaultMinQty(currentProduct), currentProduct.unit)})</span>
-                  </p>
-                  <div className="flex items-center gap-1 bg-gray-50 rounded-xl px-2 py-1.5 border border-gray-200">
-                    <button
-                      onClick={() => setQty(Math.max(defaultMinQty(currentProduct), currentQty - qtyStep(currentProduct.unit)))}
-                      className="p-0.5 hover:bg-gray-200 rounded">
-                      <Minus className="w-3.5 h-3.5 text-gray-600" />
-                    </button>
-                    <input
-                      type="number"
-                      min={defaultMinQty(currentProduct)}
-                      step={qtyStep(currentProduct.unit)}
-                      value={currentQty}
-                      onChange={e => setQty(Number(e.target.value))}
-                      className="flex-1 text-center text-sm font-medium bg-transparent outline-none w-14"
-                    />
-                    <span className="text-xs text-gray-400 pr-1">
-                      {currentProduct.unit === 'piece' ? 'pcs' : currentProduct.unit === 'kg' ? 'kg' : 'g'}
-                    </span>
-                    <button
-                      onClick={() => setQty(currentQty + qtyStep(currentProduct.unit))}
-                      className="p-0.5 hover:bg-gray-200 rounded">
-                      <Plus className="w-3.5 h-3.5 text-gray-600" />
-                    </button>
+              <div className="space-y-2">
+                <div className="flex gap-2 items-end">
+                  <div className="flex-1">
+                    <p className="text-xs font-medium text-gray-700 mb-1">
+                      {currentProduct.name}
+                      <span className="text-gray-400 ml-1">(min {formatQty(defaultMinQty(currentProduct), currentProduct.unit)})</span>
+                    </p>
+                    <div className="flex items-center gap-1 bg-gray-50 rounded-xl px-2 py-1.5 border border-gray-200">
+                      <button
+                        onClick={() => setQty(Math.max(defaultMinQty(currentProduct), currentQty - qtyStep(currentProduct.unit)))}
+                        className="p-0.5 hover:bg-gray-200 rounded">
+                        <Minus className="w-3.5 h-3.5 text-gray-600" />
+                      </button>
+                      <input
+                        type="number"
+                        min={defaultMinQty(currentProduct)}
+                        step={qtyStep(currentProduct.unit)}
+                        value={currentQty}
+                        onChange={e => setQty(Number(e.target.value))}
+                        className="flex-1 text-center text-sm font-medium bg-transparent outline-none w-14"
+                      />
+                      <span className="text-xs text-gray-400 pr-1">
+                        {currentProduct.unit === 'piece' ? 'pcs' : currentProduct.unit === 'kg' ? 'kg' : 'g'}
+                      </span>
+                      <button
+                        onClick={() => setQty(currentQty + qtyStep(currentProduct.unit))}
+                        className="p-0.5 hover:bg-gray-200 rounded">
+                        <Plus className="w-3.5 h-3.5 text-gray-600" />
+                      </button>
+                    </div>
                   </div>
+                  <button
+                    onClick={onAddToCart}
+                    className="px-4 py-2.5 rounded-xl text-white text-sm font-semibold flex items-center gap-1.5 flex-shrink-0"
+                    style={{ background: '#c8821a' }}>
+                    <Plus className="w-4 h-4" /> Add
+                  </button>
                 </div>
-                <button
-                  onClick={onAddToCart}
-                  className="px-4 py-2.5 rounded-xl text-white text-sm font-semibold flex items-center gap-1.5 flex-shrink-0"
-                  style={{ background: '#c8821a' }}>
-                  <Plus className="w-4 h-4" /> Add
-                </button>
+                {currentProduct.hasGarlicOption && (
+                  <div className="flex items-center gap-3 px-1">
+                    <span className="text-xs font-medium text-amber-700">🧄 Garlic:</span>
+                    {(['without', 'with'] as const).map(opt => (
+                      <label key={opt} className="flex items-center gap-1.5 cursor-pointer">
+                        <input type="radio" name={`garlic-${cust.id}`} value={opt}
+                          checked={(addState?.garlicPref ?? 'without') === opt}
+                          onChange={() => setGarlicPref(opt)}
+                          className="accent-orange-500 w-3.5 h-3.5" />
+                        <span className="text-xs text-gray-700">{opt === 'with' ? '🧄 With' : '🚫 Without'}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -682,6 +717,7 @@ function CustomerCard({
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-gray-800 leading-tight truncate">{item.productName}</p>
+                        {item.customizationNote && <span className="text-xs text-amber-700 font-medium">{item.customizationNote}</span>}
                         {item.isOnDemand && <span className="text-[10px] text-purple-600 font-medium">On-demand</span>}
                       </div>
                       <button onClick={() => onRemoveCartItem(i)} className="p-1 hover:bg-red-50 rounded-lg flex-shrink-0">
