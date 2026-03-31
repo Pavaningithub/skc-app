@@ -67,6 +67,7 @@ export default function AgentConsole() {
 
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [liveAgent, setLiveAgent] = useState<{ commissionPercent: number; markupPercent: number } | null>(null);
 
   // ── Multi-customer ────────────────────────────────────────────────────
   const [customers, setCustomers] = useState<AgentCustomer[]>([newCustomer()]);
@@ -76,15 +77,19 @@ export default function AgentConsole() {
   // ── Recent Orders ──────────────────────────────────────────────────────
   const [showOrders, setShowOrders] = useState(false);
   const [recentOrders, setRecentOrders] = useState<Order[]>([]);
-  const [loadingOrders, setLoadingOrders] = useState(false);
+  const [loadingOrders] = useState(false);
 
   // ── Saving ────────────────────────────────────────────────────────────────
   const [saving, setSaving] = useState(false);
   const [savingProgress, setSavingProgress] = useState('');
 
-  // ─── Subscribe to live product list ───────────────────────────────────────
+  // ─── Subscribe to live product list + fetch live agent data ───────────────────────────────────────
   useEffect(() => {
     if (!agentSession) { navigate('/agent/login'); return; }
+    // Fetch live agent so markup% and commission% are never stale from session
+    agentsService.getById(agentSession.id).then(a => {
+      if (a) setLiveAgent({ commissionPercent: a.commissionPercent, markupPercent: a.markupPercent ?? 0 });
+    });
     const unsub = productsService.subscribe(p => {
       setProducts(p.filter(x => x.isActive));
       setLoading(false);
@@ -92,8 +97,8 @@ export default function AgentConsole() {
     return () => unsub();
   }, []);
 
-  // ─── Per-item markup calc: always % from agent session ───────────────────────────────
-  const markupPct = agentSession?.markupPercent ?? 0;
+  // ─── Per-item markup calc: uses live Firestore data, falls back to session ──────────────────────
+  const markupPct = liveAgent?.markupPercent ?? agentSession?.markupPercent ?? 0;
   function markupForProduct(product: Product): number {
     if (!markupPct) return 0;
     return product.pricePerUnit * markupPct / 100;  // per-unit markup
@@ -221,13 +226,21 @@ export default function AgentConsole() {
     setSavingProgress(`Placing ${valid.length} order${valid.length > 1 ? 's' : ''}…`);
     let placed = 0;
     try {
+      // Use live commission% — liveAgent fetched from Firestore on mount, never stale
+      const commissionPercent = liveAgent?.commissionPercent ?? agent.commissionPercent;
+
       for (const cust of valid) {
         const skc = cartSkcTotal(cust.cart);
-        const commission = Math.round(skc * agent.commissionPercent / 100);
+        const customerTotal = cartCustomerTotal(cust.cart);
+        // If admin hasn't set commission %, derive it from the actual margin the agent charged
+        const commission = commissionPercent > 0
+          ? Math.round(skc * commissionPercent / 100)
+          : Math.round(customerTotal - skc);  // agent keeps the full margin
         const orderItems: OrderItem[] = cust.cart.map(i => ({
           productId: i.productId, productName: i.productName, unit: i.unit,
           quantity: i.quantity, pricePerUnit: i.pricePerUnit, totalPrice: i.totalPrice,
-          isOnDemand: i.isOnDemand, agentMarkup: i.markupPerUnit,
+          isOnDemand: i.isOnDemand,
+          // agentMarkup intentionally omitted — admin should not see agent's margin
         }));
         const order: Omit<Order, 'id'> = {
           orderNumber: generateOrderNumber(), type: 'regular',
@@ -264,19 +277,22 @@ export default function AgentConsole() {
     }
   }
 
-  // ─── Recent orders ─────────────────────────────────────────────────────────
-  async function loadRecentOrders() {
+  // ─── Live orders subscription ────────────────────────────────────────────────────────────────
+  useEffect(() => {
     if (!agentSession) return;
-    setLoadingOrders(true);
-    try {
-      const all = await ordersService.getAll();
+    // Subscribe to live orders so status always matches SKC
+    const unsub = ordersService.subscribe(all => {
       setRecentOrders(
         all.filter(o => o.agentId === agentSession.id)
           .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-          .slice(0, 30),
+          .slice(0, 50),
       );
-      setShowOrders(true);
-    } finally { setLoadingOrders(false); }
+    });
+    return () => unsub();
+  }, []);
+
+  async function loadRecentOrders() {
+    setShowOrders(true);
   }
 
   function logout() { clearAgentSession(); navigate('/agent/login'); }
