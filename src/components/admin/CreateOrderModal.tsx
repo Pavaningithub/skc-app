@@ -26,6 +26,7 @@ export default function CreateOrderModal({ onClose, onCreated }: Props) {
   // discount
   const [discountPercent, setDiscountPercent] = useState(0); // from customer standing discount
   const [manualDiscount, setManualDiscount] = useState(0);   // overridden manually
+  const [manualDiscountMode, setManualDiscountMode] = useState<'rupees' | 'percent'>('rupees'); // ₹ or %
   const [customerDiscountLabel, setCustomerDiscountLabel] = useState(''); // label shown when auto-applied
   const [standingDiscountActive, setStandingDiscountActive] = useState(false); // locks out manual/referral discounts
 
@@ -100,9 +101,13 @@ export default function CreateOrderModal({ onClose, onCreated }: Props) {
 
   const subtotal = items.reduce((s, i) => s + i.totalPrice, 0);
   const isSample = orderType === 'sample';
+  // Compute manual discount amount from ₹ or % input
+  const manualDiscountAmt = manualDiscountMode === 'percent'
+    ? Math.round(subtotal * manualDiscount / 100)
+    : manualDiscount;
   // Effective discount: standing % takes priority; admin can also set manualDiscount
   const effectiveDiscountAmt = isSample ? 0 : Math.round(
-    manualDiscount > 0 ? manualDiscount : subtotal * discountPercent / 100
+    manualDiscountAmt > 0 ? manualDiscountAmt : subtotal * discountPercent / 100
   );
   const total = isSample ? 0 : Math.max(0, subtotal - effectiveDiscountAmt);
 
@@ -298,7 +303,14 @@ export default function CreateOrderModal({ onClose, onCreated }: Props) {
                 </div>
                 {effectiveDiscountAmt > 0 && (
                   <div className="flex justify-between text-sm text-green-600">
-                    <span>Discount {discountPercent > 0 && manualDiscount === 0 ? `(${discountPercent}%)` : ''}</span>
+                    <span>
+                      Discount{' '}
+                      {discountPercent > 0 && manualDiscount === 0
+                        ? `(${discountPercent}%)`
+                        : manualDiscount > 0 && manualDiscountMode === 'percent'
+                          ? `(${manualDiscount}%)`
+                          : ''}
+                    </span>
                     <span>−₹{effectiveDiscountAmt}</span>
                   </div>
                 )}
@@ -310,17 +322,45 @@ export default function CreateOrderModal({ onClose, onCreated }: Props) {
             </div>
           )}
 
-          {/* Manual discount override — hidden when a standing discount is active */}
+          {/* Manual discount — hidden when a standing discount is active */}
           {!isSample && items.length > 0 && !standingDiscountActive && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1">
-                <Tag className="w-3.5 h-3.5 text-green-600" /> Manual Discount (₹)
+                <Tag className="w-3.5 h-3.5 text-green-600" /> Admin Discount
               </label>
-              <input type="number" min="0" step="1"
-                value={manualDiscount || ''}
-                onChange={e => setManualDiscount(Math.max(0, Number(e.target.value)))}
-                placeholder="e.g. 50"
-                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-orange-400" />
+              <div className="flex gap-2 items-center">
+                {/* ₹ / % toggle */}
+                <div className="flex rounded-xl overflow-hidden border border-gray-200 flex-shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setManualDiscountMode('rupees')}
+                    className={`px-3 py-2.5 text-sm font-bold transition-colors ${manualDiscountMode === 'rupees' ? 'bg-orange-500 text-white' : 'text-gray-500 hover:bg-gray-50'}`}>
+                    ₹
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setManualDiscountMode('percent')}
+                    className={`px-3 py-2.5 text-sm font-bold transition-colors ${manualDiscountMode === 'percent' ? 'bg-orange-500 text-white' : 'text-gray-500 hover:bg-gray-50'}`}>
+                    %
+                  </button>
+                </div>
+                <input
+                  type="number" min="0"
+                  max={manualDiscountMode === 'percent' ? 100 : undefined}
+                  step={manualDiscountMode === 'percent' ? '0.5' : '1'}
+                  value={manualDiscount || ''}
+                  onChange={e => setManualDiscount(Math.max(0, Number(e.target.value)))}
+                  placeholder={manualDiscountMode === 'rupees' ? 'e.g. 50' : 'e.g. 10'}
+                  className="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-orange-400"
+                />
+              </div>
+              {manualDiscount > 0 && subtotal > 0 && (
+                <p className="text-xs text-green-600 mt-1">
+                  Discount: ₹{manualDiscountAmt} off
+                  {manualDiscountMode === 'rupees' && ` (${Math.round(manualDiscount / subtotal * 100)}% of subtotal)`}
+                  {manualDiscountMode === 'percent' && ` (${manualDiscount}% of ₹${subtotal})`}
+                </p>
+              )}
             </div>
           )}
           {/* Standing discount active notice */}
