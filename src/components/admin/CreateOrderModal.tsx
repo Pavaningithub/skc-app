@@ -291,85 +291,72 @@ export default function CreateOrderModal({ onClose, onCreated }: Props) {
                   </button>
                 </div>
               ))}
-              <div className="border-t border-gray-100 px-4 py-3 bg-gray-50 space-y-1.5">
+              <div className="border-t border-gray-100 px-4 py-3 bg-gray-50 space-y-2">
                 {customerDiscountLabel && (
-                  <div className="flex items-center gap-1.5 text-xs text-green-700 bg-green-50 rounded-lg px-2 py-1.5 mb-1">
+                  <div className="flex items-center gap-1.5 text-xs text-green-700 bg-green-50 rounded-lg px-2 py-1.5">
                     <Tag className="w-3 h-3" />
-                    <span>{customerDiscountLabel} — auto-applied below</span>
+                    <span>{customerDiscountLabel}</span>
                   </div>
                 )}
                 <div className="flex justify-between text-sm text-gray-600">
                   <span>Subtotal</span><span>₹{subtotal}</span>
                 </div>
-                {effectiveDiscountAmt > 0 && (
+
+                {/* Discount row — hidden for samples and when standing discount active */}
+                {!isSample && !standingDiscountActive && (
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <Tag className="w-3.5 h-3.5 text-green-600 flex-shrink-0" />
+                      <span className="text-sm text-gray-600 flex-1">Discount</span>
+                      {/* ₹ / % toggle */}
+                      <div className="flex rounded-lg overflow-hidden border border-gray-200">
+                        <button type="button"
+                          onClick={() => setManualDiscountMode('rupees')}
+                          className={`px-2.5 py-1 text-xs font-bold transition-colors ${
+                            manualDiscountMode === 'rupees' ? 'bg-orange-500 text-white' : 'text-gray-500 hover:bg-gray-100'
+                          }`}>₹</button>
+                        <button type="button"
+                          onClick={() => setManualDiscountMode('percent')}
+                          className={`px-2.5 py-1 text-xs font-bold transition-colors ${
+                            manualDiscountMode === 'percent' ? 'bg-orange-500 text-white' : 'text-gray-500 hover:bg-gray-100'
+                          }`}>%</button>
+                      </div>
+                      <input
+                        type="number" min="0"
+                        max={manualDiscountMode === 'percent' ? 100 : undefined}
+                        step={manualDiscountMode === 'percent' ? '0.5' : '1'}
+                        value={manualDiscount || ''}
+                        onChange={e => setManualDiscount(Math.max(0, Number(e.target.value)))}
+                        placeholder="0"
+                        className="w-20 border border-gray-200 rounded-lg px-2 py-1 text-sm text-right outline-none focus:border-orange-400"
+                      />
+                    </div>
+                    {manualDiscountAmt > 0 && (
+                      <div className="flex justify-between text-sm text-green-600 pl-5">
+                        <span>
+                          {manualDiscountMode === 'percent'
+                            ? `${manualDiscount}% of ₹${subtotal}`
+                            : `${Math.round(manualDiscount / subtotal * 100)}% of subtotal`}
+                        </span>
+                        <span>−₹{manualDiscountAmt}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Standing discount line */}
+                {!isSample && standingDiscountActive && effectiveDiscountAmt > 0 && (
                   <div className="flex justify-between text-sm text-green-600">
-                    <span>
-                      Discount{' '}
-                      {discountPercent > 0 && manualDiscount === 0
-                        ? `(${discountPercent}%)`
-                        : manualDiscount > 0 && manualDiscountMode === 'percent'
-                          ? `(${manualDiscount}%)`
-                          : ''}
-                    </span>
+                    <span>Standing discount ({discountPercent}%)</span>
                     <span>−₹{effectiveDiscountAmt}</span>
                   </div>
                 )}
+
                 <div className="flex justify-between font-semibold text-gray-700 border-t border-gray-100 pt-1.5">
-                  <span>{isSample ? 'Total (Sample - Free)' : 'Total'}</span>
+                  <span>{isSample ? 'Total (Sample — Free)' : 'Total'}</span>
                   <span className="text-lg text-orange-600">₹{total}</span>
                 </div>
               </div>
-            </div>
-          )}
-
-          {/* Manual discount — hidden when a standing discount is active */}
-          {!isSample && items.length > 0 && !standingDiscountActive && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1">
-                <Tag className="w-3.5 h-3.5 text-green-600" /> Admin Discount
-              </label>
-              <div className="flex gap-2 items-center">
-                {/* ₹ / % toggle */}
-                <div className="flex rounded-xl overflow-hidden border border-gray-200 flex-shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => setManualDiscountMode('rupees')}
-                    className={`px-3 py-2.5 text-sm font-bold transition-colors ${manualDiscountMode === 'rupees' ? 'bg-orange-500 text-white' : 'text-gray-500 hover:bg-gray-50'}`}>
-                    ₹
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setManualDiscountMode('percent')}
-                    className={`px-3 py-2.5 text-sm font-bold transition-colors ${manualDiscountMode === 'percent' ? 'bg-orange-500 text-white' : 'text-gray-500 hover:bg-gray-50'}`}>
-                    %
-                  </button>
-                </div>
-                <input
-                  type="number" min="0"
-                  max={manualDiscountMode === 'percent' ? 100 : undefined}
-                  step={manualDiscountMode === 'percent' ? '0.5' : '1'}
-                  value={manualDiscount || ''}
-                  onChange={e => setManualDiscount(Math.max(0, Number(e.target.value)))}
-                  placeholder={manualDiscountMode === 'rupees' ? 'e.g. 50' : 'e.g. 10'}
-                  className="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-orange-400"
-                />
-              </div>
-              {manualDiscount > 0 && subtotal > 0 && (
-                <p className="text-xs text-green-600 mt-1">
-                  Discount: ₹{manualDiscountAmt} off
-                  {manualDiscountMode === 'rupees' && ` (${Math.round(manualDiscount / subtotal * 100)}% of subtotal)`}
-                  {manualDiscountMode === 'percent' && ` (${manualDiscount}% of ₹${subtotal})`}
-                </p>
-              )}
-            </div>
-          )}
-          {/* Standing discount active notice */}
-          {standingDiscountActive && !isSample && items.length > 0 && (
-            <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5 text-xs text-amber-800">
-              <Tag className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-amber-600" />
-              <span>
-                <strong>Standing discount active ({discountPercent}%).</strong> Manual discount and referral/subscription discounts are disabled for this customer.
-              </span>
             </div>
           )}
 
