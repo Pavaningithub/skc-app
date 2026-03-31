@@ -7,19 +7,11 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { productsService, feedbackService, ordersService, customersService, stockService } from '../../lib/services';
-import { generateOrderNumber, formatCurrency, computeReferralDiscount, computeCreditRedemption } from '../../lib/utils';
+import { generateOrderNumber, formatCurrency, computeReferralDiscount, computeCreditRedemption, normalizeWhatsapp } from '../../lib/utils';
 import { APP_CONFIG } from '../../config';
 import type { Product, Feedback, OrderItem, Order } from '../../lib/types';
 
 interface CartItem extends OrderItem {}
-
-/** Strip spaces, dashes, +91 country code — return bare 10-digit mobile number */
-function normalizeWhatsapp(raw: string): string {
-  const digits = raw.replace(/\D/g, '');          // remove everything non-digit
-  if (digits.length === 12 && digits.startsWith('91')) return digits.slice(2);  // +91XXXXXXXXXX
-  if (digits.length === 11 && digits.startsWith('0'))  return digits.slice(1);  // 0XXXXXXXXXX
-  return digits;
-}
 
 export default function StoreFront() {
   const navigate = useNavigate();
