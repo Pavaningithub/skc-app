@@ -1631,12 +1631,8 @@ function OrderFormModal({
               )}
               {/* Info box about how referral works */}
               <div className="mt-2 rounded-xl px-3 py-2.5 text-xs" style={{ background: '#fdf5e6', color: '#7a4010' }}>
-                <p className="font-semibold mb-1">How referral discounts work:</p>
-                <p className="mb-0.5">• ₹1–₹499 → <strong>3% total</strong> — you save 25%, they earn 75% as credit</p>
-                <p className="mb-0.5">• ₹500–₹999 → <strong>5% total</strong> (max ₹50) — you save up to ₹13, they earn up to ₹37</p>
-                <p className="mb-1">• ₹1000+ → <strong>7.5% total</strong> (max ₹100) — you save up to ₹25, they earn up to ₹75</p>
-                <p className="mb-0.5" style={{ color: '#c8821a' }}>🎟️ <strong>First order only</strong> — discount applies once per customer.</p>
-                <p style={{ color: '#7a4010' }}>💡 Your friend earns credit every time <em>they</em> refer someone new — redeemable on future orders!</p>
+                <p className="font-semibold mb-1">🎟️ First order only — your discount is applied automatically at checkout.</p>
+                <p style={{ color: '#7a4010' }}>💡 Your friend also earns store credit when you order using their link!</p>
               </div>
             </div>
           )}

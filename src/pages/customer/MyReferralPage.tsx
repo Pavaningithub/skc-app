@@ -155,11 +155,11 @@ export default function MyReferralPage() {
 
             {/* How it works */}
             <div className="rounded-xl bg-gray-50 border border-gray-100 px-4 py-3 text-xs text-gray-600 space-y-1">
-              <p className="font-semibold text-gray-700 mb-1">How your referral works:</p>
-              <p>• Share your link — when a friend places their first order:</p>
-              <p className="pl-3">→ They save up to <strong>7.5%</strong> on their order</p>
-              <p className="pl-3">→ You earn <strong>75% of the discount</strong> as credit</p>
-              <p>• Credit is redeemable on your future orders (up to ₹75/order)</p>
+              <p className="font-semibold text-gray-700">How it works:</p>
+              <p>Share your link — when a friend places their <strong>first order</strong>:</p>
+              <p className="pl-3">→ They get an instant discount at checkout</p>
+              <p className="pl-3">→ You earn store credit (up to ₹75 per order)</p>
+              <p className="text-gray-400 pt-0.5">Credit is redeemable on your future orders.</p>
             </div>
 
             {/* WhatsApp share */}
