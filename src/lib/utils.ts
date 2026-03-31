@@ -2,6 +2,14 @@ import type { Order } from './types';
 import { WHATSAPP_NUMBER, UPI_ID, BUSINESS_NAME } from './constants';
 import { APP_CONFIG } from '../config';
 
+/** Strip +91 / 0 prefix and non-digits — return bare 10-digit mobile number */
+export function normalizeWhatsapp(raw: string): string {
+  const digits = raw.replace(/\D/g, '');
+  if (digits.length === 12 && digits.startsWith('91')) return digits.slice(2);
+  if (digits.length === 11 && digits.startsWith('0'))  return digits.slice(1);
+  return digits;
+}
+
 export function buildWhatsAppUrl(phone: string, message: string): string {
   const clean = phone.replace(/\D/g, '');
   const number = clean.startsWith('91') ? clean : `91${clean}`;

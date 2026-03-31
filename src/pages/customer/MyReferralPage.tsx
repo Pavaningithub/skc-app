@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Search, Copy, Share2, Leaf, ArrowLeft } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { customersService } from '../../lib/services';
-import { referralShareMessage } from '../../lib/utils';
+import { referralShareMessage, normalizeWhatsapp } from '../../lib/utils';
 import toast from 'react-hot-toast';
 
 export default function MyReferralPage() {
@@ -17,7 +17,7 @@ export default function MyReferralPage() {
   const storeUrl = typeof window !== 'undefined' ? window.location.origin : '';
   const shareMsg = referralCode ? referralShareMessage(customerName, referralCode, storeUrl) : '';
   const shareUrl = `https://wa.me/?text=${encodeURIComponent(shareMsg)}`;
-  const digits = phone.replace(/\D/g, '').replace(/^(91|0)/, '').slice(0, 10);
+  const digits = normalizeWhatsapp(phone);
 
   async function lookup() {
     if (digits.length < 10) return toast.error('Enter your 10-digit WhatsApp number');
