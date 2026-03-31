@@ -29,6 +29,7 @@ export default function StoreFront() {
   const [showOrderForm, setShowOrderForm]   = useState(false);
   const [showSampleForm, setShowSampleForm] = useState(false);
   const [activeCategory, setActiveCategory] = useState('All');
+  const [garlicOnly, setGarlicOnly]         = useState(false);
   const [searchQuery, setSearchQuery]       = useState('');
   const [submitting, setSubmitting]     = useState(false);
   // Sample: max 2 products, only powders + Dry Fruit Laddu
@@ -104,6 +105,7 @@ export default function StoreFront() {
 
   const filtered = products
     .filter(p => activeCategory === 'All' || p.category === activeCategory)
+    .filter(p => !garlicOnly || !!p.hasGarlicOption)
     .filter(p => {
       if (!searchQuery.trim()) return true;
       const q = searchQuery.toLowerCase();
@@ -675,6 +677,14 @@ export default function StoreFront() {
                 {cat}
               </button>
             ))}
+            <button
+              onClick={() => setGarlicOnly(v => !v)}
+              className="flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-medium transition-colors"
+              style={garlicOnly
+                ? { background: '#d97706', color: '#fff' }
+                : { background: '#fef3c7', color: '#92400e', border: '1px solid #fcd34d' }}>
+              🧄 Garlic
+            </button>
           </div>
 
         </div>
@@ -1059,6 +1069,10 @@ function ProductCard({ product, onAddToCart }: {
           {isOccasion && (
             <span className="absolute top-2 left-2 text-xs font-bold px-1.5 py-0.5 rounded-full"
               style={{ background: '#fce7f3', color: '#be185d', fontSize: '9px' }}>🎉 Special</span>
+          )}
+          {product.hasGarlicOption && (
+            <span className="absolute bottom-2 right-2 text-xs font-bold px-1.5 py-0.5 rounded-full"
+              style={{ background: '#fef3c7', color: '#92400e', fontSize: '9px' }}>🧄</span>
           )}
         </div>
 

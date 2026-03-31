@@ -40,6 +40,7 @@ export default function Products() {
   const [catFilter, setCatFilter] = useState<string>('all');
   const [activeFilter, setActiveFilter] = useState<ActiveFilter>('all');
   const [onDemandOnly, setOnDemandOnly] = useState(false);
+  const [garlicOnly, setGarlicOnly] = useState(false);
   const [sortKey, setSortKey] = useState<ProdSort>('name_asc');
 
   function openAdd() { setForm({ ...emptyForm }); setEditId(null); setShowForm(true); }
@@ -90,7 +91,8 @@ export default function Products() {
       const matchCat = catFilter === 'all' || p.category === catFilter;
       const matchActive = activeFilter === 'all' || (activeFilter === 'active' ? p.isActive : !p.isActive);
       const matchDemand = !onDemandOnly || p.isOnDemand;
-      return matchSearch && matchCat && matchActive && matchDemand;
+      const matchGarlic = !garlicOnly || !!p.hasGarlicOption;
+      return matchSearch && matchCat && matchActive && matchDemand && matchGarlic;
     });
     result = [...result].sort((a: Product, b: Product) => {
       switch (sortKey) {
@@ -101,7 +103,7 @@ export default function Products() {
       }
     });
     return result;
-  }, [products, search, catFilter, activeFilter, onDemandOnly, sortKey]);
+  }, [products, search, catFilter, activeFilter, onDemandOnly, garlicOnly, sortKey]);
 
   const priceLabel = (unit: Unit) => {
     if (unit === 'gram') return '/ gram';
@@ -162,6 +164,12 @@ export default function Products() {
             ${onDemandOnly ? 'bg-orange-100 text-orange-700 border-orange-300' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'}`}>
           🔥 On-demand only
         </button>
+        {/* Garlic variants toggle */}
+        <button onClick={() => setGarlicOnly(v => !v)}
+          className={`px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-colors
+            ${garlicOnly ? 'bg-amber-100 text-amber-700 border-amber-300' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'}`}>
+          🧄 Garlic variants
+        </button>
         {/* Sort */}
         <div className="flex items-center gap-1.5 ml-auto">
           <ArrowUpDown className="w-3.5 h-3.5 text-gray-400" />
@@ -196,6 +204,8 @@ export default function Products() {
                 <div className="flex items-center gap-2 flex-wrap">
                   <h3 className="font-semibold text-gray-800">{p.name}</h3>
                   <span className="text-xs bg-orange-50 text-orange-600 px-2 py-0.5 rounded-full">{p.category}</span>
+                  {p.hasGarlicOption && <span className="text-xs bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full">🧄 Garlic variant</span>}
+                  {p.isOnDemand && <span className="text-xs bg-orange-50 text-orange-500 px-2 py-0.5 rounded-full">🔥 On-demand</span>}
                   {!p.isActive && <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">Inactive</span>}
                 </div>
                 {p.description && <p className="text-sm text-gray-500 mt-0.5">{p.description}</p>}
