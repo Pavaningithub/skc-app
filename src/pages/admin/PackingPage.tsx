@@ -1,6 +1,26 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Printer, Package } from 'lucide-react';
+import { Printer, Package, CheckCircle2, Circle } from 'lucide-react';
+
+// localStorage key scoped to today's date — auto-clears tomorrow
+function todayKey() {
+  return `skc-packing-checked-${new Date().toISOString().slice(0, 10)}`;
+}
+
+function loadChecked(): Set<string> {
+  try {
+    const raw = localStorage.getItem(todayKey());
+    return raw ? new Set(JSON.parse(raw) as string[]) : new Set();
+  } catch {
+    return new Set();
+  }
+}
+
+function saveChecked(checked: Set<string>) {
+  try {
+    localStorage.setItem(todayKey(), JSON.stringify([...checked]));
+  } catch { /* quota exceeded — ignore */ }
+}
 import { ordersService } from '../../lib/services';
 import { useRealtimeCollection } from '../../lib/useRealtimeCollection';
 import { formatQuantity } from '../../lib/utils';
@@ -38,6 +58,16 @@ export default function PackingPage() {
   const [includedStatuses, setIncludedStatuses] = useState<Set<OrderStatus>>(
     new Set(['pending', 'confirmed'])
   );
+  const [checked, setChecked] = useState<Set<string>>(loadChecked);
+
+  function toggleChecked(key: string) {
+    setChecked(prev => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      saveChecked(next);
+      return next;
+    });
+  }
 
   function toggleStatus(s: OrderStatus) {
     setIncludedStatuses(prev => {
@@ -126,6 +156,32 @@ export default function PackingPage() {
         )}
       </div>
 
+      {/* Progress bar */}
+      {!loading && groups.length > 0 && (() => {
+        const totalLines = groups.reduce((s, g) => s + g.lines.length, 0);
+        const doneLines  = groups.reduce((s, g) => s + g.lines.filter(
+          l => checked.has(`${g.productId}::${l.quantity}::${l.note}`)
+        ).length, 0);
+        const pct = totalLines === 0 ? 0 : Math.round((doneLines / totalLines) * 100);
+        return (
+          <div className="space-y-1 print:hidden">
+            <div className="flex justify-between text-xs text-gray-400">
+              <span>{doneLines} of {totalLines} lines packed</span>
+              {doneLines === totalLines && totalLines > 0 && (
+                <span className="text-green-600 font-semibold">✓ All packed!</span>
+              )}
+              <span>{pct}%</span>
+            </div>
+            <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-green-400 rounded-full transition-all duration-300"
+                style={{ width: `${pct}%` }}
+              />
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Loading */}
       {loading && (
         <div className="flex justify-center py-12">
@@ -153,6 +209,7 @@ export default function PackingPage() {
                 <th className="text-center px-3 py-2.5">Packs</th>
                 <th className="text-center px-3 py-2.5 whitespace-nowrap">Line Total</th>
                 <th className="text-left px-3 py-2.5">Orders</th>
+                <th className="text-center px-3 py-2.5 print:hidden">Done</th>
               </tr>
             </thead>
             <tbody>
@@ -163,10 +220,12 @@ export default function PackingPage() {
                   const isLastLine  = li === group.lines.length - 1;
                   const isLastGroup = gi === groups.length - 1;
                   const rowBg = gi % 2 === 0 ? '' : 'bg-gray-50/60';
+                  const rowKey = `${group.productId}::${line.quantity}::${line.note}`;
+                  const isDone = checked.has(rowKey);
 
                   return (
                     <tr key={`${group.productId}-${li}`}
-                      className={`border-b border-gray-100 ${isLastLine && isLastGroup ? 'border-0' : ''} ${rowBg}`}>
+                      className={`border-b border-gray-100 transition-colors ${isLastLine && isLastGroup ? 'border-0' : ''} ${isDone ? 'bg-green-50/60' : rowBg}`}>
 
                       {/* Product name — only on first line of each group, spans all lines */}
                       {isFirstLine && (
@@ -211,7 +270,7 @@ export default function PackingPage() {
                       </td>
 
                       {/* Order chips */}
-                      <td className="px-3 py-2">
+                      <td className={`px-3 py-2 ${isDone ? 'opacity-40' : ''}`}>
                         <div className="flex flex-wrap gap-1">
                           {line.orders.map((o, oi) => (
                             <Link key={oi} to={`/admin/orders/${o.orderId}`}
@@ -223,6 +282,18 @@ export default function PackingPage() {
                             </Link>
                           ))}
                         </div>
+                      </td>
+
+                      {/* Packed checkbox */}
+                      <td className="px-3 py-2 text-center print:hidden">
+                        <button
+                          onClick={() => toggleChecked(rowKey)}
+                          title={isDone ? 'Mark as not packed' : 'Mark as packed'}
+                          className="text-gray-300 hover:text-green-500 transition-colors">
+                          {isDone
+                            ? <CheckCircle2 className="w-5 h-5 text-green-500" />
+                            : <Circle className="w-5 h-5" />}
+                        </button>
                       </td>
                     </tr>
                   );
