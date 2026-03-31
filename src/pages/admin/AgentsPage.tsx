@@ -31,8 +31,7 @@ export default function AgentsPage() {
 
   // Edit admin markup
   const [editingMarkup, setEditingMarkup] = useState<string | null>(null);
-  const [markupTypeDraft, setMarkupTypeDraft] = useState<'rupees' | 'percent'>('percent');
-  const [markupValueDraft, setMarkupValueDraft] = useState('');
+  const [markupPctDraft, setMarkupPctDraft] = useState('');
 
   // Pay commission
   const [payingAgent, setPayingAgent] = useState<string | null>(null);
@@ -102,16 +101,16 @@ export default function AgentsPage() {
   }
 
   async function saveAdminMarkup(agent: Agent) {
-    const val = Number(markupValueDraft);
-    if (isNaN(val) || val < 0) return toast.error('Enter a valid value');
-    await agentsService.update(agent.id, { adminMarkupType: markupTypeDraft, adminMarkupValue: val });
+    const val = Number(markupPctDraft);
+    if (isNaN(val) || val < 0 || val > 100) return toast.error('Enter 0–100%');
+    await agentsService.update(agent.id, { markupPercent: val });
     setEditingMarkup(null);
-    toast.success('Markup locked for agent');
+    toast.success('Markup % updated');
   }
 
   async function clearAdminMarkup(agent: Agent) {
-    await agentsService.update(agent.id, { adminMarkupType: undefined, adminMarkupValue: undefined });
-    toast.success('Markup unlocked — agent can set their own');
+    await agentsService.update(agent.id, { markupPercent: 0 });
+    toast.success('Markup cleared — agent will price manually');
   }
 
   return (
@@ -218,6 +217,7 @@ export default function AgentsPage() {
                 <p className="text-xs text-gray-400 mt-0.5">
                   {agent.phone && `📱 ${agent.phone} · `}
                   {agent.totalOrders} orders · ₹{agent.totalRevenue} revenue
+                  {agent.markupPercent > 0 && ` · ${agent.markupPercent}% markup`}
                 </p>
               </div>
               <div className="text-right flex-shrink-0">
@@ -280,27 +280,18 @@ export default function AgentsPage() {
                   )}
                 </div>
 
-                {/* Admin markup lock */}
+                {/* Markup % edit */}
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-xs text-gray-500 font-medium">Markup (agent-facing):</span>
+                  <span className="text-xs text-gray-500 font-medium">Markup % (enforced):</span>
                   {editingMarkup === agent.id ? (
                     <>
-                      <div className="flex rounded-lg overflow-hidden border border-gray-200">
-                        <button
-                          onClick={() => setMarkupTypeDraft('rupees')}
-                          className={`px-2.5 py-1 text-xs font-bold transition-colors ${markupTypeDraft === 'rupees' ? 'text-white' : 'text-gray-500'}`}
-                          style={markupTypeDraft === 'rupees' ? { background: '#3d1c02' } : {}}>₹</button>
-                        <button
-                          onClick={() => setMarkupTypeDraft('percent')}
-                          className={`px-2.5 py-1 text-xs font-bold transition-colors ${markupTypeDraft === 'percent' ? 'text-white' : 'text-gray-500'}`}
-                          style={markupTypeDraft === 'percent' ? { background: '#3d1c02' } : {}}>%</button>
-                      </div>
-                      <input type="number" min="0" step="0.5"
-                        value={markupValueDraft}
-                        onChange={e => setMarkupValueDraft(e.target.value)}
-                        placeholder="0"
+                      <input type="number" min="0" max="100" step="0.5"
+                        value={markupPctDraft}
+                        onChange={e => setMarkupPctDraft(e.target.value)}
+                        placeholder="e.g. 10"
                         className="w-20 border border-orange-300 rounded-lg px-2 py-1 text-sm outline-none text-center"
                       />
+                      <span className="text-xs text-gray-500">%</span>
                       <button onClick={() => saveAdminMarkup(agent)} className="p-1.5 bg-green-500 text-white rounded-lg">
                         <Check className="w-3.5 h-3.5" />
                       </button>
@@ -308,25 +299,23 @@ export default function AgentsPage() {
                         <X className="w-3.5 h-3.5 text-gray-500" />
                       </button>
                     </>
-                  ) : agent.adminMarkupValue != null && agent.adminMarkupValue > 0 ? (
+                  ) : agent.markupPercent > 0 ? (
                     <>
-                      <span className="text-sm font-bold text-orange-700">
-                        {agent.adminMarkupType === 'percent' ? `${agent.adminMarkupValue}%` : `₹${agent.adminMarkupValue}`}
-                        <span className="text-xs font-normal text-gray-400 ml-1">(locked)</span>
-                      </span>
-                      <button onClick={() => { setEditingMarkup(agent.id); setMarkupTypeDraft(agent.adminMarkupType ?? 'percent'); setMarkupValueDraft(String(agent.adminMarkupValue)); }}
+                      <span className="text-sm font-bold text-orange-700">{agent.markupPercent}%</span>
+                      <span className="text-xs text-gray-400">(applied automatically)</span>
+                      <button onClick={() => { setEditingMarkup(agent.id); setMarkupPctDraft(String(agent.markupPercent)); }}
                         className="p-1 text-gray-400 hover:text-orange-500">
                         <Edit2 className="w-3.5 h-3.5" />
                       </button>
                       <button onClick={() => clearAdminMarkup(agent)}
                         className="text-xs text-red-500 hover:text-red-700 px-2 py-1 rounded-lg border border-red-200 hover:bg-red-50">
-                        Unlock
+                        Clear
                       </button>
                     </>
                   ) : (
                     <>
-                      <span className="text-xs text-gray-400">None — agent sets their own</span>
-                      <button onClick={() => { setEditingMarkup(agent.id); setMarkupTypeDraft('percent'); setMarkupValueDraft(''); }}
+                      <span className="text-xs text-gray-400">Not set — agent prices manually</span>
+                      <button onClick={() => { setEditingMarkup(agent.id); setMarkupPctDraft(''); }}
                         className="p-1 text-gray-400 hover:text-orange-500">
                         <Edit2 className="w-3.5 h-3.5" />
                       </button>

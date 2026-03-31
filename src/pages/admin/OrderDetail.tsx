@@ -124,7 +124,7 @@ export default function OrderDetail() {
       setEditItems(prev => prev.filter((_, i) => i !== idx));
     } else {
       setEditItems(prev => prev.map((item, i) =>
-        i === idx ? { ...item, quantity: qty, totalPrice: Math.round(qty * item.pricePerUnit) } : item
+        i === idx ? { ...item, quantity: qty, totalPrice: Math.ceil(qty * item.pricePerUnit / 10) * 10 } : item
       ));
     }
   }
@@ -138,7 +138,7 @@ export default function OrderDetail() {
     if (existing >= 0) {
       setEditItems(prev => prev.map((item, i) =>
         i === existing
-          ? { ...item, quantity: item.quantity + qty, totalPrice: Math.round((item.quantity + qty) * item.pricePerUnit) }
+          ? { ...item, quantity: item.quantity + qty, totalPrice: Math.ceil((item.quantity + qty) * item.pricePerUnit / 10) * 10 }
           : item
       ));
     } else {
@@ -148,7 +148,7 @@ export default function OrderDetail() {
         unit: product.unit,
         quantity: qty,
         pricePerUnit: product.pricePerUnit,
-        totalPrice: Math.round(qty * product.pricePerUnit),
+        totalPrice: Math.ceil(qty * product.pricePerUnit / 10) * 10,
         isOnDemand: product.isOnDemand,
       }]);
     }

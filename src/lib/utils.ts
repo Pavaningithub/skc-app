@@ -251,14 +251,14 @@ export function computeReferralDiscount(subtotal: number): {
   if (subtotal <= 0) return { total: 0, customerDiscount: 0, referrerCredit: 0 };
   let raw: number;
   if (subtotal < 500) {
-    raw = Math.round(subtotal * 0.03);
+    raw = Math.floor(subtotal * 0.03);
   } else if (subtotal < 1000) {
-    raw = Math.min(Math.round(subtotal * 0.05), 50);
+    raw = Math.min(Math.floor(subtotal * 0.05), 50);
   } else {
-    raw = Math.min(Math.round(subtotal * 0.075), 100);
+    raw = Math.min(Math.floor(subtotal * 0.075), 100);
   }
-  const referrerCredit   = Math.round(raw * 0.75);  // referrer gets 75%
-  const customerDiscount = raw - referrerCredit;     // new customer gets 25%, avoids rounding drift
+  const referrerCredit   = Math.floor(raw * 0.75);  // referrer gets 75%, floored
+  const customerDiscount = raw - referrerCredit;     // remainder to customer
   return { total: raw, customerDiscount, referrerCredit };
 }
 
@@ -269,7 +269,7 @@ export function computeReferralDiscount(subtotal: number): {
  */
 export function computeCreditRedemption(availableCredit: number, subtotal: number): number {
   if (availableCredit <= 0 || subtotal <= 0) return 0;
-  const cap = Math.min(Math.round(subtotal * 0.10), 75);  // max 10% of order or ₹75
+  const cap = Math.min(Math.floor(subtotal * 0.10), 75);  // max 10% of order or ₹75, floored
   return Math.min(availableCredit, cap);
 }
 
