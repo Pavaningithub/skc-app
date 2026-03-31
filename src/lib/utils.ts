@@ -278,21 +278,12 @@ export function referralShareMessage(customerName: string, referralCode: string,
   const refLink = `${storeUrl}?ref=${referralCode}`;
   return `🙏 *Hare Krishna!* 🪷
 
-Hi! I've been ordering from *Sri Krishna Condiments* — authentic homemade Karnataka condiments (Chutney Powders, Masalas, Health Mixes).
+Try *Sri Krishna Condiments* — fresh homemade Karnataka condiments (Chutney Powders, Masalas, Health Mixes). Made with love! 🌿
 
-The taste is amazing and made fresh with love! 🌿
-
-🎁 Use my link — your discount is *auto-applied* at checkout:
+🎁 Use my referral link and get an instant discount on your first order:
 👉 ${refLink}
 
-• Below ₹500 → you save *3% off* your order
-• ₹500–₹999 → you save *5% off* (up to ₹13)
-• ₹1000+ → you save *7.5% off* (up to ₹25)
-
-And I earn credit for referring you — so we both win! 🙌
-I earn ₹37–₹75 in credit when you place a ₹500+ order 😊
-
-Tried by *${customerName}* — highly recommended! 😊`;
+Highly recommended by *${customerName}* 😊`;
 }
 
 export function generateBatchNumber(): string {
