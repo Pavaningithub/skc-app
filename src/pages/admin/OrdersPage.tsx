@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, Plus, ArrowUpDown } from 'lucide-react';
+import { Search, Plus, ArrowUpDown, Copy } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { ordersService } from '../../lib/services';
 import { useRealtimeCollection } from '../../lib/useRealtimeCollection';
 import { formatCurrency, formatDateTime } from '../../lib/utils';
@@ -150,36 +151,63 @@ export default function OrdersPage() {
           )}
           {filtered.map(order => (
             <div key={order.id} className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
+              {/* ── Customer row (always first) ── */}
               <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <Link to={`/admin/orders/${order.id}`}
-                      className="font-bold text-gray-800 hover:text-orange-500 transition-colors">
-                      #{order.orderNumber}
-                    </Link>
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${ORDER_STATUS_COLORS[order.status]}`}>
-                      {ORDER_STATUS_LABELS[order.status]}
-                    </span>
-                    {order.type === 'sample' && (
-                      <span className="text-xs bg-purple-100 text-purple-600 px-2 py-0.5 rounded-full">Sample</span>
-                    )}
-                    {order.paymentStatus === 'pending' && order.total > 0 && (
-                      <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full">💰 Unpaid</span>
-                    )}
-                    {order.paymentStatus === 'paid' && (
-                      <span className="text-xs bg-green-100 text-green-600 px-2 py-0.5 rounded-full">✅ Paid</span>
-                    )}
-                    {order.agentId && (
-                      <span className="text-xs bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded-full">🤝 {order.agentName ?? 'Agent'}</span>
-                    )}
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="font-bold text-gray-800 text-base">{order.customerName}</span>
+                    <button
+                      onClick={() => { navigator.clipboard.writeText(order.customerName); toast.success('Name copied'); }}
+                      className="text-gray-300 hover:text-gray-500 transition-colors" title="Copy name">
+                      <Copy className="w-3.5 h-3.5" />
+                    </button>
                   </div>
-                  <p className="text-sm text-gray-600 mt-1">{order.customerName} · {order.customerPlace}</p>
-                  <p className="text-xs text-gray-400">{formatDateTime(order.createdAt)}</p>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <span className="text-sm text-gray-500">📱 {order.customerWhatsapp}</span>
+                    <button
+                      onClick={() => { navigator.clipboard.writeText(order.customerWhatsapp); toast.success('Phone copied'); }}
+                      className="text-gray-300 hover:text-gray-500 transition-colors" title="Copy phone">
+                      <Copy className="w-3.5 h-3.5" />
+                    </button>
+                    <span className="text-gray-300">·</span>
+                    <span className="text-sm text-gray-400">{order.customerPlace}</span>
+                  </div>
                 </div>
                 <div className="text-right flex-shrink-0">
                   <p className="font-bold text-gray-800">{formatCurrency(order.total)}</p>
                   {order.type === 'sample' && <p className="text-xs text-purple-500">Free sample</p>}
                 </div>
+              </div>
+
+              {/* ── Order ID + status pills ── */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex items-center gap-1">
+                  <Link to={`/admin/orders/${order.id}`}
+                    className="font-mono font-semibold text-sm text-orange-600 hover:text-orange-700 transition-colors">
+                    #{order.orderNumber}
+                  </Link>
+                  <button
+                    onClick={() => { navigator.clipboard.writeText(order.orderNumber); toast.success('Order ID copied'); }}
+                    className="text-gray-300 hover:text-gray-500 transition-colors" title="Copy order ID">
+                    <Copy className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+                <span className={`text-xs px-2 py-0.5 rounded-full ${ORDER_STATUS_COLORS[order.status]}`}>
+                  {ORDER_STATUS_LABELS[order.status]}
+                </span>
+                {order.type === 'sample' && (
+                  <span className="text-xs bg-purple-100 text-purple-600 px-2 py-0.5 rounded-full">Sample</span>
+                )}
+                {order.paymentStatus === 'pending' && order.total > 0 && (
+                  <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full">💰 Unpaid</span>
+                )}
+                {order.paymentStatus === 'paid' && (
+                  <span className="text-xs bg-green-100 text-green-600 px-2 py-0.5 rounded-full">✅ Paid</span>
+                )}
+                {order.agentId && (
+                  <span className="text-xs bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded-full">🤝 {order.agentName ?? 'Agent'}</span>
+                )}
+                <span className="text-xs text-gray-400 ml-auto">{formatDateTime(order.createdAt)}</span>
               </div>
 
               <div className="text-sm text-gray-600">
