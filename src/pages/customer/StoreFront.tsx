@@ -243,11 +243,10 @@ export default function StoreFront() {
         customerPlace: orderForm.place.trim(),
         items: cart, subtotal: cartTotal,
         discount: totalDiscountAmt, total: finalTotal,
-        ...(standingDiscountAmt > 0 ? { standingDiscountPct: standingDiscount } : {}),
         status: 'pending', paymentStatus: 'pending',
         notes: orderForm.notes,
         hasOnDemandItems: hasOnDemand,
-        referralCodeUsed,
+        ...(referralCodeUsed ? { referralCodeUsed } : {}),
         referralDiscount: referralDiscountAmt,
         creditUsed: creditUsedAmt,
         deliveryCharge: 0,
@@ -708,6 +707,13 @@ export default function StoreFront() {
           )}
         </div>
       </div>
+
+      {/* Env indicator — fixed bottom-right */}
+      <div
+        className="fixed bottom-3 right-3 z-50 w-2.5 h-2.5 rounded-full shadow"
+        style={{ background: __APP_ENV__ === 'production' ? '#22c55e' : '#3b82f6' }}
+        title={__APP_ENV__ === 'production' ? `v${__APP_VERSION__} · Production` : `v${__APP_VERSION__} · Staging`}
+      />
 
       {/* Footer */}
       <footer className="py-8 text-center" style={{ background: 'linear-gradient(160deg, #3d1c02 0%, #1a0a00 100%)' }}>

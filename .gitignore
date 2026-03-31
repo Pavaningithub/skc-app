@@ -12,6 +12,11 @@ dist
 dist-ssr
 *.local
 
+# Environment variables — never commit real keys
+.env
+.env.local
+.env.*.local
+
 # One-off scripts contain hardcoded Firebase keys — never commit
 scripts/
 
@@ -26,3 +31,6 @@ scripts/
 *.sln
 *.sw?
 .vercel
+
+# Copilot instructions — local context, not for the repo
+.github/copilot-instructions.md
