@@ -136,6 +136,20 @@ export default function AdminLayout() {
           <LogOut className="w-4 h-4" />
           Logout
         </button>
+        {/* Version / env badge */}
+        <div className="px-3 py-1.5 flex items-center gap-1.5">
+          <span
+            className="w-2 h-2 rounded-full flex-shrink-0"
+            style={{ background: __APP_ENV__ === 'production' ? '#22c55e' : '#3b82f6' }}
+            title={__APP_ENV__ === 'production' ? 'Production (Green)' : 'Staging (Blue)'}
+          />
+          <span className="text-xs font-mono text-gray-400">v{__APP_VERSION__}</span>
+          {__APP_ENV__ !== 'production' && (
+            <span className="text-xs font-semibold px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">
+              {__APP_ENV__}
+            </span>
+          )}
+        </div>
       </div>
     </>
   );
@@ -172,6 +186,17 @@ export default function AdminLayout() {
           <div className="flex items-center gap-2">
             <Leaf className="w-5 h-5 text-orange-500" />
             <span className="font-bold text-gray-800 font-display text-sm">SKC Admin</span>
+            <span
+              className="w-2 h-2 rounded-full flex-shrink-0"
+              style={{ background: __APP_ENV__ === 'production' ? '#22c55e' : '#3b82f6' }}
+              title={__APP_ENV__ === 'production' ? 'Production (Green)' : 'Staging (Blue)'}
+            />
+            <span className="text-xs font-mono text-gray-400">v{__APP_VERSION__}</span>
+            {__APP_ENV__ !== 'production' && (
+              <span className="text-xs font-semibold px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">
+                {__APP_ENV__}
+              </span>
+            )}
           </div>
           <div className="w-9" />
         </header>

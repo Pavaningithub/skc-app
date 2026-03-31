@@ -1,13 +1,18 @@
-name: Deploy to Vercel
+name: 🟢 Green — Deploy Production (semver tag)
 
+# Triggered by pushing a semver tag: v1.0.0, v1.2.3, etc.
+# Also runs a build + type check on every PR to main for safety.
 on:
   push:
-    branches: [main]
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
   pull_request:
     branches: [main]
 
 jobs:
-  deploy:
+  # ── Build + type-check (runs on both PRs and tag pushes) ──────────────────
+  build:
+    name: Build Check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -20,8 +25,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: TypeScript check
+        run: npx tsc --noEmit
+
       - name: Build
         env:
+          VITE_APP_ENV: production
           VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
           VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
           VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
@@ -41,8 +50,50 @@ jobs:
           VITE_WA_TRACKING_LINK: ${{ secrets.VITE_WA_TRACKING_LINK }}
         run: npm run build
 
-      - name: Deploy to Vercel (Production)
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+  # ── Production deploy — only triggered by semver tags ─────────────────────
+  deploy-production:
+    name: Deploy to Vercel Production
+    runs-on: ubuntu-latest
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    environment:
+      name: production
+      url: https://skc-app.vercel.app
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build (production)
+        env:
+          VITE_APP_ENV: production
+          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+          VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+          VITE_WHATSAPP_NUMBER: ${{ secrets.VITE_WHATSAPP_NUMBER }}
+          VITE_WHATSAPP_DISPLAY: ${{ secrets.VITE_WHATSAPP_DISPLAY }}
+          VITE_WHATSAPP_NUMBER2: ${{ secrets.VITE_WHATSAPP_NUMBER2 }}
+          VITE_WHATSAPP_DISPLAY2: ${{ secrets.VITE_WHATSAPP_DISPLAY2 }}
+          VITE_UPI_ID: ${{ secrets.VITE_UPI_ID }}
+          VITE_UPI_NUMBER: ${{ secrets.VITE_UPI_NUMBER }}
+          VITE_UPI_DISPLAY: ${{ secrets.VITE_UPI_DISPLAY }}
+          VITE_ADMIN_PIN: ${{ secrets.VITE_ADMIN_PIN }}
+          VITE_WA_GROUP_LINK: ${{ secrets.VITE_WA_GROUP_LINK }}
+          VITE_WA_CHANNEL_LINK: ${{ secrets.VITE_WA_CHANNEL_LINK }}
+          VITE_WA_TRACKING_LINK: ${{ secrets.VITE_WA_TRACKING_LINK }}
+        run: npm run build
+
+      - name: Deploy to Vercel Production
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
@@ -52,3 +103,15 @@ jobs:
           vercel pull --yes --environment=production --token=$VERCEL_TOKEN
           vercel build --prod --token=$VERCEL_TOKEN
           vercel deploy --prebuilt --prod --token=$VERCEL_TOKEN
+          echo "### 🟢 Production deployed" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** \`${{ github.ref_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: "SKC App ${{ github.ref_name }}"
+          generate_release_notes: true
+          make_latest: true
+
