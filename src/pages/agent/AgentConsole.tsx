@@ -507,15 +507,16 @@ function CustomerCard({
   const highMargin = skc > 0 && margin / skc > 0.15;
 
   const [productSearch, setProductSearch] = useState('');
+  const [garlicOnly, setGarlicOnly] = useState(false);
 
   const defaultProductId = products.length > 0 ? products[0].id : '';
   const currentProductId = addState?.productId || defaultProductId;
   const currentProduct = products.find(p => p.id === currentProductId);
   const currentQty = addState?.qty ?? (currentProduct ? defaultMinQty(currentProduct) : 1);
 
-  const filteredProducts = productSearch.trim()
-    ? products.filter(p => p.name.toLowerCase().includes(productSearch.trim().toLowerCase()))
-    : products;
+  const filteredProducts = products
+    .filter(p => !productSearch.trim() || p.name.toLowerCase().includes(productSearch.trim().toLowerCase()))
+    .filter(p => !garlicOnly || !!p.hasGarlicOption);
 
   function setProduct(productId: string) {
     const p = products.find(x => x.id === productId);
@@ -575,16 +576,26 @@ function CustomerCard({
           <div className="space-y-2">
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Add Products</p>
 
-            {/* Search */}
-            <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
-              <input
-                type="text"
-                value={productSearch}
-                onChange={e => setProductSearch(e.target.value)}
-                placeholder="Search products…"
-                className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-xl outline-none focus:border-orange-400"
-              />
+            {/* Search + Garlic filter */}
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+                <input
+                  type="text"
+                  value={productSearch}
+                  onChange={e => setProductSearch(e.target.value)}
+                  placeholder="Search products…"
+                  className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-xl outline-none focus:border-orange-400"
+                />
+              </div>
+              <button
+                onClick={() => setGarlicOnly(v => !v)}
+                title={garlicOnly ? 'Show all products' : 'Show garlic variants only'}
+                className={`px-2.5 py-2 rounded-xl text-sm border transition-colors flex-shrink-0 ${
+                  garlicOnly ? 'bg-amber-100 border-amber-300 text-amber-800' : 'bg-white border-gray-200 text-gray-500 hover:border-amber-300'
+                }`}>
+                🧄
+              </button>
             </div>
 
             {/* Clickable product grid */}
@@ -603,6 +614,7 @@ function CustomerCard({
                     <p className="font-semibold text-gray-800 truncate">{p.name}</p>
                     <p className="text-gray-500">₹{p.pricePerUnit}/{p.unit}</p>
                     <p className="text-gray-400">min {formatQty(defaultMinQty(p), p.unit)}</p>
+                    {p.hasGarlicOption && <p className="text-amber-600 text-xs">🧄 garlic option</p>}
                     {inCart && <p className="text-green-600 font-medium mt-0.5">✓ {formatQty(inCart.quantity, p.unit)}</p>}
                   </button>
                 );
