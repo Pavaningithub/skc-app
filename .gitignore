@@ -34,3 +34,6 @@ scripts/
 
 # Copilot instructions — local context, not for the repo
 .github/copilot-instructions.md
+
+# README — personal reference only, not for the repo
+README.md
