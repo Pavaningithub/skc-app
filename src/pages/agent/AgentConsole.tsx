@@ -203,6 +203,18 @@ export default function AgentConsole() {
     const nameMissing = valid.find(c => !c.name.trim());
     if (nameMissing) { toast.error('Enter name for all customers with items'); return; }
 
+    // Block if any item has sell price below SKC cost
+    for (const cust of valid) {
+      for (const item of cust.cart) {
+        const skcAmt = item.totalPrice;
+        const custAmt = Math.round(item.sellingPrice * item.quantity);
+        if (custAmt < skcAmt) {
+          toast.error(`${cust.name || 'Customer'}: "${item.productName}" sell price (₹${custAmt}) is below SKC cost (₹${skcAmt})`);
+          return;
+        }
+      }
+    }
+
     setSaving(true);
     setSavingProgress(`Placing ${valid.length} order${valid.length > 1 ? 's' : ''}…`);
     let placed = 0;
@@ -682,21 +694,35 @@ function CustomerCard({
                         step="10"
                         value={custAmt}
                         onChange={e => {
-                          const val = Math.max(skcAmt, Number(e.target.value));
-                          onUpdateItemSellingPrice(i, val / item.quantity);
+                          const raw = Number(e.target.value);
+                          // Allow typing freely; clamp only to non-negative
+                          onUpdateItemSellingPrice(i, Math.max(0, raw) / item.quantity);
+                        }}
+                        onBlur={e => {
+                          // On blur: enforce sell >= SKC
+                          const raw = Number(e.target.value);
+                          if (raw < skcAmt) {
+                            onUpdateItemSellingPrice(i, skcAmt / item.quantity);
+                            toast.error(`Sell price can't be less than SKC cost (₹${skcAmt})`);
+                          }
                         }}
                         className="w-20 border rounded-lg px-2 py-1 text-sm font-semibold outline-none text-center focus:border-orange-400"
-                        style={{ borderColor: itemHighMargin ? '#fbbf24' : '#e5e7eb', color: '#c8821a' }}
+                        style={{
+                          borderColor: custAmt < skcAmt ? '#ef4444' : itemHighMargin ? '#fbbf24' : '#e5e7eb',
+                          color: custAmt < skcAmt ? '#ef4444' : '#c8821a',
+                        }}
                       />
 
                       {/* Margin */}
                       <div className="w-20 text-right">
-                        {marginAmt > 0
-                          ? <span className={`text-xs font-semibold ${itemHighMargin ? 'text-amber-600' : 'text-green-600'}`}>
-                              +₹{marginAmt}<br />
-                              <span className="font-normal text-[10px]">({marginPct}%)</span>
-                            </span>
-                          : <span className="text-xs text-gray-300">—</span>
+                        {custAmt < skcAmt
+                          ? <span className="text-xs font-semibold text-red-500">−₹{skcAmt - custAmt}</span>
+                          : marginAmt > 0
+                            ? <span className={`text-xs font-semibold ${itemHighMargin ? 'text-amber-600' : 'text-green-600'}`}>
+                                +₹{marginAmt}<br />
+                                <span className="font-normal text-[10px]">({marginPct}%)</span>
+                              </span>
+                            : <span className="text-xs text-gray-300">—</span>
                         }
                       </div>
                     </div>
