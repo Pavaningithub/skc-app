@@ -1,62 +1,62 @@
 name: 🔵 Blue — Deploy Staging (develop branch)
 
 on:
-  push:
-    branches: [develop]
+    push:
+        branches: [develop]
 
 jobs:
-  deploy-staging:
-    name: Build & Deploy to Vercel Preview
-    runs-on: ubuntu-latest
-    environment:
-      name: staging
-      url: ${{ steps.deploy.outputs.preview_url }}
+    deploy-staging:
+        name: Build & Deploy to Vercel Preview
+        runs-on: ubuntu-latest
+        environment:
+            name: staging
+            url: ${{ steps.deploy.outputs.preview_url }}
 
-    steps:
-      - uses: actions/checkout@v4
+        steps:
+            - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 20
+                  cache: npm
 
-      - name: Install dependencies
-        run: npm ci
+            - name: Install dependencies
+              run: npm ci
 
-      - name: Build (staging)
-        env:
-          VITE_APP_ENV: staging
-          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
-          VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
-          VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
-          VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
-          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
-          VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
-          VITE_WHATSAPP_NUMBER: ${{ secrets.VITE_WHATSAPP_NUMBER }}
-          VITE_WHATSAPP_DISPLAY: ${{ secrets.VITE_WHATSAPP_DISPLAY }}
-          VITE_WHATSAPP_NUMBER2: ${{ secrets.VITE_WHATSAPP_NUMBER2 }}
-          VITE_WHATSAPP_DISPLAY2: ${{ secrets.VITE_WHATSAPP_DISPLAY2 }}
-          VITE_UPI_ID: ${{ secrets.VITE_UPI_ID }}
-          VITE_UPI_NUMBER: ${{ secrets.VITE_UPI_NUMBER }}
-          VITE_UPI_DISPLAY: ${{ secrets.VITE_UPI_DISPLAY }}
-          VITE_ADMIN_PIN: ${{ secrets.VITE_ADMIN_PIN }}
-          VITE_WA_GROUP_LINK: ${{ secrets.VITE_WA_GROUP_LINK }}
-          VITE_WA_CHANNEL_LINK: ${{ secrets.VITE_WA_CHANNEL_LINK }}
-          VITE_WA_TRACKING_LINK: ${{ secrets.VITE_WA_TRACKING_LINK }}
-        run: npm run build
+            - name: Build (staging)
+              env:
+                  VITE_APP_ENV: staging
+                  VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+                  VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+                  VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+                  VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
+                  VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+                  VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+                  VITE_WHATSAPP_NUMBER: ${{ secrets.VITE_WHATSAPP_NUMBER }}
+                  VITE_WHATSAPP_DISPLAY: ${{ secrets.VITE_WHATSAPP_DISPLAY }}
+                  VITE_WHATSAPP_NUMBER2: ${{ secrets.VITE_WHATSAPP_NUMBER2 }}
+                  VITE_WHATSAPP_DISPLAY2: ${{ secrets.VITE_WHATSAPP_DISPLAY2 }}
+                  VITE_UPI_ID: ${{ secrets.VITE_UPI_ID }}
+                  VITE_UPI_NUMBER: ${{ secrets.VITE_UPI_NUMBER }}
+                  VITE_UPI_DISPLAY: ${{ secrets.VITE_UPI_DISPLAY }}
+                  VITE_ADMIN_PIN: ${{ secrets.VITE_ADMIN_PIN }}
+                  VITE_WA_GROUP_LINK: ${{ secrets.VITE_WA_GROUP_LINK }}
+                  VITE_WA_CHANNEL_LINK: ${{ secrets.VITE_WA_CHANNEL_LINK }}
+                  VITE_WA_TRACKING_LINK: ${{ secrets.VITE_WA_TRACKING_LINK }}
+              run: npm run build
 
-      - name: Deploy Preview to Vercel
-        id: deploy
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-        run: |
-          npm i -g vercel
-          # Deploy the pre-built dist folder directly as a static preview
-          PREVIEW_URL=$(vercel deploy dist --token=$VERCEL_TOKEN --yes)
-          echo "preview_url=$PREVIEW_URL" >> $GITHUB_OUTPUT
-          echo "### 🔵 Staging deployed" >> $GITHUB_STEP_SUMMARY
-          echo "**URL:** $PREVIEW_URL" >> $GITHUB_STEP_SUMMARY
-          echo "**Branch:** \`develop\`" >> $GITHUB_STEP_SUMMARY
-          echo "**Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+            - name: Deploy Preview to Vercel
+              id: deploy
+              env:
+                  VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+                  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+                  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+              run: |
+                  npm i -g vercel
+                  # Deploy the pre-built dist folder directly as a static preview
+                  PREVIEW_URL=$(vercel deploy dist --token=$VERCEL_TOKEN --yes)
+                  echo "preview_url=$PREVIEW_URL" >> $GITHUB_OUTPUT
+                  echo "### 🔵 Staging deployed" >> $GITHUB_STEP_SUMMARY
+                  echo "**URL:** $PREVIEW_URL" >> $GITHUB_STEP_SUMMARY
+                  echo "**Branch:** \`develop\`" >> $GITHUB_STEP_SUMMARY
+                  echo "**Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
