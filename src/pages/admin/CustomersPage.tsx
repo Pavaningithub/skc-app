@@ -1,9 +1,10 @@
 import { useState, useMemo } from 'react';
-import { Search, ChevronDown, ChevronUp, Tag, ArrowUpDown } from 'lucide-react';
+import { Search, ChevronDown, ChevronUp, Tag, ArrowUpDown, Copy, Share2 } from 'lucide-react';
 import { customersService, ordersService } from '../../lib/services';
 import { useRealtimeCollection } from '../../lib/useRealtimeCollection';
-import { formatCurrency, formatDate } from '../../lib/utils';
+import { formatCurrency, formatDate, referralShareMessage } from '../../lib/utils';
 import type { Customer, Order } from '../../lib/types';
+import toast from 'react-hot-toast';
 
 type CustSort = 'name_asc' | 'spent_desc' | 'orders_desc' | 'pending_desc';
 type CustFilter = 'all' | 'has_discount' | 'has_pending' | 'in_wa_group' | 'not_in_wa_group';
@@ -325,6 +326,48 @@ export default function CustomersPage() {
                             </button>
                           )}
                         </div>
+
+                        {/* Referral code section */}
+                        {c.referralCode ? (
+                          <div className="bg-white rounded-xl border border-orange-100 p-3 space-y-2">
+                            <p className="text-xs font-semibold text-gray-700">🎟️ Referral Code</p>
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="font-mono font-bold text-base tracking-widest text-orange-700 bg-orange-50 px-3 py-1.5 rounded-lg flex-1">
+                                {c.referralCode}
+                              </span>
+                              <button
+                                onClick={() => {
+                                  navigator.clipboard.writeText(c.referralCode!);
+                                  toast.success('Code copied!');
+                                }}
+                                className="flex items-center gap-1 text-xs border border-gray-200 text-gray-600 px-2.5 py-1.5 rounded-lg hover:bg-gray-50">
+                                <Copy className="w-3 h-3" /> Copy
+                              </button>
+                            </div>
+                            {c.referralCredit > 0 && (
+                              <p className="text-xs text-orange-600">💰 Credit balance: <strong>₹{c.referralCredit}</strong></p>
+                            )}
+                            <div className="flex gap-2">
+                              <a
+                                href={`https://wa.me/91${c.whatsapp}?text=${encodeURIComponent(referralShareMessage(c.name, c.referralCode, window.location.origin))}`}
+                                target="_blank" rel="noreferrer"
+                                className="flex-1 flex items-center justify-center gap-1.5 text-xs font-semibold text-white py-2 rounded-lg transition-colors"
+                                style={{ background: '#25d366' }}>
+                                <Share2 className="w-3.5 h-3.5" /> Send WA Message to Customer
+                              </a>
+                              <button
+                                onClick={() => {
+                                  navigator.clipboard.writeText(referralShareMessage(c.name, c.referralCode!, window.location.origin));
+                                  toast.success('WA message copied!');
+                                }}
+                                className="flex items-center gap-1 text-xs border border-gray-200 text-gray-600 px-2.5 py-2 rounded-lg hover:bg-gray-50">
+                                <Copy className="w-3 h-3" /> Copy Msg
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="text-xs text-gray-400 italic">No referral code yet — assigned after first confirmed order.</p>
+                        )}
                       </>
                     );
                   })()}

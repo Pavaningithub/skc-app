@@ -7,6 +7,7 @@ import { Suspense, lazy } from 'react';
 import StoreFront from './pages/customer/StoreFront';
 const OrderConfirmation = lazy(() => import('./pages/customer/OrderConfirmation'));
 const FeedbackPage      = lazy(() => import('./pages/customer/FeedbackPage'));
+const MyReferralPage    = lazy(() => import('./pages/customer/MyReferralPage'));
 
 // Admin pages — all lazy loaded (never needed by customers)
 const AdminLayout      = lazy(() => import('./pages/admin/AdminLayout'));
@@ -57,6 +58,7 @@ export default function App() {
           <Route path="/" element={<StoreFront />} />
           <Route path="/order-confirmation/:orderId" element={<OrderConfirmation />} />
           <Route path="/feedback/:orderId" element={<FeedbackPage />} />
+          <Route path="/my-referral" element={<MyReferralPage />} />
 
           {/* Agent portal — separate from customer storefront and admin */}
           <Route path="/agent/login" element={<AgentLogin />} />
