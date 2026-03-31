@@ -125,13 +125,13 @@ export default function StoreFront() {
       if (idx >= 0) {
         const u = [...prev];
         u[idx].quantity  += qty;
-        u[idx].totalPrice = u[idx].quantity * product.pricePerUnit;
+        u[idx].totalPrice = Math.ceil(u[idx].quantity * product.pricePerUnit / 10) * 10;
         return u;
       }
       return [...prev, {
         productId: product.id, productName: product.name,
         unit: product.unit, quantity: qty,
-        pricePerUnit: product.pricePerUnit, totalPrice: qty * product.pricePerUnit,
+        pricePerUnit: product.pricePerUnit, totalPrice: Math.ceil(qty * product.pricePerUnit / 10) * 10,
         customizationNote: note ?? '',
         isOnDemand: product.isOnDemand ?? false,
       }];
@@ -142,7 +142,7 @@ export default function StoreFront() {
   function updateCartItem(idx: number, qty: number) {
     if (qty <= 0) setCart(p => p.filter((_, i) => i !== idx));
     else setCart(p => p.map((item, i) => i === idx
-      ? { ...item, quantity: qty, totalPrice: qty * item.pricePerUnit }
+      ? { ...item, quantity: qty, totalPrice: Math.ceil(qty * item.pricePerUnit / 10) * 10 }
       : item
     ));
   }
@@ -1625,7 +1625,7 @@ function OrderFormModal({
               {referralDiscount > 0 && !referralError && (
                 <div className="mt-2 rounded-xl px-3 py-2.5 flex items-center justify-between"
                   style={{ background: '#f0fdf4', border: '1px solid #86efac' }}>
-                  <span className="text-xs text-green-700 font-medium">🎉 Referral discount applied!</span>
+                  <span className="text-xs text-green-700 font-medium">🎉 Code <span className="font-mono font-bold tracking-widest">{form.referralCode}</span> applied!</span>
                   <span className="text-sm font-bold text-green-700">−₹{liveReferralDiscount}</span>
                 </div>
               )}
@@ -1689,7 +1689,7 @@ function OrderFormModal({
               )}
               {!standingDiscountAmt && liveReferralDiscount > 0 && (
                 <div className="flex justify-between items-center px-4 py-2.5 text-sm border-b" style={{ borderColor: '#bbf7d0' }}>
-                  <span className="text-green-600">🎟️ Referral discount</span>
+                  <span className="text-green-600">🎟️ Referral (<span className="font-mono font-bold tracking-wide">{form.referralCode}</span>)</span>
                   <span className="font-semibold text-green-600">−₹{liveReferralDiscount}</span>
                 </div>
               )}

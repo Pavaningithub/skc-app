@@ -1,11 +1,11 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Plus, Minus, Trash2, LogOut, ShoppingBag, Package,
   Check, RefreshCw, UserPlus, ChevronDown, ChevronUp,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { productsService, ordersService, agentsService, stockService } from '../../lib/services';
+import { productsService, ordersService, stockService } from '../../lib/services';
 import { generateOrderNumber } from '../../lib/utils';
 import type { Product, OrderItem, Order } from '../../lib/types';
 import { getAgentSession, clearAgentSession } from './AgentLogin';
@@ -21,13 +21,9 @@ interface AgentCustomer {
   name: string;
   place: string;
   notes: string;
-  useCustomMarkup: boolean;
-  customMarkupPercent: number;
   cart: AgentCartItem[];
   collapsed: boolean;
 }
-
-type MarkupMode = 'rupees' | 'percent';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function uid(): string { return Math.random().toString(36).slice(2, 9); }
@@ -47,12 +43,6 @@ function defaultMinQty(p: Product): number {
   return p.unit === 'piece' ? 1 : p.unit === 'kg' ? 0.5 : 250;
 }
 
-function computeMarkupRs(product: Product, mode: MarkupMode, value: number): number {
-  if (!value || value <= 0) return 0;
-  if (mode === 'rupees') return value;
-  return Math.round(product.pricePerUnit * value / 100);
-}
-
 function cartSkcTotal(cart: AgentCartItem[]): number {
   return cart.reduce((s, i) => s + i.totalPrice, 0);
 }
@@ -66,7 +56,6 @@ function cartCustomerTotal(cart: AgentCartItem[]): number {
 function newCustomer(): AgentCustomer {
   return {
     id: uid(), name: '', place: '', notes: '',
-    useCustomMarkup: false, customMarkupPercent: 0,
     cart: [], collapsed: false,
   };
 }
@@ -78,22 +67,6 @@ export default function AgentConsole() {
 
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-
-  // ── Global markup ──────────────────────────────────────────────────────────
-  // If admin has locked a markup, use that; otherwise fall back to agent's saved preference
-  const adminLocked = !!(agentSession?.adminMarkupValue && agentSession.adminMarkupValue > 0);
-  const [globalMarkupMode, setGlobalMarkupMode] = useState<MarkupMode>(
-    adminLocked
-      ? (agentSession?.adminMarkupType ?? 'percent')
-      : (agentSession?.savedMarkupType ?? 'percent'),
-  );
-  const [globalMarkupValue, setGlobalMarkupValue] = useState<number>(
-    adminLocked
-      ? (agentSession?.adminMarkupValue ?? 0)
-      : (agentSession?.savedMarkupValue ?? 0),
-  );
-  const [savingMarkup, setSavingMarkup] = useState(false);
-  const [markupSaved, setMarkupSaved] = useState(false);
 
   // ── Multi-customer ────────────────────────────────────────────────────
   const [customers, setCustomers] = useState<AgentCustomer[]>([newCustomer()]);
@@ -119,13 +92,12 @@ export default function AgentConsole() {
     return () => unsub();
   }, []);
 
-  // ─── Per-customer markup calc ──────────────────────────────────────────────
-  const markupForProduct = useCallback((product: Product, cust: AgentCustomer): number => {
-    if (cust.useCustomMarkup && cust.customMarkupPercent > 0) {
-      return Math.round(product.pricePerUnit * cust.customMarkupPercent / 100);
-    }
-    return computeMarkupRs(product, globalMarkupMode, globalMarkupValue);
-  }, [globalMarkupMode, globalMarkupValue]);
+  // ─── Per-item markup calc: always % from agent session ───────────────────────────────
+  const markupPct = agentSession?.markupPercent ?? 0;
+  function markupForProduct(product: Product): number {
+    if (!markupPct) return 0;
+    return product.pricePerUnit * markupPct / 100;  // per-unit markup
+  }
 
   // ─── Customer CRUD ────────────────────────────────────────────────────────
   function addCustomer() {
@@ -154,13 +126,13 @@ export default function AgentConsole() {
 
     setCustomers(prev => prev.map(c => {
       if (c.id !== cid) return c;
-      const markup = markupForProduct(product, c);
+      const markup = markupForProduct(product);
       const existing = c.cart.findIndex(i => i.productId === product.id);
       if (existing >= 0) {
         const newCart = c.cart.map((item, i) => {
           if (i !== existing) return item;
           const newQty = item.quantity + qty;
-          return { ...item, quantity: newQty, totalPrice: newQty * item.pricePerUnit,
+          return { ...item, quantity: newQty, totalPrice: Math.ceil(newQty * item.pricePerUnit / 10) * 10,
             // preserve per-unit sellingPrice/markup — only qty changes
             sellingPrice: item.sellingPrice, markupPerUnit: item.markupPerUnit };
         });
@@ -169,7 +141,7 @@ export default function AgentConsole() {
       const newItem: AgentCartItem = {
         productId: product.id, productName: product.name,
         unit: product.unit, quantity: qty,
-        pricePerUnit: product.pricePerUnit, totalPrice: qty * product.pricePerUnit,
+        pricePerUnit: product.pricePerUnit, totalPrice: Math.ceil(qty * product.pricePerUnit / 10) * 10,
         isOnDemand: product.isOnDemand,
         agentMarkup: markup, markupPerUnit: markup,
         sellingPrice: product.pricePerUnit + markup,
@@ -189,7 +161,7 @@ export default function AgentConsole() {
     setCustomers(prev => prev.map(c => {
       if (c.id !== cid) return c;
       const newCart = c.cart.map((item, i) =>
-        i === idx ? { ...item, quantity: qty, totalPrice: qty * item.pricePerUnit } : item,
+        i === idx ? { ...item, quantity: qty, totalPrice: Math.ceil(qty * item.pricePerUnit / 10) * 10 } : item,
       );
       return { ...c, cart: newCart };
     }));
@@ -207,50 +179,19 @@ export default function AgentConsole() {
     }));
   }
 
-  // ─── Apply global markup to a customer's cart ─────────────────────────────
-  const applyGlobalToCustomer = useCallback((cid: string) => {
+  // ─── Re-apply markup to all items in a customer's cart ───────────────────
+  function reapplyMarkup(cid: string) {
     setCustomers(prev => prev.map(c => {
       if (c.id !== cid) return c;
       const newCart = c.cart.map(item => {
         const product = products.find(p => p.id === item.productId);
         if (!product) return item;
-        const markup = c.useCustomMarkup && c.customMarkupPercent > 0
-          ? Math.round(product.pricePerUnit * c.customMarkupPercent / 100)
-          : computeMarkupRs(product, globalMarkupMode, globalMarkupValue);
+        const markup = markupForProduct(product);
         return { ...item, markupPerUnit: markup, agentMarkup: markup, sellingPrice: item.pricePerUnit + markup };
       });
       return { ...c, cart: newCart };
     }));
-    toast.success('Markup applied');
-  }, [products, globalMarkupMode, globalMarkupValue]);
-
-  // ─── Apply global markup to ALL customers ─────────────────────────────────
-  const applyGlobalToAll = useCallback(() => {
-    setCustomers(prev => prev.map(c => {
-      const newCart = c.cart.map(item => {
-        const product = products.find(p => p.id === item.productId);
-        if (!product) return item;
-        const markup = c.useCustomMarkup && c.customMarkupPercent > 0
-          ? Math.round(product.pricePerUnit * c.customMarkupPercent / 100)
-          : computeMarkupRs(product, globalMarkupMode, globalMarkupValue);
-        return { ...item, markupPerUnit: markup, agentMarkup: markup, sellingPrice: item.pricePerUnit + markup };
-      });
-      return { ...c, cart: newCart };
-    }));
-    toast.success('Markup applied to all customers');
-  }, [products, globalMarkupMode, globalMarkupValue]);
-
-  // ─── Save markup preference ────────────────────────────────────────────────
-  async function saveMarkupPreference() {
-    if (!agentSession) return;
-    setSavingMarkup(true);
-    try {
-      await agentsService.saveMarkupPreference(agentSession.id, globalMarkupMode, globalMarkupValue);
-      const updated = { ...agentSession, savedMarkupType: globalMarkupMode, savedMarkupValue: globalMarkupValue };
-      sessionStorage.setItem('skc_agent_session', JSON.stringify(updated));
-      setMarkupSaved(true);
-      setTimeout(() => setMarkupSaved(false), 2500);
-    } finally { setSavingMarkup(false); }
+    toast.success('Markup re-applied');
   }
 
   // ─── Place All Orders ──────────────────────────────────────────────────────
@@ -406,23 +347,15 @@ export default function AgentConsole() {
       {!showOrders && (
         <div className="max-w-2xl mx-auto p-4 space-y-4 pb-12">
 
-          {/* ── Global Markup Panel (TOP) ── */}
-          <GlobalMarkupPanel
-            mode={globalMarkupMode}
-            value={globalMarkupValue}
-            saving={savingMarkup}
-            saved={markupSaved}
-            savedValue={agent.savedMarkupValue}
-            savedType={agent.savedMarkupType}
-            adminLocked={adminLocked}
-            adminMarkupType={agent.adminMarkupType}
-            adminMarkupValue={agent.adminMarkupValue}
-            onModeChange={setGlobalMarkupMode}
-            onValueChange={setGlobalMarkupValue}
-            onApplyAll={applyGlobalToAll}
-            onSave={saveMarkupPreference}
-            hasAnyCart={customers.some(c => c.cart.length > 0)}
-          />
+          {/* Markup notice */}
+          {markupPct > 0 && (
+            <div className="rounded-xl px-4 py-2.5 flex items-center gap-2 text-sm" style={{ background: '#fff8f0', border: '1px solid #f0d9c8' }}>
+              <span>🏷️</span>
+              <span style={{ color: '#7a4010' }}>
+                <strong>{markupPct}% markup</strong> applied automatically to all products.
+              </span>
+            </div>
+          )}
 
           {/* Product reference list */}
           <ProductReferenceList products={products} />
@@ -435,17 +368,14 @@ export default function AgentConsole() {
               cidx={cidx}
               products={products}
               addState={addState[cust.id]}
-              globalMarkupMode={globalMarkupMode}
-              globalMarkupValue={globalMarkupValue}
               onUpdateCustomer={updates => updateCustomer(cust.id, updates)}
               onRemoveCustomer={() => removeCustomer(cust.id)}
-              adminLocked={adminLocked}
               onAddStateChange={s => setAddState(prev => ({ ...prev, [cust.id]: s }))}
               onAddToCart={() => addToCart(cust.id)}
               onRemoveCartItem={idx => removeFromCart(cust.id, idx)}
               onUpdateCartQty={(idx, qty) => updateCartQty(cust.id, idx, qty)}
               onUpdateItemSellingPrice={(idx, sp) => updateCartItemSellingPrice(cust.id, idx, sp)}
-              onApplyGlobal={() => applyGlobalToCustomer(cust.id)}
+              onReapplyMarkup={() => reapplyMarkup(cust.id)}
               canDelete={customers.length > 1}
             />
           ))}
@@ -524,9 +454,6 @@ interface CustomerCardProps {
   cidx: number;
   products: Product[];
   addState?: { productId: string; qty: number };
-  globalMarkupMode: MarkupMode;
-  globalMarkupValue: number;
-  adminLocked: boolean;
   onUpdateCustomer: (u: Partial<AgentCustomer>) => void;
   onRemoveCustomer: () => void;
   onAddStateChange: (s: { productId: string; qty: number }) => void;
@@ -534,15 +461,14 @@ interface CustomerCardProps {
   onRemoveCartItem: (idx: number) => void;
   onUpdateCartQty: (idx: number, qty: number) => void;
   onUpdateItemSellingPrice: (idx: number, sp: number) => void;
-  onApplyGlobal: () => void;
+  onReapplyMarkup: () => void;
   canDelete: boolean;
 }
 
 function CustomerCard({
   cust, cidx, products, addState,
-  adminLocked,
   onUpdateCustomer, onRemoveCustomer, onAddStateChange, onAddToCart,
-  onRemoveCartItem, onUpdateCartQty, onUpdateItemSellingPrice, onApplyGlobal,
+  onRemoveCartItem, onUpdateCartQty, onUpdateItemSellingPrice, onReapplyMarkup,
   canDelete,
 }: CustomerCardProps) {
   const skc = cartSkcTotal(cust.cart);
@@ -608,32 +534,6 @@ function CustomerCard({
               className="border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-orange-400"
             />
           </div>
-
-          {/* Per-customer markup override — hidden when admin has set a fixed markup */}
-          {!adminLocked && (
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => onUpdateCustomer({ useCustomMarkup: !cust.useCustomMarkup })}
-              className="flex items-center gap-2 select-none">
-              <div className={`w-9 h-5 rounded-full transition-colors flex-shrink-0 relative ${cust.useCustomMarkup ? 'bg-orange-500' : 'bg-gray-200'}`}>
-                <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${cust.useCustomMarkup ? 'translate-x-4' : 'translate-x-0.5'}`} />
-              </div>
-              <span className="text-xs text-gray-600">Custom % for this customer</span>
-            </button>
-            {cust.useCustomMarkup && (
-              <div className="flex items-center gap-1 ml-auto">
-                <input
-                  type="number" min="0" step="0.5"
-                  value={cust.customMarkupPercent || ''}
-                  onChange={e => onUpdateCustomer({ customMarkupPercent: Math.max(0, Number(e.target.value)) })}
-                  placeholder="0"
-                  className="w-16 border border-gray-200 rounded-lg px-2 py-1 text-xs outline-none focus:border-orange-400 text-center"
-                />
-                <span className="text-xs text-gray-500">%</span>
-              </div>
-            )}
-          </div>
-          )}
 
           {/* ── Product picker ── */}
           <div className="space-y-2">
@@ -703,92 +603,120 @@ function CustomerCard({
           {/* ── Cart ── */}
           {cust.cart.length > 0 && (
             <div className="rounded-xl border border-gray-100 overflow-hidden">
+              {/* Header */}
               <div className="px-3 py-2 flex items-center justify-between" style={{ background: '#fdf5e6' }}>
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Order Items</p>
-                <button onClick={onApplyGlobal} className="text-xs text-orange-500 hover:text-orange-700 flex items-center gap-1">
+                <button onClick={onReapplyMarkup} className="text-xs text-orange-500 hover:text-orange-700 flex items-center gap-1">
                   <RefreshCw className="w-3 h-3" /> Re-apply markup
                 </button>
               </div>
 
-              {cust.cart.map((item, i) => (
-                <div key={i} className={`px-3 py-2.5 space-y-1.5 ${i > 0 ? 'border-t border-gray-50' : ''}`}>
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-gray-800 leading-tight">{item.productName}</p>
-                      <p className="text-xs text-gray-400">SKC ₹{item.pricePerUnit}/{item.unit}</p>
-                    </div>
-                    <button onClick={() => onRemoveCartItem(i)} className="p-1 hover:bg-red-50 rounded-lg mt-0.5 flex-shrink-0">
-                      <Trash2 className="w-3.5 h-3.5 text-red-400" />
-                    </button>
-                  </div>
+              {/* Column labels */}
+              <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-2 px-3 py-1.5 bg-gray-50 border-b border-gray-100 text-[10px] font-semibold text-gray-400 uppercase tracking-wide">
+                <span>Product</span>
+                <span className="text-right w-16">SKC ₹</span>
+                <span className="text-right w-20">Sell ₹</span>
+                <span className="text-right w-20">Margin</span>
+              </div>
 
-                  <div className="flex flex-wrap items-center gap-2">
-                    {/* Qty */}
-                    <div className="flex items-center gap-0.5 bg-gray-50 rounded-lg px-1.5 py-1 border border-gray-100">
-                      <button
-                        onClick={() => onUpdateCartQty(i, Math.max(0, item.quantity - qtyStep(item.unit)))}
-                        className="p-0.5 hover:bg-gray-200 rounded">
-                        <Minus className="w-3 h-3 text-gray-600" />
-                      </button>
-                      <span className="text-xs font-medium w-16 text-center">{formatQty(item.quantity, item.unit)}</span>
-                      <button onClick={() => onUpdateCartQty(i, item.quantity + qtyStep(item.unit))} className="p-0.5 hover:bg-gray-200 rounded">
-                        <Plus className="w-3 h-3 text-gray-600" />
+              {cust.cart.map((item, i) => {
+                const skcAmt = item.totalPrice;
+                const custAmt = Math.round(item.sellingPrice * item.quantity);
+                const marginAmt = custAmt - skcAmt;
+                const marginPct = skcAmt > 0 ? Math.round(marginAmt / skcAmt * 100) : 0;
+                const itemHighMargin = marginPct > 15;
+                return (
+                  <div key={i} className={`px-3 py-2.5 space-y-2 ${i > 0 ? 'border-t border-gray-50' : ''}`}>
+                    {/* Row 1: name + delete */}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-gray-800 leading-tight truncate">{item.productName}</p>
+                        {item.isOnDemand && <span className="text-[10px] text-purple-600 font-medium">On-demand</span>}
+                      </div>
+                      <button onClick={() => onRemoveCartItem(i)} className="p-1 hover:bg-red-50 rounded-lg flex-shrink-0">
+                        <Trash2 className="w-3.5 h-3.5 text-red-400" />
                       </button>
                     </div>
 
-                    {/* Selling price (editable) */}
-                    <div className="flex items-center gap-1">
-                      <span className="text-xs text-gray-400">Sell ₹</span>
+                    {/* Row 2: qty stepper + pricing columns */}
+                    <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-2 items-center">
+                      {/* Qty stepper */}
+                      <div className="flex items-center gap-0.5 bg-gray-50 rounded-lg px-1.5 py-1 border border-gray-100 w-fit">
+                        <button onClick={() => onUpdateCartQty(i, Math.max(0, item.quantity - qtyStep(item.unit)))} className="p-0.5 hover:bg-gray-200 rounded">
+                          <Minus className="w-3 h-3 text-gray-600" />
+                        </button>
+                        <span className="text-xs font-medium w-14 text-center">{formatQty(item.quantity, item.unit)}</span>
+                        <button onClick={() => onUpdateCartQty(i, item.quantity + qtyStep(item.unit))} className="p-0.5 hover:bg-gray-200 rounded">
+                          <Plus className="w-3 h-3 text-gray-600" />
+                        </button>
+                      </div>
+
+                      {/* SKC cost */}
+                      <span className="text-sm font-medium text-gray-600 w-16 text-right">₹{skcAmt}</span>
+
+                      {/* Editable customer price */}
                       <input
                         type="number"
-                        min={item.pricePerUnit}
-                        step="1"
-                        value={item.sellingPrice}
-                        onChange={e => onUpdateItemSellingPrice(i, Math.max(item.pricePerUnit, Number(e.target.value)))}
-                        className="w-16 border border-gray-200 rounded-lg px-2 py-1 text-xs outline-none focus:border-orange-400 text-center"
+                        min={skcAmt}
+                        step="10"
+                        value={custAmt}
+                        onChange={e => {
+                          const val = Math.max(skcAmt, Number(e.target.value));
+                          onUpdateItemSellingPrice(i, val / item.quantity);
+                        }}
+                        className="w-20 border rounded-lg px-2 py-1 text-sm font-semibold outline-none text-center focus:border-orange-400"
+                        style={{ borderColor: itemHighMargin ? '#fbbf24' : '#e5e7eb', color: '#c8821a' }}
                       />
-                      <span className="text-xs text-gray-400">/{item.unit}</span>
+
+                      {/* Margin */}
+                      <div className="w-20 text-right">
+                        {marginAmt > 0
+                          ? <span className={`text-xs font-semibold ${itemHighMargin ? 'text-amber-600' : 'text-green-600'}`}>
+                              +₹{marginAmt}<br />
+                              <span className="font-normal text-[10px]">({marginPct}%)</span>
+                            </span>
+                          : <span className="text-xs text-gray-300">—</span>
+                        }
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="flex justify-between text-xs">
-                    <span className="text-gray-400">SKC: ₹{item.totalPrice}</span>
-                    {item.markupPerUnit > 0
-                      ? <span className="text-green-600 font-medium">Customer: ₹{Math.round(item.sellingPrice * item.quantity)} · margin +₹{Math.round(item.markupPerUnit * item.quantity)}</span>
-                      : <span className="text-gray-400">Customer: ₹{Math.round(item.sellingPrice * item.quantity)}</span>
-                    }
+                    {/* Per-item high-margin nudge */}
+                    {itemHighMargin && (
+                      <p className="text-[10px] text-amber-600 flex items-center gap-1">
+                        ⚠️ {marginPct}% margin on this item — consider reducing for customer retention.
+                      </p>
+                    )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
 
-              {/* Totals */}
-              <div className="border-t border-orange-100 px-3 py-2.5 space-y-1" style={{ background: '#fdf5e6' }}>
-                <div className="flex justify-between text-xs text-gray-600">
-                  <span>SKC charges you</span>
-                  <span className="font-semibold">₹{Math.round(skc)}</span>
+              {/* ── Customer totals ── */}
+              <div className="border-t-2 border-orange-100 px-3 py-3 space-y-1.5" style={{ background: '#fdf5e6' }}>
+                <div className="flex justify-between text-xs text-gray-500">
+                  <span>SKC cost</span>
+                  <span className="font-semibold text-gray-700">₹{Math.round(skc)}</span>
                 </div>
-                {margin > 0 && (
-                  <div className="flex justify-between text-xs text-green-700">
-                    <span>Your margin</span>
-                    <span className="font-semibold">+₹{Math.round(margin)}</span>
-                  </div>
-                )}
-                <div className="flex justify-between text-sm font-bold border-t border-orange-200 pt-1">
-                  <span>Customer pays you</span>
+                <div className="flex justify-between text-xs">
+                  <span className="text-green-700">Your margin profit</span>
+                  <span className={`font-semibold ${margin > 0 ? 'text-green-700' : 'text-gray-400'}`}>
+                    {margin > 0 ? `+₹${Math.round(margin)} (${Math.round(margin / skc * 100)}%)` : '₹0'}
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm font-bold border-t border-orange-200 pt-1.5">
+                  <span style={{ color: '#3d1c02' }}>Customer pays you</span>
                   <span style={{ color: '#c8821a' }}>₹{Math.round(custTotal)}</span>
                 </div>
               </div>
-            </div>
-          )}
 
-          {/* High margin warning */}
-          {highMargin && (
-            <div className="flex items-start gap-2 rounded-xl px-3 py-2.5 border" style={{ background: '#fffbeb', borderColor: '#fcd34d' }}>
-              <span className="text-base leading-none flex-shrink-0 mt-0.5">⚠️</span>
-              <div className="text-xs">
-                <p className="font-semibold text-amber-800">{Math.round(margin / skc * 100)}% markup — above 15%</p>
-                <p className="text-amber-700 mt-0.5">High markup may deter customers. Keeping under 15% helps retain them long-term.</p>
-              </div>
+              {/* Overall high-margin warning */}
+              {highMargin && (
+                <div className="flex items-start gap-2 px-3 py-2.5 border-t" style={{ background: '#fffbeb', borderColor: '#fcd34d' }}>
+                  <span className="text-base leading-none flex-shrink-0">⚠️</span>
+                  <p className="text-xs text-amber-700">
+                    <strong className="text-amber-800">Overall {Math.round(margin / skc * 100)}% markup</strong> — above 15% may deter customers. Consider lowering prices to retain them long-term.
+                  </p>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -797,8 +725,9 @@ function CustomerCard({
       {/* Collapsed summary */}
       {cust.collapsed && cust.cart.length > 0 && (
         <div className="px-4 pb-3 flex items-center justify-between text-xs text-gray-500">
-          <span>{cust.cart.length} item{cust.cart.length > 1 ? 's' : ''} · SKC ₹{skc}</span>
-          {margin > 0 && <span className="text-green-600 font-medium">Margin ₹{margin}</span>}
+          <span>{cust.cart.length} item{cust.cart.length > 1 ? 's' : ''} · SKC ₹{Math.round(skc)}</span>
+          {margin > 0 && <span className="text-green-600 font-medium">+₹{Math.round(margin)} margin ({Math.round(margin / skc * 100)}%)</span>}
+          <span className="font-semibold" style={{ color: '#c8821a' }}>Customer ₹{Math.round(custTotal)}</span>
         </div>
       )}
     </div>

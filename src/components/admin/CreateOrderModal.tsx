@@ -73,7 +73,7 @@ export default function CreateOrderModal({ onClose, onCreated }: Props) {
     if (existing >= 0) {
       const updated = [...items];
       updated[existing].quantity += qty;
-      updated[existing].totalPrice = updated[existing].quantity * product.pricePerUnit;
+      updated[existing].totalPrice = Math.ceil(updated[existing].quantity * product.pricePerUnit / 10) * 10;
       setItems(updated);
     } else {
       setItems([...items, {
@@ -82,7 +82,7 @@ export default function CreateOrderModal({ onClose, onCreated }: Props) {
         unit: product.unit,
         quantity: qty,
         pricePerUnit: product.pricePerUnit,
-        totalPrice: qty * product.pricePerUnit,
+        totalPrice: Math.ceil(qty * product.pricePerUnit / 10) * 10,
       }]);
     }
   }
@@ -95,7 +95,7 @@ export default function CreateOrderModal({ onClose, onCreated }: Props) {
     if (qty <= 0) return removeItem(idx);
     const updated = [...items];
     updated[idx].quantity = qty;
-    updated[idx].totalPrice = qty * updated[idx].pricePerUnit;
+    updated[idx].totalPrice = Math.ceil(qty * updated[idx].pricePerUnit / 10) * 10;
     setItems(updated);
   }
 
