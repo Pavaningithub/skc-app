@@ -597,11 +597,11 @@ function CustomerCard({
               </div>
               <button
                 onClick={() => setGarlicOnly(v => !v)}
-                title={garlicOnly ? 'Show all products' : 'Show garlic variants only'}
-                className={`px-2.5 py-2 rounded-xl text-sm border transition-colors flex-shrink-0 ${
-                  garlicOnly ? 'bg-amber-100 border-amber-300 text-amber-800' : 'bg-white border-gray-200 text-gray-500 hover:border-amber-300'
+                title={garlicOnly ? 'Show all products' : 'Show With/Without Garlic products only'}
+                className={`px-2.5 py-2 rounded-xl text-xs border transition-colors flex-shrink-0 ${
+                  garlicOnly ? 'bg-amber-100 border-amber-300 text-amber-800 font-medium' : 'bg-white border-gray-200 text-gray-500 hover:border-amber-300'
                 }`}>
-                🧄
+                🧄 Garlic
               </button>
             </div>
 
@@ -621,7 +621,7 @@ function CustomerCard({
                     <p className="font-semibold text-gray-800 truncate">{p.name}</p>
                     <p className="text-gray-500">₹{p.pricePerUnit}/{p.unit}</p>
                     <p className="text-gray-400">min {formatQty(defaultMinQty(p), p.unit)}</p>
-                    {p.hasGarlicOption && <p className="text-amber-600 text-xs">🧄 garlic option</p>}
+                    {p.hasGarlicOption && <p className="text-amber-700 text-xs font-medium">🧄 w/wo garlic</p>}
                     {inCart && <p className="text-green-600 font-medium mt-0.5">✓ {formatQty(inCart.quantity, p.unit)}</p>}
                   </button>
                 );

@@ -168,7 +168,7 @@ export default function Products() {
         <button onClick={() => setGarlicOnly(v => !v)}
           className={`px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-colors
             ${garlicOnly ? 'bg-amber-100 text-amber-700 border-amber-300' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'}`}>
-          🧄 Garlic variants
+          🧄 With/Without Garlic
         </button>
         {/* Sort */}
         <div className="flex items-center gap-1.5 ml-auto">
@@ -204,7 +204,7 @@ export default function Products() {
                 <div className="flex items-center gap-2 flex-wrap">
                   <h3 className="font-semibold text-gray-800">{p.name}</h3>
                   <span className="text-xs bg-orange-50 text-orange-600 px-2 py-0.5 rounded-full">{p.category}</span>
-                  {p.hasGarlicOption && <span className="text-xs bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full">🧄 Garlic variant</span>}
+                  {p.hasGarlicOption && <span className="text-xs bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full border border-amber-200" title="Prepared with separate utensils for garlic &amp; non-garlic versions">🧄 With/Without Garlic</span>}
                   {p.isOnDemand && <span className="text-xs bg-orange-50 text-orange-500 px-2 py-0.5 rounded-full">🔥 On-demand</span>}
                   {!p.isActive && <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">Inactive</span>}
                 </div>
