@@ -615,6 +615,19 @@ export default function StoreFront() {
             </div>
             <ChevronRight className="w-5 h-5 text-gray-400 ml-auto" />
           </button>
+
+          {/* Referral code lookup */}
+          <a href="/my-referral"
+            className="flex items-center gap-3 bg-white rounded-2xl px-4 py-3 shadow-sm"
+            style={{ border: '1px solid #fde68a' }}>
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
+              style={{ background: '#fef9c3' }}>🎟️</div>
+            <div>
+              <p className="text-sm font-semibold text-gray-800">Find My Referral Code</p>
+              <p className="text-xs text-gray-500">Look up your code &amp; share to earn credit</p>
+            </div>
+            <ChevronRight className="w-5 h-5 text-gray-400 ml-auto" />
+          </a>
         </div>
       </div>
 
@@ -736,6 +749,7 @@ export default function StoreFront() {
             </a>
           </p>
           <a href="/admin/login" className="block mt-5 text-xs" style={{ color: '#555' }}>Admin Login</a>
+          <a href="/my-referral" className="block mt-2 text-xs" style={{ color: '#888' }}>🎟️ Find My Referral Code</a>
         </div>
       </footer>
 
@@ -1413,9 +1427,13 @@ function OrderFormModal({
   const creditDiscount = (isReturningCustomer && useCredit)
     ? computeCreditRedemption(availableCredit, cartTotal) : 0;
   const standingDiscountAmt = standingDiscount > 0 ? Math.round(cartTotal * standingDiscount / 100) : 0;
+  // Always recompute referral discount live from current cartTotal so preview matches saved order
+  const liveReferralDiscount = referralDiscount > 0
+    ? computeReferralDiscount(cartTotal).customerDiscount
+    : 0;
   const finalTotal = standingDiscountAmt > 0
     ? Math.max(0, cartTotal - standingDiscountAmt)
-    : Math.max(0, cartTotal - referralDiscount - creditDiscount);
+    : Math.max(0, cartTotal - liveReferralDiscount - creditDiscount);
 
   // When phone number reaches 10 digits, look up existing customer to show their referral code
   async function handlePhoneChange(raw: string) {
@@ -1616,7 +1634,7 @@ function OrderFormModal({
                 <div className="mt-2 rounded-xl px-3 py-2.5 flex items-center justify-between"
                   style={{ background: '#f0fdf4', border: '1px solid #86efac' }}>
                   <span className="text-xs text-green-700 font-medium">🎉 Referral discount applied!</span>
-                  <span className="text-sm font-bold text-green-700">−₹{referralDiscount}</span>
+                  <span className="text-sm font-bold text-green-700">−₹{liveReferralDiscount}</span>
                 </div>
               )}
               {/* Info box about how referral works */}
@@ -1669,7 +1687,7 @@ function OrderFormModal({
           )}
 
           {/* Updated total showing any active discount */}
-          {!isSample && (standingDiscountAmt > 0 || referralDiscount > 0 || (useCredit && creditDiscount > 0)) && (
+          {!isSample && (standingDiscountAmt > 0 || liveReferralDiscount > 0 || (useCredit && creditDiscount > 0)) && (
             <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid #86efac', background: '#f0fdf4' }}>
               <div className="flex justify-between items-center px-4 py-2.5 text-sm border-b" style={{ borderColor: '#bbf7d0' }}>
                 <span className="text-gray-500">Subtotal</span>
@@ -1681,10 +1699,10 @@ function OrderFormModal({
                   <span className="font-semibold text-green-600">−₹{standingDiscountAmt}</span>
                 </div>
               )}
-              {!standingDiscountAmt && referralDiscount > 0 && (
+              {!standingDiscountAmt && liveReferralDiscount > 0 && (
                 <div className="flex justify-between items-center px-4 py-2.5 text-sm border-b" style={{ borderColor: '#bbf7d0' }}>
                   <span className="text-green-600">🎟️ Referral discount</span>
-                  <span className="font-semibold text-green-600">−₹{referralDiscount}</span>
+                  <span className="font-semibold text-green-600">−₹{liveReferralDiscount}</span>
                 </div>
               )}
               {!standingDiscountAmt && useCredit && creditDiscount > 0 && (
@@ -1711,7 +1729,7 @@ function OrderFormModal({
           <button onClick={onSubmit} disabled={submitting}
             className="w-full text-white font-bold py-3.5 rounded-2xl text-sm disabled:opacity-50"
             style={{ background: '#c8821a' }}>
-            {submitting ? 'Sending…' : isSample ? '🎁 Request Sample' : `✅ Place Order${(standingDiscountAmt > 0 || referralDiscount > 0 || (useCredit && creditDiscount > 0)) ? ` · ₹${finalTotal}` : ''}`}
+            {submitting ? 'Sending…' : isSample ? '🎁 Request Sample' : `✅ Place Order${(standingDiscountAmt > 0 || liveReferralDiscount > 0 || (useCredit && creditDiscount > 0)) ? ` · ₹${finalTotal}` : ''}`}
           </button>
         </div>
       </div>
