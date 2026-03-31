@@ -45,7 +45,8 @@ export default function OrderConfirmation() {
   );
 
   const isSample = order.type === 'sample';
-  const referralCode = customer?.referralCode;
+  const isAgentOrder = !!order.agentId;
+  const referralCode = !isAgentOrder ? customer?.referralCode : undefined;
   const storeUrl = typeof window !== 'undefined' ? window.location.origin : 'https://skc-app.vercel.app';
   const shareMsg = referralCode ? referralShareMessage(order.customerName, referralCode, storeUrl) : '';
   const shareUrl = `https://wa.me/?text=${encodeURIComponent(shareMsg)}`;
@@ -98,7 +99,7 @@ export default function OrderConfirmation() {
             )}
           </div>
 
-          {!isSample && (
+          {!isSample && !isAgentOrder && (
             <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-left mb-4">
               <p className="text-sm font-semibold text-blue-800 mb-2">💳 Payment Instructions</p>
               <p className="text-xs text-blue-700 mb-1">Pay via GPay / PhonePe / UPI:</p>

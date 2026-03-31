@@ -309,7 +309,7 @@ export default function OrderDetail() {
           <p className="text-xs text-gray-400 mb-2">Opens WhatsApp on your phone. Send message to customer from your number.</p>
           <div className="flex gap-2 flex-wrap">
             {([
-              { status: 'confirmed',        label: '✅ Order Confirmed',     url: buildCustomerWhatsAppUrl(order.customerWhatsapp, orderConfirmedToCustomer(order, customerReferralCode, window.location.origin)) },
+              { status: 'confirmed',        label: '✅ Order Confirmed',     url: buildCustomerWhatsAppUrl(order.customerWhatsapp, orderConfirmedToCustomer(order, order.agentId ? undefined : customerReferralCode, window.location.origin)) },
               { status: 'out_for_delivery', label: '🚚 Out for Delivery',  url: buildCustomerWhatsAppUrl(order.customerWhatsapp, outForDeliveryToCustomer(order)) },
               { status: 'delivered',        label: '🎉 Delivered',          url: buildCustomerWhatsAppUrl(order.customerWhatsapp, deliveredToCustomer(order, `${origin}/feedback/${order.id}`)) },
               { status: 'cancelled',        label: '❌ Cancelled',           url: buildCustomerWhatsAppUrl(order.customerWhatsapp, orderCancelledToCustomer(order)) },
