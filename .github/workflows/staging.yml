@@ -62,8 +62,9 @@ jobs:
                   printf '{"version":3,"routes":[{"handle":"filesystem"},{"src":"/(.*)","dest":"/index.html"}]}' > .vercel/output/config.json
 
                   PREVIEW_URL=$(vercel deploy --prebuilt --token=$VERCEL_TOKEN)
-                  echo "preview_url=$PREVIEW_URL" >> $GITHUB_OUTPUT
+                  vercel alias set $PREVIEW_URL skc-staging.vercel.app --token=$VERCEL_TOKEN --yes || true
+                  echo "preview_url=https://skc-staging.vercel.app" >> $GITHUB_OUTPUT
                   echo "### 🔵 Staging deployed" >> $GITHUB_STEP_SUMMARY
-                  echo "**URL:** $PREVIEW_URL" >> $GITHUB_STEP_SUMMARY
+                  echo "**URL:** https://skc-staging.vercel.app" >> $GITHUB_STEP_SUMMARY
                   echo "**Branch:** \`develop\`" >> $GITHUB_STEP_SUMMARY
                   echo "**Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
