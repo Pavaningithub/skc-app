@@ -2,10 +2,10 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Plus, Minus, Trash2, LogOut, ShoppingBag, Package,
-  Check, RefreshCw, UserPlus, ChevronDown, ChevronUp,
+  RefreshCw, UserPlus, ChevronDown, ChevronUp,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { productsService, ordersService, stockService } from '../../lib/services';
+import { productsService, ordersService, stockService, agentsService } from '../../lib/services';
 import { generateOrderNumber } from '../../lib/utils';
 import type { Product, OrderItem, Order } from '../../lib/types';
 import { getAgentSession, clearAgentSession } from './AgentLogin';
@@ -734,109 +734,3 @@ function CustomerCard({
   );
 }
 
-// ─── Global Markup Panel ───────────────────────────────────────────────────────
-interface GlobalMarkupPanelProps {
-  mode: MarkupMode;
-  value: number;
-  saving: boolean;
-  saved: boolean;
-  savedValue?: number;
-  savedType?: string;
-  adminLocked: boolean;
-  adminMarkupType?: string;
-  adminMarkupValue?: number;
-  onModeChange: (m: MarkupMode) => void;
-  onValueChange: (v: number) => void;
-  onApplyAll: () => void;
-  onSave: () => void;
-  hasAnyCart: boolean;
-}
-
-function GlobalMarkupPanel({
-  mode, value, saving, saved, savedValue, savedType,
-  adminLocked, adminMarkupType, adminMarkupValue,
-  onModeChange, onValueChange, onApplyAll, onSave, hasAnyCart,
-}: GlobalMarkupPanelProps) {
-  return (
-    <div className={`rounded-2xl border p-4 space-y-3 ${adminLocked ? 'border-orange-200' : 'bg-white border-gray-100'}`}
-      style={adminLocked ? { background: '#fff8f0' } : {}}>
-      <div className="flex items-center justify-between">
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Global Markup / Margin</p>
-        {!adminLocked && savedValue && savedValue > 0 && (
-          <span className="text-xs text-green-600">
-            Saved: {savedType === 'percent' ? `${savedValue}%` : `₹${savedValue}`}
-          </span>
-        )}
-        {adminLocked && (
-          <span className="text-xs font-semibold text-orange-600 flex items-center gap-1">
-            🔒 Managed by admin
-          </span>
-        )}
-      </div>
-
-      {/* Admin-locked notice */}
-      {adminLocked && (
-        <div className="rounded-xl px-3 py-2.5 border border-orange-200 flex items-start gap-2" style={{ background: '#fff3e0' }}>
-          <span className="text-base leading-none flex-shrink-0">🔒</span>
-          <div className="text-xs">
-            <p className="font-semibold text-orange-800">
-              Markup is set by admin:&nbsp;
-              <strong>{adminMarkupType === 'percent' ? `${adminMarkupValue}%` : `₹${adminMarkupValue} per unit`}</strong>
-            </p>
-            <p className="text-orange-700 mt-0.5">
-              You cannot change this. Contact your SKC admin if you need a different rate.
-            </p>
-          </div>
-        </div>
-      )}
-
-      <div className="flex gap-2 items-center">
-        <div className={`flex rounded-xl overflow-hidden border flex-shrink-0 ${adminLocked ? 'border-orange-200 opacity-50 pointer-events-none' : 'border-gray-200'}`}>
-          <button
-            onClick={() => onModeChange('rupees')}
-            disabled={adminLocked}
-            className={`px-3 py-2 text-sm font-bold transition-colors ${mode === 'rupees' ? 'text-white' : 'text-gray-500'}`}
-            style={mode === 'rupees' ? { background: '#3d1c02' } : {}}>₹</button>
-          <button
-            onClick={() => onModeChange('percent')}
-            disabled={adminLocked}
-            className={`px-3 py-2 text-sm font-bold transition-colors ${mode === 'percent' ? 'text-white' : 'text-gray-500'}`}
-            style={mode === 'percent' ? { background: '#3d1c02' } : {}}>%</button>
-        </div>
-        <input
-          type="number" min="0" step={mode === 'percent' ? '0.5' : '1'}
-          value={value || ''}
-          onChange={e => onValueChange(Math.max(0, Number(e.target.value)))}
-          placeholder={mode === 'rupees' ? 'e.g. 50' : 'e.g. 10'}
-          disabled={adminLocked}
-          className={`flex-1 border rounded-xl px-3 py-2 text-sm outline-none ${adminLocked ? 'border-orange-200 bg-orange-50 text-orange-700 cursor-not-allowed opacity-60' : 'border-gray-200 focus:border-orange-400'}`}
-        />
-        <button
-          onClick={onApplyAll}
-          disabled={!hasAnyCart || adminLocked}
-          className="text-xs font-semibold px-3 py-2 rounded-xl border border-orange-300 text-orange-600 hover:bg-orange-50 flex-shrink-0 flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed">
-          <RefreshCw className="w-3.5 h-3.5" /> Apply all
-        </button>
-      </div>
-
-      {!adminLocked && (
-        <p className="text-xs text-gray-400">
-          {mode === 'percent'
-            ? 'Applied as % above SKC price. Per-customer override takes priority.'
-            : 'Fixed ₹ added per unit on every product. Per-customer override takes priority.'}
-        </p>
-      )}
-
-      {!adminLocked && (
-        <button
-          onClick={onSave} disabled={saving}
-          className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl border transition-colors disabled:opacity-50"
-          style={saved
-            ? { background: '#f0fdf4', borderColor: '#86efac', color: '#166534' }
-            : { borderColor: '#e0d0c0', color: '#7a4010' }}>
-          {saved ? <><Check className="w-3.5 h-3.5" />Saved!</> : saving ? 'Saving…' : '💾 Save for future orders'}
-        </button>
-      )}
-    </div>
-  );
-}

@@ -51,6 +51,7 @@ export default function AgentsPage() {
         pin: form.pin.trim(),
         mustChangePin: true,
         commissionPercent: Number(form.commissionPercent),
+        markupPercent: 0,
         isActive: true,
         notes: form.notes.trim(),
       });
