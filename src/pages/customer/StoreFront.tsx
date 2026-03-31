@@ -683,7 +683,7 @@ export default function StoreFront() {
               style={garlicOnly
                 ? { background: '#d97706', color: '#fff' }
                 : { background: '#fef3c7', color: '#92400e', border: '1px solid #fcd34d' }}>
-              🧄 Garlic
+              🧄 With/Without Garlic
             </button>
           </div>
 
@@ -706,6 +706,21 @@ export default function StoreFront() {
             <span className="text-amber-800">
               Products marked <strong>🔥 Made Fresh on Order</strong> are prepared after your order. Delivery may take 1–2 extra days.
             </span>
+          </div>
+        )}
+
+        {/* Garlic hygiene notice — shown whenever any garlic-option product is visible */}
+        {filtered.some(p => p.hasGarlicOption) && (
+          <div className="mb-4 flex items-start gap-3 rounded-xl px-4 py-3"
+            style={{ background: 'linear-gradient(135deg, #fffbeb, #fef3c7)', border: '1px solid #fcd34d' }}>
+            <span className="text-xl flex-shrink-0">🧄</span>
+            <div className="text-xs">
+              <p className="font-bold text-amber-900 mb-0.5">Garlic &amp; Non-Garlic variants available</p>
+              <p className="text-amber-800 leading-relaxed">
+                Select products are made in both <strong>With Garlic</strong> and <strong>Without Garlic</strong> versions.
+                We use <strong>separate utensils &amp; cutleries</strong> for each — safe for those who avoid garlic.
+              </p>
+            </div>
           </div>
         )}
 
@@ -1072,7 +1087,7 @@ function ProductCard({ product, onAddToCart }: {
           )}
           {product.hasGarlicOption && (
             <span className="absolute bottom-2 right-2 text-xs font-bold px-1.5 py-0.5 rounded-full"
-              style={{ background: '#fef3c7', color: '#92400e', fontSize: '9px' }}>🧄</span>
+              style={{ background: '#fef3c7', color: '#92400e', fontSize: '9px', border: '1px solid #fcd34d' }}>🧄 w/wo garlic</span>
           )}
         </div>
 
@@ -1216,22 +1231,32 @@ function ProductDetailSheet({ product, qty, setQty, qtyStep, minQty, qtyLabel, p
 
         {/* Garlic option */}
         {product.hasGarlicOption && (
-          <div className="rounded-xl p-3" style={{ background: '#fdf5e6', border: '1px solid #e8d5b0' }}>
-            <p className="text-sm font-semibold text-gray-700 mb-2">🧄 Garlic preference <span className="text-red-500">*</span></p>
-            <div className="flex gap-3">
-              {(['with', 'without'] as const).map(opt => (
-                <label key={opt} className="flex items-center gap-2 cursor-pointer">
+          <div className="rounded-xl p-3 space-y-2" style={{ background: 'linear-gradient(135deg, #fffbeb, #fef3c7)', border: '1px solid #fcd34d' }}>
+            <div className="flex items-center gap-2">
+              <span className="text-base">🧄</span>
+              <p className="text-sm font-bold text-amber-900">Garlic preference <span className="text-red-500">*</span></p>
+            </div>
+            <p className="text-xs text-amber-800 leading-relaxed">
+              We prepare both versions using <strong>separate utensils &amp; cutleries</strong> — safe for those who avoid garlic for religious or dietary reasons.
+            </p>
+            <div className="flex gap-4 pt-1">
+              {(['without', 'with'] as const).map(opt => (
+                <label key={opt}
+                  className={`flex items-center gap-2 cursor-pointer px-3 py-2 rounded-xl border-2 flex-1 transition-all ${
+                    garlic === opt ? 'border-amber-500 bg-white' : 'border-transparent bg-white/60'
+                  }`}>
                   <input type="radio" name={`garlic-${product.id}`} value={opt}
                     checked={garlic === opt} onChange={() => setGarlic(opt)}
                     className="accent-orange-500 w-4 h-4" />
-                  <span className="text-sm font-medium text-gray-700">
-                    {opt === 'with' ? '🧄 With Garlic' : '🚫 Without Garlic'}
-                  </span>
+                  <div>
+                    <p className="text-sm font-semibold text-gray-800">{opt === 'with' ? '🧄 With Garlic' : '🚫 Without Garlic'}</p>
+                    <p className="text-xs text-gray-500">{opt === 'with' ? 'Regular recipe' : 'No garlic added'}</p>
+                  </div>
                 </label>
               ))}
             </div>
             {garlicRequired && (
-              <p className="text-xs text-red-400 mt-1.5">Please choose one to continue</p>
+              <p className="text-xs text-red-500 font-medium">⚠️ Please choose one to continue</p>
             )}
           </div>
         )}
