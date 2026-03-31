@@ -42,10 +42,13 @@ export function buildUPIGPayLink(amount: number, orderId: string): string {
 }
 
 // Sent TO CUSTOMER confirming their order
-export function orderConfirmedToCustomer(order: Order): string {
+export function orderConfirmedToCustomer(order: Order, referralCode?: string, storeUrl?: string): string {
   const items = order.items
     .map(i => `  • ${i.productName}: ${formatQuantity(i.quantity, i.unit)} = ₹${i.totalPrice}`)
     .join('\n');
+  const referralLine = referralCode
+    ? `\n\n🎁 *Refer a friend & earn store credit!*\nShare your link: ${storeUrl ?? 'https://skc-app.vercel.app'}?ref=${referralCode}`
+    : '';
   return `🙏 *Hare Krishna!* 🪷
 
 Hi *${order.customerName}*, your order is confirmed! 🎉
@@ -59,7 +62,7 @@ ${order.discount > 0 ? `\nDiscount: -₹${order.discount}` : ''}
 ${order.type === 'sample' ? '\n✅ This is a *FREE SAMPLE* — no payment needed.' : ''}
 
 We will keep you updated on your order.
-Thank you for choosing ${BUSINESS_NAME}! 🌿`;
+Thank you for choosing ${BUSINESS_NAME}! 🌿${referralLine}`;
 }
 
 // Sent TO CUSTOMER when out for delivery
