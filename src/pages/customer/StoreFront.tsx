@@ -1120,7 +1120,9 @@ function ProductDetailSheet({ product, qty, setQty, qtyStep, minQty, qtyLabel, p
   qtyStep: number; minQty: number; qtyLabel: string; price: number; priceDisplay: string;
   onClose: () => void; onAddToCart: (p: Product, qty: number, note?: string) => void;
 }) {
-  const [garlic, setGarlic] = useState<'with' | 'without' | ''>('');
+  const [garlic, setGarlic] = useState<'with' | 'without' | ''>(
+    product.hasGarlicOption ? 'without' : ''
+  );
   const [note, setNote]   = useState('');
   const [showNote, setShowNote] = useState(false);
   const isOccasion = product.category === 'Sweets';
