@@ -10,7 +10,7 @@ export function getAgentSession() {
     const s = sessionStorage.getItem(SESSION_KEY);
     return s ? JSON.parse(s) as {
       id: string; name: string; phone: string; agentCode: string;
-      commissionPercent: number; markupPercent: number; mustChangePin: boolean;
+      markupPercent: number; mustChangePin: boolean;
     } : null;
   } catch { return null; }
 }
@@ -27,7 +27,7 @@ export default function AgentLogin() {
 
   // Change PIN flow
   const [changingPin, setChangingPin] = useState(false);
-  const [pendingAgent, setPendingAgent] = useState<{ id: string; name: string; phone: string; agentCode: string; commissionPercent: number; markupPercent: number } | null>(null);
+  const [pendingAgent, setPendingAgent] = useState<{ id: string; name: string; phone: string; agentCode: string; markupPercent: number } | null>(null);
   const [newPin, setNewPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
 
@@ -42,11 +42,11 @@ export default function AgentLogin() {
         return;
       }
       if (agent.mustChangePin) {
-        setPendingAgent({ id: agent.id, name: agent.name, phone: agent.phone, agentCode: agent.agentCode, commissionPercent: agent.commissionPercent, markupPercent: agent.markupPercent ?? 0 });
+        setPendingAgent({ id: agent.id, name: agent.name, phone: agent.phone, agentCode: agent.agentCode, markupPercent: agent.markupPercent ?? 0 });
         setChangingPin(true);
         return;
       }
-      const session = { id: agent.id, name: agent.name, phone: agent.phone, agentCode: agent.agentCode, commissionPercent: agent.commissionPercent, markupPercent: agent.markupPercent ?? 0, mustChangePin: false };
+      const session = { id: agent.id, name: agent.name, phone: agent.phone, agentCode: agent.agentCode, markupPercent: agent.markupPercent ?? 0, mustChangePin: false };
       sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
       navigate('/agent');
     } finally {
@@ -62,7 +62,7 @@ export default function AgentLogin() {
     setLoading(true);
     try {
       await agentsService.changePin(pendingAgent.id, newPin);
-      const session = { id: pendingAgent.id, name: pendingAgent.name, phone: pendingAgent.phone, agentCode: pendingAgent.agentCode, commissionPercent: pendingAgent.commissionPercent, markupPercent: pendingAgent.markupPercent, mustChangePin: false };
+      const session = { id: pendingAgent.id, name: pendingAgent.name, phone: pendingAgent.phone, agentCode: pendingAgent.agentCode, markupPercent: pendingAgent.markupPercent, mustChangePin: false };
       sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
       toast.success('PIN set! Welcome, ' + pendingAgent.name);
       navigate('/agent');

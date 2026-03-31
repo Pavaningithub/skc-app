@@ -547,13 +547,11 @@ export const agentsService = {
     return agent;
   },
 
-  async add(data: Omit<Agent, 'id' | 'totalOrders' | 'totalRevenue' | 'totalCommissionEarned' | 'totalCommissionPaid' | 'createdAt' | 'updatedAt'>): Promise<string> {
+  async add(data: Omit<Agent, 'id' | 'totalOrders' | 'totalRevenue' | 'createdAt' | 'updatedAt'>): Promise<string> {
     const ref = await addDoc(collection(db, COLLECTIONS.AGENTS), {
       ...data,
       totalOrders: 0,
       totalRevenue: 0,
-      totalCommissionEarned: 0,
-      totalCommissionPaid: 0,
       createdAt: now(),
       updatedAt: now(),
     });
@@ -568,25 +566,11 @@ export const agentsService = {
     await updateDoc(doc(db, COLLECTIONS.AGENTS, id), { pin: newPin, mustChangePin: false, updatedAt: now() });
   },
 
-  /** Save agent's preferred markup type + value so it auto-loads next session. */
-  async saveMarkupPreference(id: string, type: 'rupees' | 'percent', value: number): Promise<void> {
-    await updateDoc(doc(db, COLLECTIONS.AGENTS, id), { savedMarkupType: type, savedMarkupValue: value, updatedAt: now() });
-  },
-
-  /** Called after an agent order is placed. Updates agent totals. */
-  async recordOrder(agentId: string, skcTotal: number, commission: number): Promise<void> {
+  /** Called after an agent order is placed. Updates agent order/revenue totals. */
+  async recordOrder(agentId: string, skcTotal: number): Promise<void> {
     await updateDoc(doc(db, COLLECTIONS.AGENTS, agentId), {
       totalOrders: increment(1),
       totalRevenue: increment(skcTotal),
-      totalCommissionEarned: increment(commission),
-      updatedAt: now(),
-    });
-  },
-
-  /** Mark commission as paid. */
-  async markCommissionPaid(agentId: string, amount: number): Promise<void> {
-    await updateDoc(doc(db, COLLECTIONS.AGENTS, agentId), {
-      totalCommissionPaid: increment(amount),
       updatedAt: now(),
     });
   },
