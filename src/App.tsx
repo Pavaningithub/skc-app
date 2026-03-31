@@ -17,6 +17,7 @@ const Products         = lazy(() => import('./pages/admin/Products'));
 const StockPage        = lazy(() => import('./pages/admin/StockPage'));
 const OrdersPage       = lazy(() => import('./pages/admin/OrdersPage'));
 const OrderDetail      = lazy(() => import('./pages/admin/OrderDetail'));
+const PackingPage      = lazy(() => import('./pages/admin/PackingPage'));
 const ExpensesPage     = lazy(() => import('./pages/admin/ExpensesPage'));
 const CustomersPage    = lazy(() => import('./pages/admin/CustomersPage'));
 const SubscriptionsPage = lazy(() => import('./pages/admin/SubscriptionsPage'));
@@ -70,6 +71,7 @@ export default function App() {
             <Route path="dashboard" element={<Dashboard />} />
             <Route path="orders" element={<OrdersPage />} />
             <Route path="orders/:orderId" element={<OrderDetail />} />
+            <Route path="packing" element={<PackingPage />} />
             <Route path="products" element={<Products />} />
             <Route path="stock" element={<StockPage />} />
             <Route path="batches" element={<BatchesPage />} />
