@@ -17,30 +17,22 @@ export default function AgentsPage() {
 
   // Create form
   const [showCreate, setShowCreate] = useState(false);
-  const [form, setForm] = useState({ name: '', phone: '', commissionPercent: 10, pin: '', notes: '' });
+  const [form, setForm] = useState({ name: '', phone: '', pin: '', notes: '' });
   const [creating, setCreating] = useState(false);
 
-  // Expanded agent (view orders + commission)
+  // Expanded agent (view orders)
   const [expanded, setExpanded] = useState<string | null>(null);
   const [agentOrders, setAgentOrders] = useState<Record<string, Order[]>>({});
   const [loadingOrders, setLoadingOrders] = useState<string | null>(null);
-
-  // Edit commission
-  const [editingCommission, setEditingCommission] = useState<string | null>(null);
-  const [commissionDraft, setCommissionDraft] = useState('');
 
   // Edit admin markup
   const [editingMarkup, setEditingMarkup] = useState<string | null>(null);
   const [markupPctDraft, setMarkupPctDraft] = useState('');
 
-  // Pay commission
-  const [payingAgent, setPayingAgent] = useState<string | null>(null);
-
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     if (!form.name.trim()) return toast.error('Name required');
     if (!form.pin.trim() || form.pin.length < 4) return toast.error('PIN must be at least 4 digits');
-    if (form.commissionPercent < 0 || form.commissionPercent > 100) return toast.error('Commission must be 0–100%');
     setCreating(true);
     try {
       const agentCode = generateAgentCode(form.name);
@@ -50,13 +42,12 @@ export default function AgentsPage() {
         agentCode,
         pin: form.pin.trim(),
         mustChangePin: true,
-        commissionPercent: Number(form.commissionPercent),
         markupPercent: 0,
         isActive: true,
         notes: form.notes.trim(),
       });
       toast.success(`Agent created! Code: ${agentCode}`);
-      setForm({ name: '', phone: '', commissionPercent: 10, pin: '', notes: '' });
+      setForm({ name: '', phone: '', pin: '', notes: '' });
       setShowCreate(false);
     } catch (err) {
       console.error(err);
@@ -78,27 +69,9 @@ export default function AgentsPage() {
     } finally { setLoadingOrders(null); }
   }
 
-  async function saveCommission(agent: Agent) {
-    const pct = Number(commissionDraft);
-    if (isNaN(pct) || pct < 0 || pct > 100) return toast.error('Enter 0–100');
-    await agentsService.update(agent.id, { commissionPercent: pct });
-    setEditingCommission(null);
-    toast.success('Commission updated');
-  }
-
   async function toggleActive(agent: Agent) {
     await agentsService.update(agent.id, { isActive: !agent.isActive });
     toast.success(agent.isActive ? 'Agent deactivated' : 'Agent activated');
-  }
-
-  async function markCommissionPaid(agent: Agent) {
-    const pending = agent.totalCommissionEarned - agent.totalCommissionPaid;
-    if (pending <= 0) return toast.error('No pending commission');
-    setPayingAgent(agent.id);
-    try {
-      await agentsService.markCommissionPaid(agent.id, pending);
-      toast.success(`₹${pending} commission marked as paid to ${agent.name}`);
-    } finally { setPayingAgent(null); }
   }
 
   async function saveAdminMarkup(agent: Agent) {
@@ -120,7 +93,7 @@ export default function AgentsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-gray-800">🤝 Agents</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Manage partner agents and their commissions</p>
+          <p className="text-sm text-gray-500 mt-0.5">Manage partner agents and markup guardrails</p>
         </div>
         <button
           onClick={() => setShowCreate(s => !s)}
@@ -151,13 +124,6 @@ export default function AgentsPage() {
                 placeholder="10-digit number"
                 type="tel"
                 className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-orange-400" />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-500 mb-1">Commission % *</label>
-              <input value={form.commissionPercent} onChange={e => setForm(f => ({ ...f, commissionPercent: Number(e.target.value) }))}
-                type="number" min="0" max="100" step="0.5"
-                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-orange-400" />
-              <p className="text-xs text-gray-400 mt-1">% of SKC order value paid to agent monthly</p>
             </div>
             <div>
               <label className="block text-xs font-semibold text-gray-500 mb-1">Initial PIN *</label>
@@ -197,7 +163,6 @@ export default function AgentsPage() {
       )}
 
       {agents.map(agent => {
-        const pendingCommission = agent.totalCommissionEarned - agent.totalCommissionPaid;
         const orders = agentOrders[agent.id] ?? [];
         const isExpanded = expanded === agent.id;
 
@@ -221,14 +186,6 @@ export default function AgentsPage() {
                   {agent.markupPercent > 0 && ` · ${agent.markupPercent}% markup`}
                 </p>
               </div>
-              <div className="text-right flex-shrink-0">
-                {pendingCommission > 0 ? (
-                  <p className="text-sm font-bold text-green-600">₹{pendingCommission} due</p>
-                ) : (
-                  <p className="text-xs text-gray-400">₹0 pending</p>
-                )}
-                <p className="text-xs text-gray-400">{agent.commissionPercent}% commission</p>
-              </div>
               <button onClick={() => toggleExpand(agent.id)} className="p-1 text-gray-400 hover:text-gray-600 ml-1">
                 {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
               </button>
@@ -238,47 +195,15 @@ export default function AgentsPage() {
             {isExpanded && (
               <div className="border-t border-gray-50 px-4 py-4 space-y-4">
                 {/* Stats strip */}
-                <div className="grid grid-cols-3 gap-3 text-center">
+                <div className="grid grid-cols-2 gap-3 text-center">
                   <div className="bg-gray-50 rounded-xl p-3">
                     <p className="text-lg font-bold text-gray-800">{agent.totalOrders}</p>
-                    <p className="text-xs text-gray-500">Orders</p>
+                    <p className="text-xs text-gray-500">Orders placed</p>
                   </div>
-                  <div className="bg-green-50 rounded-xl p-3">
-                    <p className="text-lg font-bold text-green-700">₹{agent.totalCommissionEarned}</p>
-                    <p className="text-xs text-gray-500">Earned</p>
+                  <div className="bg-orange-50 rounded-xl p-3">
+                    <p className="text-lg font-bold text-orange-700">₹{agent.totalRevenue}</p>
+                    <p className="text-xs text-gray-500">SKC Revenue</p>
                   </div>
-                  <div className={`rounded-xl p-3 ${pendingCommission > 0 ? 'bg-amber-50' : 'bg-gray-50'}`}>
-                    <p className={`text-lg font-bold ${pendingCommission > 0 ? 'text-amber-700' : 'text-gray-400'}`}>₹{pendingCommission}</p>
-                    <p className="text-xs text-gray-500">Pending payout</p>
-                  </div>
-                </div>
-
-                {/* Commission % edit */}
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-gray-500 font-medium">Commission %:</span>
-                  {editingCommission === agent.id ? (
-                    <>
-                      <input type="number" min="0" max="100" step="0.5"
-                        value={commissionDraft}
-                        onChange={e => setCommissionDraft(e.target.value)}
-                        className="w-20 border border-orange-300 rounded-lg px-2 py-1 text-sm outline-none text-center"
-                      />
-                      <button onClick={() => saveCommission(agent)} className="p-1.5 bg-green-500 text-white rounded-lg">
-                        <Check className="w-3.5 h-3.5" />
-                      </button>
-                      <button onClick={() => setEditingCommission(null)} className="p-1.5 bg-gray-100 rounded-lg">
-                        <X className="w-3.5 h-3.5 text-gray-500" />
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <span className="text-sm font-bold text-gray-700">{agent.commissionPercent}%</span>
-                      <button onClick={() => { setEditingCommission(agent.id); setCommissionDraft(String(agent.commissionPercent)); }}
-                        className="p-1 text-gray-400 hover:text-orange-500">
-                        <Edit2 className="w-3.5 h-3.5" />
-                      </button>
-                    </>
-                  )}
                 </div>
 
                 {/* Markup % edit */}
@@ -326,14 +251,6 @@ export default function AgentsPage() {
 
                 {/* Action buttons */}
                 <div className="flex gap-2 flex-wrap">
-                  {pendingCommission > 0 && (
-                    <button
-                      onClick={() => markCommissionPaid(agent)}
-                      disabled={payingAgent === agent.id}
-                      className="text-xs bg-green-500 hover:bg-green-600 text-white px-3 py-2 rounded-xl font-semibold disabled:opacity-50 transition-colors">
-                      {payingAgent === agent.id ? 'Marking…' : `✅ Mark ₹${pendingCommission} Paid`}
-                    </button>
-                  )}
                   <button
                     onClick={() => toggleActive(agent)}
                     className={`text-xs px-3 py-2 rounded-xl font-semibold transition-colors ${
@@ -366,9 +283,6 @@ export default function AgentsPage() {
                       </div>
                       <div className="text-right">
                         <p className="text-sm font-bold text-gray-700">₹{o.total}</p>
-                        {o.agentCommission && o.agentCommission > 0 && (
-                          <p className="text-xs text-green-600">+₹{o.agentCommission} commission</p>
-                        )}
                         <p className="text-xs text-gray-400">
                           {new Date(o.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
                         </p>

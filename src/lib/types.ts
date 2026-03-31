@@ -202,20 +202,17 @@ export interface Subscription {
   createdAt: string;
 }
 
-// ─── Agent (Partner / Reseller) ──────────────────────────────────────────────
+// ─── Agent (Partner / Reseller) ────────────────────────────────────────────────────────────────
 export interface Agent {
   id: string;
   name: string;                   // e.g. "Ravi Traders"
   phone: string;                  // 10-digit, used as login username
-  agentCode: string;              // e.g. "AGT-RAVI" — unique, used in URL /agent/AGT-RAVI
-  pin: string;                    // hashed or plain 4-6 digit PIN
+  agentCode: string;              // e.g. "AGT-RAVI" — unique
+  pin: string;                    // 4-6 digit PIN
   mustChangePin: boolean;         // force change on first login
-  commissionPercent: number;      // % of SKC price we pay agent (e.g. 10%)
-  markupPercent: number;           // % markup agent applies on top of SKC price (enforced by admin)
+  markupPercent: number;          // admin-enforced guardrail: auto-applied % on top of SKC price (0 = agent prices freely)
   totalOrders: number;
   totalRevenue: number;           // sum of SKC prices on their orders
-  totalCommissionEarned: number;  // sum of commissions on all orders
-  totalCommissionPaid: number;    // sum of payouts already made
   isActive: boolean;
   notes?: string;
   createdAt: string;

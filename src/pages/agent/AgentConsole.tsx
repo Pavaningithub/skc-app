@@ -67,7 +67,7 @@ export default function AgentConsole() {
 
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  const [liveAgent, setLiveAgent] = useState<{ commissionPercent: number; markupPercent: number } | null>(null);
+  const [liveAgent, setLiveAgent] = useState<{ markupPercent: number } | null>(null);
 
   // ── Multi-customer ────────────────────────────────────────────────────
   const [customers, setCustomers] = useState<AgentCustomer[]>([newCustomer()]);
@@ -88,7 +88,7 @@ export default function AgentConsole() {
     if (!agentSession) { navigate('/agent/login'); return; }
     // Fetch live agent so markup% and commission% are never stale from session
     agentsService.getById(agentSession.id).then(a => {
-      if (a) setLiveAgent({ commissionPercent: a.commissionPercent, markupPercent: a.markupPercent ?? 0 });
+      if (a) setLiveAgent({ markupPercent: a.markupPercent ?? 0 });
     });
     const unsub = productsService.subscribe(p => {
       setProducts(p.filter(x => x.isActive));
@@ -226,16 +226,8 @@ export default function AgentConsole() {
     setSavingProgress(`Placing ${valid.length} order${valid.length > 1 ? 's' : ''}…`);
     let placed = 0;
     try {
-      // Use live commission% — liveAgent fetched from Firestore on mount, never stale
-      const commissionPercent = liveAgent?.commissionPercent ?? agent.commissionPercent;
-
       for (const cust of valid) {
         const skc = cartSkcTotal(cust.cart);
-        const customerTotal = cartCustomerTotal(cust.cart);
-        // If admin hasn't set commission %, derive it from the actual margin the agent charged
-        const commission = commissionPercent > 0
-          ? Math.round(skc * commissionPercent / 100)
-          : Math.round(customerTotal - skc);  // agent keeps the full margin
         const orderItems: OrderItem[] = cust.cart.map(i => ({
           productId: i.productId, productName: i.productName, unit: i.unit,
           quantity: i.quantity, pricePerUnit: i.pricePerUnit, totalPrice: i.totalPrice,
@@ -253,7 +245,7 @@ export default function AgentConsole() {
           notes: cust.notes.trim(),
           hasOnDemandItems: cust.cart.some(i => i.isOnDemand),
           referralDiscount: 0, creditUsed: 0, deliveryCharge: 0,
-          agentId: agent.id, agentName: agent.name, agentCommission: commission,
+          agentId: agent.id, agentName: agent.name,
           createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
         };
         await ordersService.add(order);
@@ -262,7 +254,7 @@ export default function AgentConsole() {
             await stockService.deduct(item.productId, item.quantity, { productName: item.productName, unit: item.unit });
           }
         }
-        await agentsService.recordOrder(agent.id, skc, commission);
+        await agentsService.recordOrder(agent.id, skc);
         placed++;
         setSavingProgress(`Placed ${placed}/${valid.length}…`);
       }
@@ -374,9 +366,6 @@ export default function AgentConsole() {
               </p>
               <div className="flex justify-between text-xs text-gray-500 pt-1 border-t border-gray-50">
                 <span>SKC cost: <strong className="text-gray-700">₹{o.total}</strong></span>
-                {(o.agentCommission ?? 0) > 0 && (
-                  <span className="text-green-600">Your commission: <strong>₹{o.agentCommission}</strong></span>
-                )}
                 <span>{new Date(o.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' })}</span>
               </div>
             </div>
