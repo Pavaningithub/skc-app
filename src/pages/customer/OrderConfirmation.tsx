@@ -66,6 +66,13 @@ export default function OrderConfirmation() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 to-amber-50 flex items-center justify-center p-4">
+      {/* Version badge */}
+      <div className="fixed bottom-3 right-3 z-50 flex items-center gap-1.5 px-2.5 py-1 rounded-full shadow-md text-white text-xs font-mono"
+        style={{ background: __APP_ENV__ === 'production' ? '#22c55e' : '#3b82f6', opacity: 0.85 }}
+        title={__APP_ENV__ === 'production' ? 'Production (Green)' : 'Staging (Blue)'}>
+        <span className="w-1.5 h-1.5 rounded-full bg-white/70" />
+        v{__APP_VERSION__}{__APP_ENV__ !== 'production' && ` · ${__APP_ENV__}`}
+      </div>
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm animate-fade-in overflow-hidden">
 
         {/* Success header */}
