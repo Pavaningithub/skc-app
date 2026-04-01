@@ -17,8 +17,11 @@ dist-ssr
 .env.local
 .env.*.local
 
-# One-off scripts contain hardcoded Firebase keys — never commit
-scripts/
+# One-off scripts that contain hardcoded Firebase keys — never commit these
+# (Only scripts/release.mjs is safe to commit — it has no secrets)
+scripts/*.sh
+scripts/*.js
+!scripts/release.mjs
 
 # Editor directories and files
 .vscode/*
