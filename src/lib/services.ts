@@ -10,7 +10,9 @@ import { generateReferralCode } from "./utils";
 import type {
   Product, StockItem, RawMaterial, RawMaterialPurchase,
   Batch, Customer, Order, Expense, Subscription, Feedback, AdminAction, AdminActionType, AdminUser, Agent,
+  ReferralConfig,
 } from "./types";
+import { DEFAULT_REFERRAL_CONFIG } from "./types";
 
 // ─── Collection Names ─────────────────────────────────────────────────────────
 export const COLLECTIONS = {
@@ -25,6 +27,7 @@ export const COLLECTIONS = {
   SUBSCRIPTIONS:         "subscriptions",
   FEEDBACK:              "feedback",
   SETTINGS:              "settings",
+  REFERRAL_CONFIG:       "settings",   // doc id = 'referral_config' inside 'settings'
   ADMIN_ACTIVITY:        "adminActivity",
   ADMIN_USERS:           "adminUsers",
   AGENTS:                "agents",
@@ -585,3 +588,23 @@ export const agentsService = {
   },
 };
 
+// ─── Referral Config ─────────────────────────────────────────────────────────
+export const referralConfigService = {
+  async get(): Promise<ReferralConfig> {
+    try {
+      const snap = await getDoc(doc(db, 'settings', 'referral_config'));
+      if (!snap.exists()) return { ...DEFAULT_REFERRAL_CONFIG };
+      return snap.data() as ReferralConfig;
+    } catch {
+      return { ...DEFAULT_REFERRAL_CONFIG };
+    }
+  },
+  async save(config: ReferralConfig): Promise<void> {
+    await setDoc(doc(db, 'settings', 'referral_config'), { ...config, updatedAt: now() });
+  },
+  subscribe(cb: (config: ReferralConfig) => void): Unsubscribe {
+    return onSnapshot(doc(db, 'settings', 'referral_config'), snap => {
+      cb(snap.exists() ? (snap.data() as ReferralConfig) : { ...DEFAULT_REFERRAL_CONFIG });
+    });
+  },
+};

@@ -4,7 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import {
   LayoutDashboard, ShoppingBag, Package, BarChart3, Users,
   Receipt, RefreshCw, MessageSquare, Settings, Menu,
-  Leaf, LogOut, FlaskConical, Bell, Megaphone, Handshake, Boxes,
+  Leaf, LogOut, FlaskConical, Bell, Megaphone, Handshake, Boxes, Gift,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { ordersService } from '../../lib/services';
@@ -13,7 +13,8 @@ import type { Order } from '../../lib/types';
 
 const navItems = [
   { to: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/admin/orders',    icon: ShoppingBag,     label: 'Orders' },
+  { to: '/admin/analytics', icon: BarChart3,        label: 'Analytics' },
+  { to: '/admin/orders',    icon: ShoppingBag,      label: 'Orders' },
   { to: '/admin/packing',   icon: Boxes,           label: 'Packing' },
   { to: '/admin/products',  icon: Package,         label: 'Products' },
   { to: '/admin/stock', icon: BarChart3, label: 'Stock' },
@@ -22,6 +23,7 @@ const navItems = [
   { to: '/admin/customers', icon: Users, label: 'Customers' },
   { to: '/admin/subscriptions', icon: RefreshCw, label: 'Subscriptions' },
   { to: '/admin/agents', icon: Handshake, label: 'Agents' },
+  { to: '/admin/referral-settings', icon: Gift, label: 'Referral' },
   { to: '/admin/feedback', icon: MessageSquare, label: 'Feedback' },
   { to: '/admin/announcements', icon: Megaphone, label: 'Announce' },
   { to: '/admin/settings', icon: Settings, label: 'Settings' },

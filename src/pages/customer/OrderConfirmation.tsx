@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { CheckCircle, Leaf, MessageCircle, XCircle, Copy, Share2 } from 'lucide-react';
 import { ordersService, customersService } from '../../lib/services';
-import { formatCurrency, buildAdminWhatsAppUrl, referralShareMessage } from '../../lib/utils';
+import { formatCurrency, buildAdminWhatsAppUrl, referralShareMessage, computeReferralDiscountFromTiers } from '../../lib/utils';
+import { useReferralConfig } from '../../lib/useReferralConfig';
 import { UPI_ID } from '../../lib/constants';
 import { APP_CONFIG } from '../../config';
 import type { Order, Customer } from '../../lib/types';
@@ -48,7 +49,14 @@ export default function OrderConfirmation() {
   const isAgentOrder = !!order.agentId;
   const referralCode = !isAgentOrder ? customer?.referralCode : undefined;
   const storeUrl = typeof window !== 'undefined' ? window.location.origin : 'https://skc-app.vercel.app';
-  const shareMsg = referralCode ? referralShareMessage(order.customerName, referralCode, storeUrl) : '';
+  const { config: referralConfig } = useReferralConfig();
+  // Derive top tier hint for the WA share message
+  const topTier = referralConfig.tiers.reduce((best, t) => t.minOrder > best.minOrder ? t : best, referralConfig.tiers[0]);
+  const topTierSample = topTier ? computeReferralDiscountFromTiers(topTier.minOrder + 1, referralConfig.tiers, referralConfig.splitReferrerPct) : null;
+  const topTierHint = topTier && topTierSample
+    ? `up to ₹${topTierSample.customerDiscount} off on orders ₹${topTier.minOrder}+`
+    : undefined;
+  const shareMsg = referralCode ? referralShareMessage(order.customerName, referralCode, storeUrl, topTierHint) : '';
   const shareUrl = `https://wa.me/?text=${encodeURIComponent(shareMsg)}`;
 
   function copyCode() {
@@ -132,18 +140,22 @@ export default function OrderConfirmation() {
                   <Copy className="w-3.5 h-3.5" /> Copy
                 </button>
               </div>
-              {/* Discount info pills */}
-                <div className="flex gap-2 mb-3">
-                <div className="flex-1 bg-white/10 rounded-xl px-3 py-2 text-center">
-                  <p className="text-orange-200 text-xs">Orders ₹1000+</p>
-                  <p className="text-white font-bold text-sm">friend gets up to ₹25 off</p>
-                  <p className="text-orange-300 text-xs">+ you earn up to ₹75</p>
-                </div>
-                <div className="flex-1 bg-white/10 rounded-xl px-3 py-2 text-center">
-                  <p className="text-orange-200 text-xs">Orders ₹500–₹999</p>
-                  <p className="text-white font-bold text-sm">friend gets up to ₹13 off</p>
-                  <p className="text-orange-300 text-xs">+ you earn up to ₹37</p>
-                </div>
+              {/* Discount info pills — dynamic from Firestore referral config */}
+                <div className="flex gap-2 mb-3 flex-wrap">
+                {[...referralConfig.tiers].reverse().map((tier, i) => {
+                  const sampleAmt = tier.minOrder + 1;
+                  const disc = computeReferralDiscountFromTiers(sampleAmt, referralConfig.tiers, referralConfig.splitReferrerPct);
+                  const rangeLabel = tier.maxOrder
+                    ? `Orders ₹${tier.minOrder}–₹${tier.maxOrder - 1}`
+                    : `Orders ₹${tier.minOrder}+`;
+                  return (
+                    <div key={i} className="flex-1 min-w-[120px] bg-white/10 rounded-xl px-3 py-2 text-center">
+                      <p className="text-orange-200 text-xs">{rangeLabel}</p>
+                      <p className="text-white font-bold text-sm">friend gets up to ₹{disc.customerDiscount} off</p>
+                      <p className="text-orange-300 text-xs">+ you earn up to ₹{disc.referrerCredit}</p>
+                    </div>
+                  );
+                })}
               </div>
               {/* Share on WhatsApp button */}
               <a href={shareUrl} target="_blank" rel="noreferrer"

@@ -13,6 +13,34 @@ export interface AdminUser {
   updatedAt: string;
 }
 
+// ─── Referral Config ────────────────────────────────────────────────────────
+export interface ReferralTier {
+  minOrder: number;          // ₹ minimum order (inclusive)
+  maxOrder: number | null;   // ₹ maximum order (exclusive), null = unlimited
+  pct: number;               // total discount % (e.g. 7.5)
+  cap: number | null;        // max total ₹ discount, null = no cap
+}
+
+export interface ReferralConfig {
+  tiers: ReferralTier[];         // sorted by minOrder ascending
+  splitReferrerPct: number;      // % of total going to referrer (e.g. 75), rest goes to friend
+  creditRedemptionPct: number;   // % of order redeemable as credit (e.g. 10)
+  creditRedemptionCap: number;   // max ₹ redeemable per order (e.g. 75)
+  updatedAt?: string;
+}
+
+// Default tiers (used if Firestore doc doesn't exist yet)
+export const DEFAULT_REFERRAL_CONFIG: ReferralConfig = {
+  tiers: [
+    { minOrder: 1,    maxOrder: 500,  pct: 3,   cap: null },
+    { minOrder: 500,  maxOrder: 1000, pct: 5,   cap: 50   },
+    { minOrder: 1000, maxOrder: null, pct: 7.5, cap: 100  },
+  ],
+  splitReferrerPct: 75,
+  creditRedemptionPct: 10,
+  creditRedemptionCap: 75,
+};
+
 // ─── Product ─────────────────────────────────────────────────────────────────
 export interface Product {
   id: string;
@@ -167,6 +195,7 @@ export interface Order {
   agentId?: string;               // set when order placed via Agent Console
   agentName?: string;             // agent's display name (denormalised)
   agentCommission?: number;       // ₹ commission due to agent on this order
+  agentMargin?: number;           // ₹ agent's profit (sellingTotal - skcTotal) — visible to agent only, not shown in admin
   createdAt: string;
   updatedAt: string;
   deliveredAt?: string;
