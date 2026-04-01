@@ -346,6 +346,17 @@ export default function StoreFront() {
             </div>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
+            {/* Nav links — hidden on very small screens */}
+            <a href="/about"
+              className="hidden sm:flex items-center text-xs font-medium px-3 py-1.5 rounded-full transition-colors"
+              style={{ color: '#ffd700', border: '1px solid rgba(200,130,26,0.5)' }}>
+              About
+            </a>
+            <a href="/my-orders"
+              className="hidden sm:flex items-center text-xs font-medium px-3 py-1.5 rounded-full transition-colors"
+              style={{ color: '#ffd700', border: '1px solid rgba(200,130,26,0.5)' }}>
+              My Orders
+            </a>
             <button onClick={() => setShowCart(true)}
               className="relative w-11 h-11 rounded-full flex items-center justify-center"
               style={{ background: 'rgba(200,130,26,0.25)', border: '1.5px solid #c8821a' }}>
@@ -358,6 +369,19 @@ export default function StoreFront() {
               )}
             </button>
           </div>
+        </div>
+        {/* Mobile nav row — visible only on small screens */}
+        <div className="sm:hidden flex gap-3 px-4 pb-2">
+          <a href="/about"
+            className="text-xs font-medium px-3 py-1 rounded-full"
+            style={{ color: '#ffd700', border: '1px solid rgba(200,130,26,0.5)' }}>
+            About Us
+          </a>
+          <a href="/my-orders"
+            className="text-xs font-medium px-3 py-1 rounded-full"
+            style={{ color: '#ffd700', border: '1px solid rgba(200,130,26,0.5)' }}>
+            My Orders
+          </a>
         </div>
       </header>
 
