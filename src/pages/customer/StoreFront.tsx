@@ -664,7 +664,7 @@ export default function StoreFront() {
           </button>
 
           {/* Referral code lookup */}
-          <a href="/my-referral"
+          <a href="/my-orders?tab=referral"
             className="flex items-center gap-3 bg-white rounded-2xl px-4 py-3 shadow-sm"
             style={{ border: '1px solid #fde68a' }}>
             <div className="w-9 h-9 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
@@ -822,7 +822,7 @@ export default function StoreFront() {
           <div className="flex justify-center gap-4 mt-3">
             <a href="/about" className="text-xs" style={{ color: '#d4a574' }}>About Us</a>
             <a href="/my-orders" className="text-xs" style={{ color: '#d4a574' }}>My Orders</a>
-            <a href="/my-referral" className="text-xs" style={{ color: '#d4a574' }}>🎟️ Referral</a>
+            <a href="/my-orders?tab=referral" className="text-xs" style={{ color: '#d4a574' }}>🎟️ Referral</a>
           </div>
         </div>
       </footer>
