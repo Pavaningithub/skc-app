@@ -1554,6 +1554,7 @@ function OrderFormModal({
         }
       } finally { setLookingUpPhone(false); }
     } else {
+      setLookingUpPhone(false);
       setMyReferralCode(null);
       setIsReturningCustomer(false);
       setStandingDiscount(0);

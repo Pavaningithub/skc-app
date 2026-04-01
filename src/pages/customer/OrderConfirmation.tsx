@@ -50,8 +50,10 @@ export default function OrderConfirmation() {
   const referralCode = !isAgentOrder ? customer?.referralCode : undefined;
   const storeUrl = typeof window !== 'undefined' ? window.location.origin : 'https://YOUR_DOMAIN';
   const { config: referralConfig } = useReferralConfig();
-  // Derive top tier hint for the WA share message
-  const topTier = referralConfig.tiers.reduce((best, t) => t.minOrder > best.minOrder ? t : best, referralConfig.tiers[0]);
+  // Derive top tier hint for the WA share message (guard against empty tiers array)
+  const topTier = referralConfig.tiers.length > 0
+    ? referralConfig.tiers.reduce((best, t) => t.minOrder > best.minOrder ? t : best, referralConfig.tiers[0])
+    : null;
   const topTierSample = topTier ? computeReferralDiscountFromTiers(topTier.minOrder + 1, referralConfig.tiers, referralConfig.splitReferrerPct) : null;
   const topTierHint = topTier && topTierSample
     ? `up to ₹${topTierSample.customerDiscount} off on orders ₹${topTier.minOrder}+`
