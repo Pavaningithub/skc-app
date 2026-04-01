@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { Search, Copy, Share2, Leaf, ArrowLeft } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { customersService } from '../../lib/services';
-import { referralShareMessage, normalizeWhatsapp } from '../../lib/utils';
+import { referralShareMessage, normalizeWhatsapp, computeReferralDiscountFromTiers } from '../../lib/utils';
+import { useReferralConfig } from '../../lib/useReferralConfig';
 import { APP_CONFIG } from '../../config';
 import toast from 'react-hot-toast';
 
@@ -16,7 +17,13 @@ export default function MyReferralPage() {
   const [noCode, setNoCode] = useState(false);
 
   const storeUrl = typeof window !== 'undefined' ? window.location.origin : '';
-  const shareMsg = referralCode ? referralShareMessage(customerName, referralCode, storeUrl) : '';
+  const { config: referralConfig } = useReferralConfig();
+  const topTier = referralConfig.tiers.reduce((best, t) => t.minOrder > best.minOrder ? t : best, referralConfig.tiers[0]);
+  const topTierSample = topTier ? computeReferralDiscountFromTiers(topTier.minOrder + 1, referralConfig.tiers, referralConfig.splitReferrerPct) : null;
+  const topTierHint = topTier && topTierSample
+    ? `up to ₹${topTierSample.customerDiscount} off on orders ₹${topTier.minOrder}+`
+    : undefined;
+  const shareMsg = referralCode ? referralShareMessage(customerName, referralCode, storeUrl, topTierHint) : '';
   const shareUrl = `https://wa.me/?text=${encodeURIComponent(shareMsg)}`;
   const digits = normalizeWhatsapp(phone);
 
@@ -158,8 +165,16 @@ export default function MyReferralPage() {
               <p className="font-semibold text-gray-700">How it works:</p>
               <p>Share your link — when a friend places their <strong>first order</strong>:</p>
               <p className="pl-3">→ They get an instant discount at checkout</p>
-              <p className="pl-3">→ You earn up to <strong>₹37</strong> credit (orders ₹500–₹999)</p>
-              <p className="pl-3">→ You earn up to <strong>₹75</strong> credit (orders ₹1000+)</p>
+              {[...referralConfig.tiers].reverse().map((tier, i) => {
+                const sampleAmt = tier.minOrder + 1;
+                const disc = computeReferralDiscountFromTiers(sampleAmt, referralConfig.tiers, referralConfig.splitReferrerPct);
+                const rangeLabel = tier.maxOrder
+                  ? `₹${tier.minOrder}–₹${tier.maxOrder - 1}`
+                  : `₹${tier.minOrder}+`;
+                return (
+                  <p key={i} className="pl-3">→ You earn up to <strong>₹{disc.referrerCredit}</strong> credit (orders {rangeLabel})</p>
+                );
+              })}
               <p className="text-gray-400 pt-0.5">Credit is redeemable on your future orders.</p>
             </div>
 
