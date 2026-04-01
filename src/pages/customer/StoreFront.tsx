@@ -508,7 +508,34 @@ export default function StoreFront() {
             </span>
           </div>
 
-          {/* Scrolling chat bubbles */}
+          {/* ── Latest review — pinned featured card ── */}
+          {(() => {
+            const latest = testimonials[0];
+            if (!latest) return null;
+            const initials = latest.customerName.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase();
+            return (
+              <div className="mx-4 mb-4 rounded-2xl p-3.5 shadow-sm flex gap-3 items-start"
+                style={{ background: '#fff', border: '2px solid #c8821a' }}>
+                <div className="w-9 h-9 rounded-full flex-shrink-0 flex items-center justify-center text-white text-sm font-bold"
+                  style={{ background: '#128c7e' }}>{initials}</div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap mb-1">
+                    <span className="text-xs font-bold" style={{ color: '#075e54' }}>{latest.customerName}</span>
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: '#fff3e0', color: '#c8821a' }}>🆕 Latest</span>
+                    {latest.orderNumber && (
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: '#e8f5e9', color: '#256029' }}>✓ Order #{latest.orderNumber}</span>
+                    )}
+                  </div>
+                  <div className="flex gap-0.5 mb-1">
+                    {[1,2,3,4,5].map(s => (
+                      <Star key={s} className="w-3 h-3" style={{ fill: s <= latest.rating ? '#f59e0b' : '#e5e7eb', color: s <= latest.rating ? '#f59e0b' : '#e5e7eb' }} />
+                    ))}
+                  </div>
+                  <p className="text-sm leading-snug" style={{ color: '#1a1a1a' }}>"{latest.whatYouLiked}"</p>
+                </div>
+              </div>
+            );
+          })()}
           <div className="relative">
             <div className="flex gap-4 px-4 animate-marquee" style={{ width: 'max-content' }}>
               {[...testimonials, ...testimonials].map((t, i) => {
@@ -768,7 +795,11 @@ export default function StoreFront() {
             </a>
           </p>
           <a href="/admin/login" className="block mt-5 text-xs" style={{ color: '#555' }}>Admin Login</a>
-          <a href="/my-referral" className="block mt-2 text-xs" style={{ color: '#888' }}>🎟️ Find My Referral Code</a>
+          <div className="flex justify-center gap-4 mt-3">
+            <a href="/about" className="text-xs" style={{ color: '#d4a574' }}>About Us</a>
+            <a href="/my-orders" className="text-xs" style={{ color: '#d4a574' }}>My Orders</a>
+            <a href="/my-referral" className="text-xs" style={{ color: '#d4a574' }}>🎟️ Referral</a>
+          </div>
         </div>
       </footer>
 

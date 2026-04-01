@@ -8,6 +8,8 @@ import StoreFront from './pages/customer/StoreFront';
 const OrderConfirmation = lazy(() => import('./pages/customer/OrderConfirmation'));
 const FeedbackPage      = lazy(() => import('./pages/customer/FeedbackPage'));
 const MyReferralPage    = lazy(() => import('./pages/customer/MyReferralPage'));
+const MyAccountPage     = lazy(() => import('./pages/customer/MyAccountPage'));
+const AboutPage         = lazy(() => import('./pages/customer/AboutPage'));
 
 // Admin pages — all lazy loaded (never needed by customers)
 const AdminLayout      = lazy(() => import('./pages/admin/AdminLayout'));
@@ -62,6 +64,8 @@ export default function App() {
           <Route path="/order-confirmation/:orderId" element={<OrderConfirmation />} />
           <Route path="/feedback/:orderId" element={<FeedbackPage />} />
           <Route path="/my-referral" element={<MyReferralPage />} />
+          <Route path="/my-orders" element={<MyAccountPage />} />
+          <Route path="/about" element={<AboutPage />} />
 
           {/* Agent portal — separate from customer storefront and admin */}
           <Route path="/agent/login" element={<AgentLogin />} />

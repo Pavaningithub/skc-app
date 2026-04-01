@@ -290,6 +290,13 @@ export const ordersService = {
     const items = snap.docs.map(d => ({ id: d.id, ...d.data() } as Order));
     return items.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   },
+  async getByWhatsapp(whatsapp: string): Promise<Order[]> {
+    const snap = await getDocs(
+      query(collection(db, COLLECTIONS.ORDERS), where('customerWhatsapp', '==', whatsapp))
+    );
+    const items = snap.docs.map(d => ({ id: d.id, ...d.data() } as Order));
+    return items.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  },
   async getById(id: string): Promise<Order | null> {
     const docSnap = await getDoc(doc(db, COLLECTIONS.ORDERS, id));
     if (!docSnap.exists()) return null;
