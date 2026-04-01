@@ -158,7 +158,8 @@ export default function MyReferralPage() {
               <p className="font-semibold text-gray-700">How it works:</p>
               <p>Share your link — when a friend places their <strong>first order</strong>:</p>
               <p className="pl-3">→ They get an instant discount at checkout</p>
-              <p className="pl-3">→ You earn store credit (up to ₹75 per order)</p>
+              <p className="pl-3">→ You earn up to <strong>₹37</strong> credit (orders ₹500–₹999)</p>
+              <p className="pl-3">→ You earn up to <strong>₹75</strong> credit (orders ₹1000+)</p>
               <p className="text-gray-400 pt-0.5">Credit is redeemable on your future orders.</p>
             </div>
 

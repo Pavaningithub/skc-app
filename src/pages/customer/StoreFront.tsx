@@ -1673,7 +1673,7 @@ function OrderFormModal({
               {/* Info box about how referral works */}
               <div className="mt-2 rounded-xl px-3 py-2.5 text-xs" style={{ background: '#fdf5e6', color: '#7a4010' }}>
                 <p className="font-semibold mb-1">🎟️ First order only — your discount is applied automatically at checkout.</p>
-                <p style={{ color: '#7a4010' }}>💡 Your friend also earns store credit when you order using their link!</p>
+                <p style={{ color: '#7a4010' }}>💡 The person who shared this code also earns store credit — it's a win-win!</p>
               </div>
             </div>
           )}
@@ -1711,7 +1711,7 @@ function OrderFormModal({
           {!isSample && isReturningCustomer && availableCredit === 0 && myReferralCode && (
             <div className="rounded-xl px-3 py-2.5 text-xs" style={{ background: '#fdf5e6', color: '#7a4010' }}>
               <p className="font-semibold mb-0.5">💡 Earn store credit!</p>
-              <p>Share your code <span className="font-mono font-bold">{myReferralCode}</span> with friends. You earn <strong>75% of the discount</strong> as credit every time someone new orders using your link!</p>
+              <p>Share your code <span className="font-mono font-bold">{myReferralCode}</span> with friends. When they order using your link, <strong>they get a discount</strong> and <strong>you earn store credit</strong> (up to ₹75 per referral)!</p>
             </div>
           )}
 

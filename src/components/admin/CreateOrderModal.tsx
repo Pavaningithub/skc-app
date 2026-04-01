@@ -256,9 +256,9 @@ export default function CreateOrderModal({ onClose, onCreated }: Props) {
                   <option key={p.id} value={p.id}>{p.name} — ₹{p.pricePerUnit}/{p.unit}</option>
                 ))}
               </select>
-              <input type="number" min="1" value={selectedQty} onChange={e => setSelectedQty(Number(e.target.value))}
+              <input type="number" min="0" step={selectedProduct?.unit === 'kg' ? 0.25 : selectedProduct?.unit === 'piece' ? 1 : 50} value={selectedQty} onChange={e => setSelectedQty(Number(e.target.value))}
                 className="w-24 border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-orange-400 text-center"
-                placeholder={selectedProduct?.unit === 'piece' ? 'pcs' : 'grams'} />
+                placeholder={selectedProduct?.unit === 'piece' ? 'pcs' : selectedProduct?.unit === 'kg' ? 'kg' : 'grams'} />
               <button onClick={addItem}
                 className="bg-orange-500 hover:bg-orange-600 text-white px-3 py-2 rounded-xl transition-colors">
                 <Plus className="w-5 h-5" />
@@ -266,7 +266,9 @@ export default function CreateOrderModal({ onClose, onCreated }: Props) {
             </div>
             {selectedProduct && (
               <p className="text-xs text-gray-400 mt-1">
-                Unit: {selectedProduct.unit} · ₹{selectedProduct.pricePerUnit} per {selectedProduct.unit}
+                ₹{selectedProduct.pricePerUnit} per {selectedProduct.unit}
+                {selectedProduct.unit === 'kg' && <span className="text-orange-500 font-medium ml-1">— enter qty in kg (e.g. 0.25 = 250g, 1 = 1kg)</span>}
+                {selectedProduct.unit === 'gram' && <span className="ml-1">— enter qty in grams (e.g. 250, 500)</span>}
               </p>
             )}
             {selectedProduct?.hasGarlicOption && (
