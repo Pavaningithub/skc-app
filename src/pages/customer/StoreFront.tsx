@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ShoppingCart, Star, Plus, Minus,
@@ -83,24 +83,16 @@ export default function StoreFront() {
   async function load() {
     setLoading(true);
     try {
-      const [p, allOrders, allCustomers] = await Promise.all([
-        productsService.getActive(),
-        ordersService.getAll(),
-        customersService.getAll(),
-      ]);
+      // Load products first — unblock the UI immediately
+      const p = await productsService.getActive();
       setProducts(p);
-      const HOLIGE_BASE = 444;
-      const holigeDelivered = allOrders
-        .filter(o => o.status === 'delivered')
-        .flatMap(o => o.items)
-        .filter(i => i.productName.toLowerCase().includes('holige') || i.productName.toLowerCase().includes('obbattu'))
-        .reduce((sum, i) => sum + i.quantity, 0);
-      setSiteStats({
-        orders:    allOrders.filter(o => o.status !== 'cancelled').length,
-        customers: allCustomers.length,
-        holige:    HOLIGE_BASE + holigeDelivered,
-      });
     } finally { setLoading(false); }
+
+    // Load stats in the background after products are shown — uses aggregate counts (no full fetch)
+    try {
+      const stats = await ordersService.getSiteStats();
+      setSiteStats({ orders: stats.orders, customers: stats.customers, holige: 444 });
+    } catch { /* stats are non-critical, fail silently */ }
   }
 
   const categories = ['All', ...Array.from(new Set(products.map(p => p.category)))];
@@ -1515,7 +1507,18 @@ function OrderFormModal({
 }) {
   const [validatingReferral, setValidatingReferral] = useState(false);
   const [lookingUpPhone, setLookingUpPhone] = useState(false);
+  const referralDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { config: referralConfig } = useReferralConfig();
+
+  // Auto-validate referral code 600ms after the user stops typing
+  useEffect(() => {
+    const code = form.referralCode.trim();
+    if (!code || isReturningCustomer || standingDiscount > 0) return;
+    if (referralDebounceRef.current) clearTimeout(referralDebounceRef.current);
+    referralDebounceRef.current = setTimeout(() => { handleReferralCodeBlur(); }, 600);
+    return () => { if (referralDebounceRef.current) clearTimeout(referralDebounceRef.current); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.referralCode]);
   const creditDiscount = (isReturningCustomer && useCredit)
     ? computeCreditRedemption(availableCredit, cartTotal, referralConfig.creditRedemptionPct, referralConfig.creditRedemptionCap) : 0;
   const standingDiscountAmt = standingDiscount > 0 ? Math.round(cartTotal * standingDiscount / 100) : 0;
