@@ -227,6 +227,16 @@ export function generateOrderNumber(): string {
   return `SKC${y}${m}${d}${r}`;
 }
 
+/** Generate subscription order number — SUB prefix to distinguish from regular orders */
+export function generateSubscriptionOrderNumber(): string {
+  const now = new Date();
+  const y = now.getFullYear().toString().slice(2);
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  const r = Math.floor(Math.random() * 9000) + 1000;
+  return `SUB${y}${m}${d}${r}`;
+}
+
 /** Generate a unique referral code from customer name, e.g. "Pavan Naik" → SKC-PAVAN47 */
 export function generateReferralCode(name: string): string {
   const slug = name.trim().split(' ')[0].toUpperCase().replace(/[^A-Z]/g, '').slice(0, 6);
