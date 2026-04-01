@@ -7,7 +7,6 @@ import { Suspense, lazy } from 'react';
 import StoreFront from './pages/customer/StoreFront';
 const OrderConfirmation = lazy(() => import('./pages/customer/OrderConfirmation'));
 const FeedbackPage      = lazy(() => import('./pages/customer/FeedbackPage'));
-const MyReferralPage    = lazy(() => import('./pages/customer/MyReferralPage'));
 const MyAccountPage     = lazy(() => import('./pages/customer/MyAccountPage'));
 const AboutPage         = lazy(() => import('./pages/customer/AboutPage'));
 
@@ -65,7 +64,7 @@ export default function App() {
             <Route path="/" element={<StoreFront />} />
             <Route path="/order-confirmation/:orderId" element={<OrderConfirmation />} />
             <Route path="/feedback/:orderId" element={<FeedbackPage />} />
-            <Route path="/my-referral" element={<MyReferralPage />} />
+            <Route path="/my-referral" element={<Navigate to="/my-orders?tab=referral" replace />} />
             <Route path="/my-orders" element={<MyAccountPage />} />
             <Route path="/about" element={<AboutPage />} />
 
