@@ -153,8 +153,16 @@ export default function OrderConfirmation() {
               {/* Discount info pills — dynamic from Firestore referral config */}
                 <div className="flex gap-2 mb-3 flex-wrap">
                 {[...referralConfig.tiers].reverse().map((tier, i) => {
-                  const sampleAmt = tier.minOrder + 1;
-                  const disc = computeReferralDiscountFromTiers(sampleAmt, referralConfig.tiers, referralConfig.splitReferrerPct);
+                  // Compute at the amount that yields the maximum discount for this tier:
+                  // - capped tier: use the order amount where cap is hit (cap / pct * 100)
+                  // - bounded tier: use maxOrder - 1
+                  // - unbounded tier: use minOrder (no cap means linear, just show at minOrder)
+                  const maxAmt = tier.cap !== null
+                    ? Math.ceil(tier.cap / (tier.pct / 100))   // order amount where cap kicks in
+                    : tier.maxOrder !== null
+                      ? tier.maxOrder - 1                       // top of bounded range
+                      : tier.minOrder;                          // unbounded — show at minOrder
+                  const disc = computeReferralDiscountFromTiers(maxAmt, referralConfig.tiers, referralConfig.splitReferrerPct);
                   const rangeLabel = tier.maxOrder
                     ? `Orders ₹${tier.minOrder}–₹${tier.maxOrder - 1}`
                     : `Orders ₹${tier.minOrder}+`;
