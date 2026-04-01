@@ -30,6 +30,13 @@ export default function AboutPage() {
 
   return (
     <div className="min-h-screen" style={{ background: '#fdf5e6' }}>
+      {/* Version badge */}
+      <div className="fixed bottom-3 right-3 z-50 flex items-center gap-1.5 px-2.5 py-1 rounded-full shadow-md text-white text-xs font-mono"
+        style={{ background: __APP_ENV__ === 'production' ? '#22c55e' : '#3b82f6', opacity: 0.85 }}
+        title={__APP_ENV__ === 'production' ? 'Production (Green)' : 'Staging (Blue)'}>
+        <span className="w-1.5 h-1.5 rounded-full bg-white/70" />
+        v{__APP_VERSION__}{__APP_ENV__ !== 'production' && ` · ${__APP_ENV__}`}
+      </div>
       {/* Header */}
       <div className="sticky top-0 z-10 shadow-sm" style={{ background: '#3d1c02' }}>
         <div className="max-w-lg mx-auto px-4 py-3 flex items-center gap-3">

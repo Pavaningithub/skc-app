@@ -791,12 +791,13 @@ export default function StoreFront() {
         </div>
       </div>
 
-      {/* Env indicator — fixed bottom-right */}
-      <div
-        className="fixed bottom-3 right-3 z-50 w-2.5 h-2.5 rounded-full shadow"
-        style={{ background: __APP_ENV__ === 'production' ? '#22c55e' : '#3b82f6' }}
-        title={__APP_ENV__ === 'production' ? `v${__APP_VERSION__} · Production` : `v${__APP_VERSION__} · Staging`}
-      />
+      {/* Version badge — fixed bottom-right */}
+      <div className="fixed bottom-3 right-3 z-50 flex items-center gap-1.5 px-2.5 py-1 rounded-full shadow-md text-white text-xs font-mono"
+        style={{ background: __APP_ENV__ === 'production' ? '#22c55e' : '#3b82f6', opacity: 0.85 }}
+        title={__APP_ENV__ === 'production' ? 'Production (Green)' : 'Staging (Blue)'}>
+        <span className="w-1.5 h-1.5 rounded-full bg-white/70" />
+        v{__APP_VERSION__}{__APP_ENV__ !== 'production' && ` · ${__APP_ENV__}`}
+      </div>
 
       {/* Footer */}
       <footer className="py-8 text-center" style={{ background: 'linear-gradient(160deg, #3d1c02 0%, #1a0a00 100%)' }}>
