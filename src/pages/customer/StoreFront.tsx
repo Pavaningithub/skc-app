@@ -355,7 +355,7 @@ export default function StoreFront() {
             <a href="/my-orders"
               className="hidden sm:flex items-center text-xs font-medium px-3 py-1.5 rounded-full transition-colors"
               style={{ color: '#ffd700', border: '1px solid rgba(200,130,26,0.5)' }}>
-              My Orders
+              My Account
             </a>
             <button onClick={() => setShowCart(true)}
               className="relative w-11 h-11 rounded-full flex items-center justify-center"
@@ -380,7 +380,7 @@ export default function StoreFront() {
           <a href="/my-orders"
             className="text-xs font-medium px-3 py-1 rounded-full"
             style={{ color: '#ffd700', border: '1px solid rgba(200,130,26,0.5)' }}>
-            My Orders
+            My Account
           </a>
         </div>
       </header>
@@ -821,7 +821,7 @@ export default function StoreFront() {
           <a href="/admin/login" className="block mt-5 text-xs" style={{ color: '#555' }}>Admin Login</a>
           <div className="flex justify-center gap-4 mt-3">
             <a href="/about" className="text-xs" style={{ color: '#d4a574' }}>About Us</a>
-            <a href="/my-orders" className="text-xs" style={{ color: '#d4a574' }}>My Orders</a>
+            <a href="/my-orders" className="text-xs" style={{ color: '#d4a574' }}>My Account</a>
             <a href="/my-orders?tab=referral" className="text-xs" style={{ color: '#d4a574' }}>🎟️ Referral</a>
           </div>
         </div>
