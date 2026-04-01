@@ -119,6 +119,11 @@ test('customer can place an order', async ({ page }) => {
   if (popup) await popup.close();
 
   await expect(page).toHaveURL(/\/order-confirmation\//, { timeout: 15000 });
+
+  // Verify the order confirmation page actually renders its content
+  await expect(page.getByText(/Order Placed/i)).toBeVisible({ timeout: 10000 });
+  await expect(page.getByText(/Order No:/i)).toBeVisible();
+  await expect(page.getByText(TEST_NAME)).toBeVisible();
 });
 
 // ─── 8. Order appears in admin ───────────────────────────────────────────────
@@ -165,6 +170,10 @@ test('customer can request a free sample', async ({ page }) => {
   ]);
   if (popup) await popup.close();
   await expect(page).toHaveURL(/\/order-confirmation\//, { timeout: 10000 });
+
+  // Verify the sample confirmation page actually renders its content
+  await expect(page.getByText(/Sample Requested/i)).toBeVisible({ timeout: 10000 });
+  await expect(page.getByText(/Order No:/i)).toBeVisible();
 });
 
 // ─── 12. Admin settings page ─────────────────────────────────────────────────
