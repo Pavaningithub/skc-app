@@ -86,13 +86,9 @@ export const APP_CONFIG = {
   ON_DEMAND_BADGE:     'Made Fresh on Order 🔥',
   ON_DEMAND_NOTE:      'This product is prepared fresh after your order. Delivery may take 1–2 extra days.',
 
-  // ── Domain / Subdomains ───────────────────────────────────────
-  // Set VITE_APP_DOMAIN=YOUR_DOMAIN in your env to enable subdomain routing.
-  // Falls back to vercel hostname for staging / local dev.
-  APP_DOMAIN:          (import.meta.env.VITE_APP_DOMAIN as string) || '',
+  // ── Domain / Subdomains ────────────────────────────────────────────────────
+  // Used for generating correct store URLs in WhatsApp messages etc.
   STORE_URL:           import.meta.env.VITE_APP_DOMAIN
                          ? `https://${import.meta.env.VITE_APP_DOMAIN}`
                          : (typeof window !== 'undefined' ? window.location.origin : 'https://YOUR_DOMAIN'),
-  ADMIN_SUBDOMAIN:     import.meta.env.VITE_APP_DOMAIN ? `admin.${import.meta.env.VITE_APP_DOMAIN}` : '',
-  AGENT_SUBDOMAIN:     import.meta.env.VITE_APP_DOMAIN ? `agents.${import.meta.env.VITE_APP_DOMAIN}` : '',
 };

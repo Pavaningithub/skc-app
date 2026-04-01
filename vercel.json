@@ -5,6 +5,20 @@
       "destination": "/index.html"
     }
   ],
+  "redirects": [
+    {
+      "source": "/",
+      "has": [{ "type": "host", "value": "admin.YOUR_DOMAIN" }],
+      "destination": "https://admin.YOUR_DOMAIN/admin/dashboard",
+      "permanent": false
+    },
+    {
+      "source": "/",
+      "has": [{ "type": "host", "value": "agents.YOUR_DOMAIN" }],
+      "destination": "https://agents.YOUR_DOMAIN/agent/login",
+      "permanent": false
+    }
+  ],
   "headers": [
     {
       "source": "/(.*)",
