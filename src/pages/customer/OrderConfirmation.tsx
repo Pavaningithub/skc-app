@@ -17,17 +17,18 @@ export default function OrderConfirmation() {
 
   useEffect(() => {
     if (!orderId) return;
-    ordersService.getById(orderId).then(async o => {
-      setOrder(o);
-      if (o?.customerId) {
-        // Fetch customer to get their referral code
-        try {
-          const c = await customersService.getById(o.customerId);
-          setCustomer(c);
-        } catch { /* non-fatal */ }
-      }
-      setLoading(false);
-    });
+    ordersService.getById(orderId)
+      .then(async o => {
+        setOrder(o);
+        if (o?.customerId) {
+          try {
+            const c = await customersService.getById(o.customerId);
+            setCustomer(c);
+          } catch { /* non-fatal */ }
+        }
+      })
+      .catch(err => console.error('Failed to load order:', err))
+      .finally(() => setLoading(false));
   }, [orderId]);
 
   if (loading) return (
