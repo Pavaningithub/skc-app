@@ -231,6 +231,17 @@ export interface Subscription {
   createdAt: string;
 }
 
+export interface SubscriptionConfig {
+  threeMonthPct: number;   // discount % for 3-month plan
+  sixMonthPct: number;     // discount % for 6-month plan
+  updatedAt?: string;
+}
+
+export const DEFAULT_SUBSCRIPTION_CONFIG: SubscriptionConfig = {
+  threeMonthPct: 5,
+  sixMonthPct:   10,
+};
+
 // ─── Agent (Partner / Reseller) ────────────────────────────────────────────────────────────────
 export interface Agent {
   id: string;

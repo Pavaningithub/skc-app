@@ -28,6 +28,7 @@ export default function OrdersPage() {
   const [payFilter, setPayFilter] = useState<PayFilter>('all');
   const [sortKey, setSortKey] = useState<SortKey>('date_desc');
   const [showCreate, setShowCreate] = useState(false);
+  const [showSubscriptions, setShowSubscriptions] = useState(false);
 
   async function updateStatus(order: Order, status: OrderStatus) {
     await ordersService.updateStatus(order.id, status);
@@ -35,6 +36,7 @@ export default function OrdersPage() {
 
   const filtered = useMemo(() => {
     let result = orders.filter(o => {
+      if (!showSubscriptions && o.type === 'subscription') return false;
       const matchSearch = o.customerName.toLowerCase().includes(search.toLowerCase()) ||
         o.orderNumber.toLowerCase().includes(search.toLowerCase()) ||
         o.customerPlace.toLowerCase().includes(search.toLowerCase());
@@ -56,7 +58,9 @@ export default function OrdersPage() {
       }
     });
     return result;
-  }, [orders, search, statusFilter, payFilter, sortKey]);
+  }, [orders, search, statusFilter, payFilter, sortKey, showSubscriptions]);
+
+  const subCount = orders.filter(o => o.type === 'subscription').length;
 
   const statusCounts = {
     all: orders.length,
@@ -85,10 +89,20 @@ export default function OrdersPage() {
           <h1 className="text-2xl font-bold text-gray-800 font-display">Orders</h1>
           <p className="text-sm text-gray-500">{filtered.length !== orders.length ? `${filtered.length} of ${orders.length}` : `${orders.length} total`} orders</p>
         </div>
-        <button onClick={() => setShowCreate(true)}
-          className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-xl text-sm font-semibold transition-colors">
-          <Plus className="w-4 h-4" /> New Order
-        </button>
+        <div className="flex items-center gap-2">
+          {subCount > 0 && (
+            <button onClick={() => setShowSubscriptions(v => !v)}
+              className={`text-xs px-3 py-1.5 rounded-xl border font-medium transition-colors ${
+                showSubscriptions ? 'bg-blue-500 text-white border-blue-500' : 'bg-white text-blue-600 border-blue-200 hover:bg-blue-50'
+              }`}>
+              {showSubscriptions ? '✓ ' : ''}SUB orders ({subCount})
+            </button>
+          )}
+          <button onClick={() => setShowCreate(true)}
+            className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-xl text-sm font-semibold transition-colors">
+            <Plus className="w-4 h-4" /> New Order
+          </button>
+        </div>
       </div>
 
       {/* Status Filter Pills */}

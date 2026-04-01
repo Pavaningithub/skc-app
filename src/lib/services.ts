@@ -10,9 +10,9 @@ import { generateReferralCode } from "./utils";
 import type {
   Product, StockItem, RawMaterial, RawMaterialPurchase,
   Batch, Customer, Order, Expense, Subscription, Feedback, AdminAction, AdminActionType, AdminUser, Agent,
-  ReferralConfig,
+  ReferralConfig, SubscriptionConfig,
 } from "./types";
-import { DEFAULT_REFERRAL_CONFIG } from "./types";
+import { DEFAULT_REFERRAL_CONFIG, DEFAULT_SUBSCRIPTION_CONFIG } from "./types";
 
 // ─── Collection Names ─────────────────────────────────────────────────────────
 export const COLLECTIONS = {
@@ -28,6 +28,7 @@ export const COLLECTIONS = {
   FEEDBACK:              "feedback",
   SETTINGS:              "settings",
   REFERRAL_CONFIG:       "settings",   // doc id = 'referral_config' inside 'settings'
+  SUBSCRIPTION_CONFIG:   "settings",   // doc id = 'subscription_config' inside 'settings'
   ADMIN_ACTIVITY:        "adminActivity",
   ADMIN_USERS:           "adminUsers",
   AGENTS:                "agents",
@@ -612,6 +613,27 @@ export const referralConfigService = {
   subscribe(cb: (config: ReferralConfig) => void): Unsubscribe {
     return onSnapshot(doc(db, 'settings', 'referral_config'), snap => {
       cb(snap.exists() ? (snap.data() as ReferralConfig) : { ...DEFAULT_REFERRAL_CONFIG });
+    });
+  },
+};
+
+// ─── Subscription Config ─────────────────────────────────────────────────────────────
+export const subscriptionConfigService = {
+  async get(): Promise<SubscriptionConfig> {
+    try {
+      const snap = await getDoc(doc(db, 'settings', 'subscription_config'));
+      if (!snap.exists()) return { ...DEFAULT_SUBSCRIPTION_CONFIG };
+      return snap.data() as SubscriptionConfig;
+    } catch {
+      return { ...DEFAULT_SUBSCRIPTION_CONFIG };
+    }
+  },
+  async save(config: SubscriptionConfig): Promise<void> {
+    await setDoc(doc(db, 'settings', 'subscription_config'), { ...config, updatedAt: now() });
+  },
+  subscribe(cb: (config: SubscriptionConfig) => void): Unsubscribe {
+    return onSnapshot(doc(db, 'settings', 'subscription_config'), snap => {
+      cb(snap.exists() ? (snap.data() as SubscriptionConfig) : { ...DEFAULT_SUBSCRIPTION_CONFIG });
     });
   },
 };
