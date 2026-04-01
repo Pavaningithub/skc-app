@@ -1,7 +1,7 @@
 import {
   collection, doc, addDoc, updateDoc, deleteDoc,
   getDocs, getDoc, query, where, setDoc, onSnapshot,
-  increment,
+  increment, getCountFromServer,
   type Unsubscribe,
 } from "firebase/firestore";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
@@ -311,6 +311,17 @@ export const ordersService = {
   async add(order: Omit<Order, "id">): Promise<string> {
     const ref = await addDoc(collection(db, COLLECTIONS.ORDERS), { ...order, createdAt: now(), updatedAt: now() });
     return ref.id;
+  },
+  /** Lightweight stats for the storefront — uses aggregate counts, no full document fetch */
+  async getSiteStats(): Promise<{ orders: number; customers: number }> {
+    const [ordersSnap, customersSnap] = await Promise.all([
+      getCountFromServer(query(collection(db, COLLECTIONS.ORDERS), where('status', '!=', 'cancelled'))),
+      getCountFromServer(collection(db, COLLECTIONS.CUSTOMERS)),
+    ]);
+    return {
+      orders: ordersSnap.data().count,
+      customers: customersSnap.data().count,
+    };
   },
   async updateStatus(id: string, status: Order["status"], extra?: Partial<Order>): Promise<void> {
     await updateDoc(doc(db, COLLECTIONS.ORDERS, id), {
