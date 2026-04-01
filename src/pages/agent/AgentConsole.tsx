@@ -342,20 +342,27 @@ export default function AgentConsole() {
         <div className="max-w-2xl mx-auto p-4 space-y-3">
           <h2 className="font-bold text-gray-800">My Orders</h2>
           {recentOrders.length > 0 && (() => {
-            const totalMargin = recentOrders.reduce((s, o) => s + (o.agentMargin ?? 0), 0);
-            const paidMargin  = recentOrders.filter(o => o.paymentStatus === 'paid').reduce((s, o) => s + (o.agentMargin ?? 0), 0);
-            return totalMargin > 0 ? (
+            const ordersWithMargin = recentOrders.filter(o => o.agentMargin != null && o.agentMargin > 0);
+            const totalMargin = ordersWithMargin.reduce((s, o) => s + (o.agentMargin ?? 0), 0);
+            const paidMargin  = ordersWithMargin.filter(o => o.paymentStatus === 'paid').reduce((s, o) => s + (o.agentMargin ?? 0), 0);
+            const totalCollect = recentOrders.reduce((s, o) => s + o.total + (o.agentMargin ?? 0), 0);
+            return (
               <div className="grid grid-cols-2 gap-2">
                 <div className="bg-green-50 border border-green-200 rounded-xl px-3 py-2 text-center">
                   <p className="text-xs text-green-600">Total Profit</p>
                   <p className="font-bold text-green-700 text-lg">₹{totalMargin}</p>
+                  <p className="text-[10px] text-green-500">{ordersWithMargin.length} orders</p>
                 </div>
                 <div className="bg-blue-50 border border-blue-200 rounded-xl px-3 py-2 text-center">
                   <p className="text-xs text-blue-600">Paid Orders Profit</p>
                   <p className="font-bold text-blue-700 text-lg">₹{paidMargin}</p>
                 </div>
+                <div className="bg-orange-50 border border-orange-200 rounded-xl px-3 py-2 text-center col-span-2">
+                  <p className="text-xs text-orange-600">Total to Collect from Customers</p>
+                  <p className="font-bold text-orange-700 text-lg">₹{totalCollect}</p>
+                </div>
               </div>
-            ) : null;
+            );
           })()}
           {recentOrders.length === 0 && (
             <p className="text-sm text-gray-400 text-center py-8">No orders yet.</p>
@@ -386,12 +393,19 @@ export default function AgentConsole() {
               <p className="text-xs text-gray-500">
                 {o.items.map(i => `${i.productName} ${formatQty(i.quantity, i.unit)}`).join(', ')}
               </p>
-              <div className="flex justify-between text-xs text-gray-500 pt-1 border-t border-gray-50">
-                <span>SKC cost: <strong className="text-gray-700">₹{o.total}</strong></span>
-                {o.agentMargin != null && o.agentMargin > 0 && (
-                  <span className="font-semibold text-green-600">+₹{o.agentMargin} profit</span>
-                )}
-                <span>{new Date(o.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' })}</span>
+              <div className="flex justify-between items-center text-xs pt-1 border-t border-gray-50 gap-2 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-400">SKC: <strong className="text-gray-600">₹{o.total}</strong></span>
+                  {o.agentMargin != null && o.agentMargin > 0 && (
+                    <>
+                      <span className="text-gray-300">·</span>
+                      <span className="text-gray-400">Collect: <strong className="text-gray-800">₹{o.total + o.agentMargin}</strong></span>
+                      <span className="text-gray-300">·</span>
+                      <span className="font-semibold text-green-600">+₹{o.agentMargin} profit</span>
+                    </>
+                  )}
+                </div>
+                <span className="text-gray-400">{new Date(o.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' })}</span>
               </div>
             </div>
           ))}
