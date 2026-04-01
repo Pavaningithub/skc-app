@@ -22,7 +22,7 @@ export default function OrderConfirmation() {
       if (o?.customerId) {
         // Fetch customer to get their referral code
         try {
-          const c = await customersService.getAll().then(all => all.find(x => x.id === o.customerId) ?? null);
+          const c = await customersService.getById(o.customerId);
           setCustomer(c);
         } catch { /* non-fatal */ }
       }
