@@ -129,13 +129,13 @@ export default function StoreFront() {
       if (idx >= 0) {
         const u = [...prev];
         u[idx].quantity  += qty;
-        u[idx].totalPrice = Math.ceil(u[idx].quantity * product.pricePerUnit / 10) * 10;
+        u[idx].totalPrice = u[idx].quantity * product.pricePerUnit;
         return u;
       }
       return [...prev, {
         productId: product.id, productName: product.name,
         unit: product.unit, quantity: qty,
-        pricePerUnit: product.pricePerUnit, totalPrice: Math.ceil(qty * product.pricePerUnit / 10) * 10,
+        pricePerUnit: product.pricePerUnit, totalPrice: qty * product.pricePerUnit,
         customizationNote: note ?? '',
         isOnDemand: product.isOnDemand ?? false,
       }];
@@ -146,7 +146,7 @@ export default function StoreFront() {
   function updateCartItem(idx: number, qty: number) {
     if (qty <= 0) setCart(p => p.filter((_, i) => i !== idx));
     else setCart(p => p.map((item, i) => i === idx
-      ? { ...item, quantity: qty, totalPrice: Math.ceil(qty * item.pricePerUnit / 10) * 10 }
+      ? { ...item, quantity: qty, totalPrice: qty * item.pricePerUnit }
       : item
     ));
   }
@@ -1655,16 +1655,7 @@ function OrderFormModal({
                 <div className="absolute right-3 top-3.5 w-4 h-4 border-2 border-orange-400 border-t-transparent rounded-full animate-spin" />
               )}
             </div>
-            {/* Show customer's own referral code after phone lookup */}
-            {!isSample && myReferralCode && (
-              <div className="mt-2 flex items-center gap-2 rounded-xl px-3 py-2.5"
-                style={{ background: '#e8f5e9', border: '1px solid #a5d6a7' }}>
-                <span className="text-xs text-green-700 flex-1">
-                  🎁 <strong>Your referral code:</strong> <span className="font-mono font-bold tracking-widest">{myReferralCode}</span>
-                  <br /><span className="text-green-600">Share this with friends — you both get a discount on their order!</span>
-                </span>
-              </div>
-            )}
+
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">Your Area / Place</label>

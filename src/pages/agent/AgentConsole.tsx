@@ -139,13 +139,13 @@ export default function AgentConsole() {
         const newCart = c.cart.map((item, i) => {
           if (i !== existing) return item;
           const newQty = item.quantity + qty;
-          return { ...item, quantity: newQty, totalPrice: Math.ceil(newQty * item.pricePerUnit / 10) * 10,
+          return { ...item, quantity: newQty, totalPrice: newQty * item.pricePerUnit,
             sellingPrice: item.sellingPrice, markupPerUnit: item.markupPerUnit };
         });
         return { ...c, cart: newCart };
       }
-      const skcTotal = Math.ceil(qty * product.pricePerUnit / 10) * 10;
-      const sellTotal = Math.ceil(qty * (product.pricePerUnit + markup) / 10) * 10;
+      const skcTotal = qty * product.pricePerUnit;
+      const sellTotal = qty * (product.pricePerUnit + markup);
       const newItem: AgentCartItem = {
         productId: product.id, productName: product.name,
         unit: product.unit, quantity: qty,
@@ -170,7 +170,7 @@ export default function AgentConsole() {
     setCustomers(prev => prev.map(c => {
       if (c.id !== cid) return c;
       const newCart = c.cart.map((item, i) =>
-        i === idx ? { ...item, quantity: qty, totalPrice: Math.ceil(qty * item.pricePerUnit / 10) * 10 } : item,
+        i === idx ? { ...item, quantity: qty, totalPrice: qty * item.pricePerUnit } : item,
       );
       return { ...c, cart: newCart };
     }));
