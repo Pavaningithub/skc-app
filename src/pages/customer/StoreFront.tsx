@@ -823,7 +823,7 @@ export default function StoreFront() {
           <div className="flex justify-center gap-4 mt-3">
             <a href="/about" className="text-xs" style={{ color: '#d4a574' }}>About Us</a>
             <a href="/my-orders" className="text-xs" style={{ color: '#d4a574' }}>My Account</a>
-            <a href="/my-orders?tab=referral" className="text-xs" style={{ color: '#d4a574' }}>🎟️ Referral</a>
+            {/* <a href="/my-orders?tab=referral" className="text-xs" style={{ color: '#d4a574' }}>🎟️ Referral</a> */}
           </div>
         </div>
       </footer>
