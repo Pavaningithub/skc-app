@@ -13,7 +13,8 @@ import type { Order } from '../../lib/types';
 
 const navItems = [
   { to: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/admin/orders',    icon: ShoppingBag,     label: 'Orders' },
+  { to: '/admin/analytics', icon: BarChart3,        label: 'Analytics' },
+  { to: '/admin/orders',    icon: ShoppingBag,      label: 'Orders' },
   { to: '/admin/packing',   icon: Boxes,           label: 'Packing' },
   { to: '/admin/products',  icon: Package,         label: 'Products' },
   { to: '/admin/stock', icon: BarChart3, label: 'Stock' },

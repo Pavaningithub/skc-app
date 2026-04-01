@@ -417,21 +417,27 @@ export default function Dashboard() {
             )}
             {recentOrders.map(order => (
               <Link key={order.id} to={`/admin/orders/${order.id}`}
-                className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors">
-                <div>
-                  <p className="text-sm font-medium text-gray-800">#{order.orderNumber}</p>
-                  <p className="text-xs text-gray-500">{order.customerName} · {formatDate(order.createdAt)}</p>
+                className="flex items-start justify-between px-4 py-3 hover:bg-gray-50 transition-colors gap-3">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-medium text-gray-800">#{order.orderNumber}</p>
+                    <span className={`text-xs px-2 py-0.5 rounded-full flex-shrink-0
+                      ${order.status === 'delivered' ? 'bg-green-100 text-green-700' :
+                        order.status === 'out_for_delivery' ? 'bg-purple-100 text-purple-700' :
+                        order.status === 'confirmed' ? 'bg-blue-100 text-blue-700' :
+                        order.status === 'cancelled' ? 'bg-gray-100 text-gray-500' :
+                        'bg-yellow-100 text-yellow-700'}`}>
+                      {order.status.replace(/_/g, ' ')}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-0.5">{order.customerName} · {formatDate(order.createdAt)}</p>
+                  {order.items.length > 0 && (
+                    <p className="text-xs text-gray-400 mt-0.5 truncate">
+                      {order.items.map(i => `${i.productName} ×${i.quantity}${i.unit === 'gram' ? 'g' : i.unit === 'kg' ? 'kg' : ''}`).join(', ')}
+                    </p>
+                  )}
                 </div>
-                <div className="text-right">
-                  <p className="text-sm font-semibold text-gray-800">{formatCurrency(order.total)}</p>
-                  <span className={`text-xs px-2 py-0.5 rounded-full
-                    ${order.status === 'delivered' ? 'bg-green-100 text-green-700' :
-                      order.status === 'out_for_delivery' ? 'bg-purple-100 text-purple-700' :
-                      order.status === 'confirmed' ? 'bg-blue-100 text-blue-700' :
-                      'bg-yellow-100 text-yellow-700'}`}>
-                    {order.status.replace('_', ' ')}
-                  </span>
-                </div>
+                <p className="text-sm font-semibold text-gray-800 flex-shrink-0 mt-0.5">{formatCurrency(order.total)}</p>
               </Link>
             ))}
           </div>
