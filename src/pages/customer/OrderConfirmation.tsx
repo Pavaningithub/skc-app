@@ -133,16 +133,16 @@ export default function OrderConfirmation() {
                 </button>
               </div>
               {/* Discount info pills */}
-              <div className="flex gap-2 mb-3">
+                <div className="flex gap-2 mb-3">
                 <div className="flex-1 bg-white/10 rounded-xl px-3 py-2 text-center">
                   <p className="text-orange-200 text-xs">Orders ₹1000+</p>
-                  <p className="text-white font-bold text-sm">up to ₹25 off</p>
-                  <p className="text-orange-300 text-xs">+ friend earns ₹75</p>
+                  <p className="text-white font-bold text-sm">friend gets up to ₹25 off</p>
+                  <p className="text-orange-300 text-xs">+ you earn up to ₹75</p>
                 </div>
                 <div className="flex-1 bg-white/10 rounded-xl px-3 py-2 text-center">
                   <p className="text-orange-200 text-xs">Orders ₹500–₹999</p>
-                  <p className="text-white font-bold text-sm">up to ₹13 off</p>
-                  <p className="text-orange-300 text-xs">+ friend earns ₹37</p>
+                  <p className="text-white font-bold text-sm">friend gets up to ₹13 off</p>
+                  <p className="text-orange-300 text-xs">+ you earn up to ₹37</p>
                 </div>
               </div>
               {/* Share on WhatsApp button */}
