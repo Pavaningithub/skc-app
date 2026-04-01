@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   Search, Copy, Share2, ChevronDown, ChevronUp,
   ArrowLeft, Star, Leaf, CheckCircle2, Clock, Truck, XCircle,
@@ -26,6 +26,7 @@ const STATUS_META: Record<string, { label: string; color: string; icon: React.Re
 };
 
 export default function MyAccountPage() {
+  const [searchParams] = useSearchParams();
   const [phone, setPhone]         = useState('');
   const [loading, setLoading]     = useState(false);
   const [orders, setOrders]       = useState<Order[] | null>(null);
@@ -36,7 +37,9 @@ export default function MyAccountPage() {
   const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
   const [editingNotes, setEditingNotes]   = useState<Record<string, string>>({});
   const [savingNotes, setSavingNotes]     = useState<Set<string>>(new Set());
-  const [activeTab, setActiveTab] = useState<'orders' | 'referral'>('orders');
+  const [activeTab, setActiveTab] = useState<'orders' | 'referral'>(
+    searchParams.get('tab') === 'referral' ? 'referral' : 'orders'
+  );
 
   const { config: referralConfig } = useReferralConfig();
   const storeUrl = typeof window !== 'undefined' ? window.location.origin : '';
