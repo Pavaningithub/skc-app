@@ -819,7 +819,7 @@ export default function StoreFront() {
               {APP_CONFIG.WHATSAPP_DISPLAY2}
             </a>
           </p>
-          <a href="/admin/login" className="block mt-5 text-xs" style={{ color: '#555' }}>Admin Login</a>
+          {/* <a href="/admin/login" className="block mt-5 text-xs" style={{ color: '#555' }}>Admin Login</a> */}
           <div className="flex justify-center gap-4 mt-3">
             <a href="/about" className="text-xs" style={{ color: '#d4a574' }}>About Us</a>
             <a href="/my-orders" className="text-xs" style={{ color: '#d4a574' }}>My Account</a>
