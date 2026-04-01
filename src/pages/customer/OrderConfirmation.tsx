@@ -48,7 +48,7 @@ export default function OrderConfirmation() {
   const isSample = order.type === 'sample';
   const isAgentOrder = !!order.agentId;
   const referralCode = !isAgentOrder ? customer?.referralCode : undefined;
-  const storeUrl = typeof window !== 'undefined' ? window.location.origin : 'https://skc-app.vercel.app';
+  const storeUrl = typeof window !== 'undefined' ? window.location.origin : 'https://skctreats.in';
   const { config: referralConfig } = useReferralConfig();
   // Derive top tier hint for the WA share message
   const topTier = referralConfig.tiers.reduce((best, t) => t.minOrder > best.minOrder ? t : best, referralConfig.tiers[0]);

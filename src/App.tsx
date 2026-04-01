@@ -1,7 +1,42 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './contexts/AuthContext';
-import { Suspense, lazy } from 'react';
+import { Suspense, lazy, useEffect } from 'react';
+import { APP_CONFIG } from './config';
+
+/**
+ * SubdomainGuard — runs once on mount and redirects the browser to the
+ * correct section based on the subdomain, when a custom domain is configured.
+ *
+ * admin.skctreats.in  → /admin/dashboard
+ * agents.skctreats.in → /agent/login  (or /agent if already authenticated)
+ * skctreats.in        → /  (storefront — block /admin and /agent paths)
+ */
+function SubdomainGuard() {
+  useEffect(() => {
+    if (!APP_CONFIG.APP_DOMAIN) return; // not configured (local dev / staging)
+    const host = window.location.hostname;
+    const path = window.location.pathname;
+
+    if (host === APP_CONFIG.ADMIN_SUBDOMAIN) {
+      // admin subdomain — must be on an /admin/* path
+      if (!path.startsWith('/admin')) {
+        window.location.replace('/admin/dashboard');
+      }
+    } else if (host === APP_CONFIG.AGENT_SUBDOMAIN) {
+      // agents subdomain — must be on an /agent/* path
+      if (!path.startsWith('/agent')) {
+        window.location.replace('/agent/login');
+      }
+    } else if (host === APP_CONFIG.APP_DOMAIN) {
+      // storefront — block admin and agent paths
+      if (path.startsWith('/admin') || path.startsWith('/agent')) {
+        window.location.replace('/');
+      }
+    }
+  }, []);
+  return null;
+}
 
 // Customer pages — eagerly loaded (public-facing, must be fast)
 import StoreFront from './pages/customer/StoreFront';
@@ -50,6 +85,7 @@ function PageLoader() {
 export default function App() {
   return (
     <BrowserRouter>
+      <SubdomainGuard />
       <AuthProvider>
         <Toaster
           position="top-center"
