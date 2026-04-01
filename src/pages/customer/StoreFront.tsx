@@ -7,7 +7,8 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { productsService, feedbackService, ordersService, customersService, stockService } from '../../lib/services';
-import { generateOrderNumber, formatCurrency, computeReferralDiscount, computeCreditRedemption, normalizeWhatsapp } from '../../lib/utils';
+import { generateOrderNumber, formatCurrency, computeReferralDiscountFromTiers, computeCreditRedemption, normalizeWhatsapp } from '../../lib/utils';
+import { useReferralConfig } from '../../lib/useReferralConfig';
 import { APP_CONFIG } from '../../config';
 import type { Product, Feedback, OrderItem, Order } from '../../lib/types';
 
@@ -44,6 +45,7 @@ export default function StoreFront() {
   const [referralDiscount, setReferralDiscount] = useState(0);
   const [referralError, setReferralError] = useState('');
   const [standingDiscount, setStandingDiscount] = useState(0); // auto-applied from customer's discountApplyToNew
+  const { config: referralConfig } = useReferralConfig();
 
   useEffect(() => { load(); }, []);
 
@@ -54,7 +56,7 @@ export default function StoreFront() {
       try {
         const referrer = await customersService.getByReferralCode(urlRefCode);
         if (referrer) {
-          const disc = computeReferralDiscount(cartTotal);
+          const disc = computeReferralDiscountFromTiers(cartTotal, referralConfig.tiers, referralConfig.splitReferrerPct);
           setReferralDiscount(disc.customerDiscount);
           setReferralError('');
         } else {
@@ -217,13 +219,13 @@ export default function StoreFront() {
           return;
         }
         referralCodeUsed = enteredCode;
-        const split = computeReferralDiscount(cartTotal);
+        const split = computeReferralDiscountFromTiers(cartTotal, referralConfig.tiers, referralConfig.splitReferrerPct);
         referralDiscountAmt = split.customerDiscount;  // new customer gets 25% off
         referrerId = referrer.id;
         referrerCreditAmt = split.referrerCredit;       // referrer earns 75% as credit
       } else if (useCredit && existing && (existing.referralCredit ?? 0) > 0) {
-        // Credit redemption — returning customers only, capped to 10% of order or ₹75 max
-        creditUsedAmt = computeCreditRedemption(existing.referralCredit ?? 0, cartTotal);
+        // Credit redemption — returning customers only, capped by config
+        creditUsedAmt = computeCreditRedemption(existing.referralCredit ?? 0, cartTotal, referralConfig.creditRedemptionPct, referralConfig.creditRedemptionCap);
       }
 
       // Standing discount takes priority — if active, ignore referral and credit
@@ -1457,12 +1459,13 @@ function OrderFormModal({
 }) {
   const [validatingReferral, setValidatingReferral] = useState(false);
   const [lookingUpPhone, setLookingUpPhone] = useState(false);
+  const { config: referralConfig } = useReferralConfig();
   const creditDiscount = (isReturningCustomer && useCredit)
-    ? computeCreditRedemption(availableCredit, cartTotal) : 0;
+    ? computeCreditRedemption(availableCredit, cartTotal, referralConfig.creditRedemptionPct, referralConfig.creditRedemptionCap) : 0;
   const standingDiscountAmt = standingDiscount > 0 ? Math.round(cartTotal * standingDiscount / 100) : 0;
   // Always recompute referral discount live from current cartTotal so preview matches saved order
   const liveReferralDiscount = referralDiscount > 0
-    ? computeReferralDiscount(cartTotal).customerDiscount
+    ? computeReferralDiscountFromTiers(cartTotal, referralConfig.tiers, referralConfig.splitReferrerPct).customerDiscount
     : 0;
   const finalTotal = standingDiscountAmt > 0
     ? Math.max(0, cartTotal - standingDiscountAmt)
@@ -1526,8 +1529,8 @@ function OrderFormModal({
         setReferralDiscount(0);
         return;
       }
-      const disc = computeReferralDiscount(cartTotal);
-      setReferralDiscount(disc.customerDiscount);  // fix: was passing whole object
+      const disc = computeReferralDiscountFromTiers(cartTotal, referralConfig.tiers, referralConfig.splitReferrerPct);
+      setReferralDiscount(disc.customerDiscount);
       setReferralError('');
     } finally { setValidatingReferral(false); }
   }
@@ -1690,8 +1693,8 @@ function OrderFormModal({
                   </p>
                   <p className="text-xs mt-0.5" style={{ color: useCredit ? '#15803d' : '#a06030' }}>
                     You have <strong>₹{availableCredit}</strong> credit —
-                    save up to <strong>₹{computeCreditRedemption(availableCredit, cartTotal)}</strong> on this order
-                    <span className="text-gray-400 ml-1">(max 10% of order or ₹75)</span>
+                    save up to <strong>₹{computeCreditRedemption(availableCredit, cartTotal, referralConfig.creditRedemptionPct, referralConfig.creditRedemptionCap)}</strong> on this order
+                    <span className="text-gray-400 ml-1">(max {referralConfig.creditRedemptionPct}% of order or ₹{referralConfig.creditRedemptionCap})</span>
                   </p>
                 </div>
                 <div className={`w-11 h-6 rounded-full transition-colors flex-shrink-0 relative ${useCredit ? 'bg-green-500' : 'bg-gray-300'}`}>
@@ -1700,8 +1703,8 @@ function OrderFormModal({
               </div>
               {useCredit && (
                 <div className="mt-1.5 rounded-xl px-3 py-2 text-xs" style={{ background: '#f0fdf4', border: '1px solid #86efac' }}>
-                  <p className="text-green-700">✅ <strong>₹{computeCreditRedemption(availableCredit, cartTotal)}</strong> credit will be deducted from your balance after order is placed.</p>
-                  <p className="text-green-600 mt-0.5">Remaining balance: ₹{Math.max(0, availableCredit - computeCreditRedemption(availableCredit, cartTotal))}</p>
+                  <p className="text-green-700">✅ <strong>₹{computeCreditRedemption(availableCredit, cartTotal, referralConfig.creditRedemptionPct, referralConfig.creditRedemptionCap)}</strong> credit will be deducted from your balance after order is placed.</p>
+                  <p className="text-green-600 mt-0.5">Remaining balance: ₹{Math.max(0, availableCredit - computeCreditRedemption(availableCredit, cartTotal, referralConfig.creditRedemptionPct, referralConfig.creditRedemptionCap))}</p>
                 </div>
               )}
             </div>

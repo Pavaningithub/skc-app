@@ -1,4 +1,5 @@
-import type { Order } from './types';
+import type { Order, ReferralTier } from './types';
+import { DEFAULT_REFERRAL_CONFIG } from './types';
 import { WHATSAPP_NUMBER, UPI_ID, BUSINESS_NAME } from './constants';
 import { APP_CONFIG } from '../config';
 
@@ -234,32 +235,46 @@ export function generateReferralCode(name: string): string {
 }
 
 /**
- * Compute referral discount with 3 tiers.
- * Total discount is split: 75% to the referrer (credit added to account), 25% to the new customer (price off).
- *
- * Tiers:
- *   ₹1   – ₹499    → 3%   total, no cap
- *   ₹500 – ₹999    → 5%   total, max ₹50 total
- *   ₹1000+          → 7.5% total, max ₹100 total
- *
- * Split: referrer gets 75%, new customer gets 25%.
- * Returns: { total, customerDiscount (25%), referrerCredit (75%) }
+ * Compute referral discount from dynamic tiers.
+ * tiers: sorted by minOrder ascending (gaps/overlaps not validated here — admin saves valid data).
+ * splitReferrerPct: % of total going to referrer (rest to friend as discount).
+ */
+export function computeReferralDiscountFromTiers(
+  subtotal: number,
+  tiers: ReferralTier[],
+  splitReferrerPct: number,
+): { total: number; customerDiscount: number; referrerCredit: number } {
+  if (subtotal <= 0 || tiers.length === 0)
+    return { total: 0, customerDiscount: 0, referrerCredit: 0 };
+
+  // Find the matching tier (last one whose minOrder ≤ subtotal)
+  const tier = [...tiers]
+    .sort((a, b) => a.minOrder - b.minOrder)
+    .reverse()
+    .find(t => subtotal >= t.minOrder && (t.maxOrder === null || subtotal < t.maxOrder));
+
+  if (!tier) return { total: 0, customerDiscount: 0, referrerCredit: 0 };
+
+  let raw = Math.floor(subtotal * (tier.pct / 100));
+  if (tier.cap !== null) raw = Math.min(raw, tier.cap);
+
+  const referrerCredit   = Math.floor(raw * (splitReferrerPct / 100));
+  const customerDiscount = raw - referrerCredit;
+  return { total: raw, customerDiscount, referrerCredit };
+}
+
+/**
+ * Backward-compatible wrapper using default hardcoded tiers.
+ * All new code should use computeReferralDiscountFromTiers with live config.
  */
 export function computeReferralDiscount(subtotal: number): {
   total: number; customerDiscount: number; referrerCredit: number;
 } {
-  if (subtotal <= 0) return { total: 0, customerDiscount: 0, referrerCredit: 0 };
-  let raw: number;
-  if (subtotal < 500) {
-    raw = Math.floor(subtotal * 0.03);
-  } else if (subtotal < 1000) {
-    raw = Math.min(Math.floor(subtotal * 0.05), 50);
-  } else {
-    raw = Math.min(Math.floor(subtotal * 0.075), 100);
-  }
-  const referrerCredit   = Math.floor(raw * 0.75);  // referrer gets 75%, floored
-  const customerDiscount = raw - referrerCredit;     // remainder to customer
-  return { total: raw, customerDiscount, referrerCredit };
+  return computeReferralDiscountFromTiers(
+    subtotal,
+    DEFAULT_REFERRAL_CONFIG.tiers,
+    DEFAULT_REFERRAL_CONFIG.splitReferrerPct,
+  );
 }
 
 /**
@@ -267,23 +282,36 @@ export function computeReferralDiscount(subtotal: number): {
  * Cap: min of (available credit, 10% of subtotal, ₹75 max per order).
  * This is separate from the referral code discount — only one can apply at a time.
  */
-export function computeCreditRedemption(availableCredit: number, subtotal: number): number {
+export function computeCreditRedemption(
+  availableCredit: number,
+  subtotal: number,
+  redemptionPct = 10,   // % of subtotal that can be redeemed (default: 10%)
+  redemptionCap = 75,   // hard ₹ cap per order (default: ₹75)
+): number {
   if (availableCredit <= 0 || subtotal <= 0) return 0;
-  const cap = Math.min(Math.floor(subtotal * 0.10), 75);  // max 10% of order or ₹75, floored
+  const cap = Math.min(Math.floor(subtotal * redemptionPct / 100), redemptionCap);
   return Math.min(availableCredit, cap);
 }
 
 /**
  * WhatsApp message a customer sends to their friends to refer them.
- * Pre-populates the referral code so the friend just taps the link.
+ * topTierHint: optional string like 'up to ₹25 off on orders ₹1000+'
  */
-export function referralShareMessage(customerName: string, referralCode: string, storeUrl: string): string {
+export function referralShareMessage(
+  customerName: string,
+  referralCode: string,
+  storeUrl: string,
+  topTierHint?: string,
+): string {
   const refLink = `${storeUrl}?ref=${referralCode}`;
+  const discountLine = topTierHint
+    ? `🎁 Use my referral link and get *${topTierHint}* on your first order:`
+    : `🎁 Use my referral link and get an instant discount on your first order:`;
   return `🙏 *Hare Krishna!* 🪷
 
-Try *Sri Krishna Condiments* — fresh homemade Karnataka condiments (Chutney Powders, Masalas, Health Mixes). Made with love! 🌿
+Try *Sri Krishna Condiments* 🌿 — fresh homemade Karnataka condiments (Chutney Powders, Masalas, Health Mixes). Made with love!
 
-🎁 Use my referral link and get an instant discount on your first order:
+${discountLine}
 👉 ${refLink}
 
 Highly recommended by *${customerName}* 😊`;

@@ -26,6 +26,7 @@ const BatchesPage      = lazy(() => import('./pages/admin/BatchesPage'));
 const SettingsPage     = lazy(() => import('./pages/admin/SettingsPage'));
 const AnnouncementsPage = lazy(() => import('./pages/admin/AnnouncementsPage'));
 const AgentsPage       = lazy(() => import('./pages/admin/AgentsPage'));
+const ReferralSettingsPage = lazy(() => import('./pages/admin/ReferralSettingsPage'));
 
 // Agent portal
 const AgentLogin   = lazy(() => import('./pages/agent/AgentLogin'));
@@ -81,6 +82,7 @@ export default function App() {
             <Route path="feedback" element={<FeedbackAdmin />} />
             <Route path="announcements" element={<AnnouncementsPage />} />
             <Route path="agents" element={<AgentsPage />} />
+            <Route path="referral-settings" element={<ReferralSettingsPage />} />
             <Route path="settings" element={<SettingsPage />} />
           </Route>
 
