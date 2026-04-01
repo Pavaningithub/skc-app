@@ -664,7 +664,7 @@ export default function StoreFront() {
           </button>
 
           {/* Referral code lookup */}
-          <a href="/my-orders?tab=referral"
+          {/* <a href="/my-orders?tab=referral"
             className="flex items-center gap-3 bg-white rounded-2xl px-4 py-3 shadow-sm"
             style={{ border: '1px solid #fde68a' }}>
             <div className="w-9 h-9 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
@@ -674,7 +674,7 @@ export default function StoreFront() {
               <p className="text-xs text-gray-500">Look up your code &amp; share to earn credit</p>
             </div>
             <ChevronRight className="w-5 h-5 text-gray-400 ml-auto" />
-          </a>
+          </a> */}
         </div>
       </div>
 
