@@ -5,6 +5,20 @@
       "destination": "/index.html"
     }
   ],
+  "redirects": [
+    {
+      "source": "/",
+      "has": [{ "type": "host", "value": "admin.skctreats.in" }],
+      "destination": "https://admin.skctreats.in/admin/dashboard",
+      "permanent": false
+    },
+    {
+      "source": "/",
+      "has": [{ "type": "host", "value": "agents.skctreats.in" }],
+      "destination": "https://agents.skctreats.in/agent/login",
+      "permanent": false
+    }
+  ],
   "headers": [
     {
       "source": "/(.*)",
