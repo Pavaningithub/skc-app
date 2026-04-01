@@ -48,6 +48,7 @@ jobs:
           VITE_WA_GROUP_LINK: ${{ secrets.VITE_WA_GROUP_LINK }}
           VITE_WA_CHANNEL_LINK: ${{ secrets.VITE_WA_CHANNEL_LINK }}
           VITE_WA_TRACKING_LINK: ${{ secrets.VITE_WA_TRACKING_LINK }}
+          VITE_APP_DOMAIN: ${{ secrets.VITE_APP_DOMAIN }}
         run: npm run build
 
   # ── Production deploy — only triggered by semver tags ─────────────────────
@@ -60,7 +61,7 @@ jobs:
       contents: write   # required to create GitHub Releases
     environment:
       name: production
-      url: https://skc-app.vercel.app
+      url: https://YOUR_DOMAIN
 
     steps:
       - uses: actions/checkout@v4
@@ -93,6 +94,7 @@ jobs:
           VITE_WA_GROUP_LINK: ${{ secrets.VITE_WA_GROUP_LINK }}
           VITE_WA_CHANNEL_LINK: ${{ secrets.VITE_WA_CHANNEL_LINK }}
           VITE_WA_TRACKING_LINK: ${{ secrets.VITE_WA_TRACKING_LINK }}
+          VITE_APP_DOMAIN: ${{ secrets.VITE_APP_DOMAIN }}
         run: npm run build
 
       - name: Deploy to Vercel Production

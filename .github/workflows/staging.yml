@@ -43,6 +43,7 @@ jobs:
                   VITE_WA_GROUP_LINK: ${{ secrets.VITE_WA_GROUP_LINK }}
                   VITE_WA_CHANNEL_LINK: ${{ secrets.VITE_WA_CHANNEL_LINK }}
                   VITE_WA_TRACKING_LINK: ${{ secrets.VITE_WA_TRACKING_LINK }}
+                  VITE_APP_DOMAIN: ${{ secrets.VITE_APP_DOMAIN }}
               run: npm run build
 
             - name: Deploy Preview to Vercel

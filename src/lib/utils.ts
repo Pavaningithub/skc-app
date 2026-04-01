@@ -48,7 +48,7 @@ export function orderConfirmedToCustomer(order: Order, referralCode?: string, st
     .map(i => `  • ${i.productName}: ${formatQuantity(i.quantity, i.unit)} = ₹${i.totalPrice}`)
     .join('\n');
   const referralLine = referralCode
-    ? `\n\n🎁 *Refer a friend & earn store credit!*\nShare your link: ${storeUrl ?? 'https://skc-app.vercel.app'}?ref=${referralCode}`
+    ? `\n\n🎁 *Refer a friend & earn store credit!*\nShare your link: ${storeUrl ?? 'https://YOUR_DOMAIN'}?ref=${referralCode}`
     : '';
   return `🙏 *Hare Krishna!* 🪷
 
