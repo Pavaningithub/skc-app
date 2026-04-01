@@ -28,6 +28,7 @@ interface PackRow {
   orderNumber: string;
   customerName: string;
   status: OrderStatus;
+  isSample: boolean;
   rowKey: string; // productId::qty::note::orderId
 }
 
@@ -82,7 +83,7 @@ export default function PackingPage() {
 
   // ── Aggregate: one PackRow per (product × size × note × order) ───────────
   const groups = useMemo<ProductGroup[]>(() => {
-    const active = orders.filter(o => includedStatuses.has(o.status) && o.type !== 'sample');
+    const active = orders.filter(o => includedStatuses.has(o.status));
     const map = new Map<string, { productName: string; unit: string; lines: Map<string, PackLine> }>();
 
     for (const order of active) {
@@ -99,6 +100,7 @@ export default function PackingPage() {
           orderNumber: order.orderNumber,
           customerName: order.customerName,
           status: order.status,
+          isSample: order.type === 'sample',
           rowKey: `${item.productId}::${item.quantity}::${note}::${order.id}`,
         });
       }
@@ -352,6 +354,9 @@ export default function PackingPage() {
                                 title={row.customerName}>
                                 <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${STATUS_DOT[row.status]}`} />
                                 <span className="font-mono text-orange-600 font-semibold">#{row.orderNumber}</span>
+                                {row.isSample && (
+                                  <span className="text-[9px] font-bold bg-purple-100 text-purple-600 px-1 rounded">SAMPLE</span>
+                                )}
                                 <span className="text-gray-400 max-w-[80px] truncate">{row.customerName}</span>
                               </Link>
                               {orderReady && isDone && (
