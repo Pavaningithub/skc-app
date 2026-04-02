@@ -48,7 +48,9 @@ export default function MyAccountPage() {
     ? referralConfig.tiers.reduce((b, t) => t.minOrder > b.minOrder ? t : b, referralConfig.tiers[0])
     : null;
   const topTierSample = topTier
-    ? computeReferralDiscountFromTiers(topTier.minOrder + 1, referralConfig.tiers, referralConfig.splitReferrerPct)
+    ? computeReferralDiscountFromTiers(
+        topTier.cap !== null ? Math.ceil(topTier.cap / (topTier.pct / 100)) : topTier.minOrder,
+        referralConfig.tiers, referralConfig.splitReferrerPct)
     : null;
   const topTierHint = topTier && topTierSample
     ? `up to ₹${topTierSample.customerDiscount} off on orders ₹${topTier.minOrder}+`
@@ -365,7 +367,13 @@ export default function MyAccountPage() {
                     <p className="text-sm font-bold" style={{ color: '#3d1c02' }}>💡 How it works</p>
                     <div className="space-y-2">
                       {referralConfig.tiers.map((tier, i) => {
-                        const disc = computeReferralDiscountFromTiers(tier.minOrder + 1, referralConfig.tiers, referralConfig.splitReferrerPct);
+                        // Compute at the amount that yields the maximum discount for this tier
+                        const maxAmt = tier.cap !== null
+                          ? Math.ceil(tier.cap / (tier.pct / 100))
+                          : tier.maxOrder !== null
+                            ? tier.maxOrder - 1
+                            : tier.minOrder;
+                        const disc = computeReferralDiscountFromTiers(maxAmt, referralConfig.tiers, referralConfig.splitReferrerPct);
                         const rangeLabel = tier.maxOrder ? `₹${tier.minOrder}–₹${tier.maxOrder - 1}` : `₹${tier.minOrder}+`;
                         return (
                           <div key={i} className="flex items-center gap-3 rounded-xl px-3 py-2.5" style={{ background: '#fdf5e6' }}>
