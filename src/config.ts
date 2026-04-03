@@ -6,7 +6,7 @@
 export const APP_CONFIG = {
   // ── Business Details ────────────────────────────────────────
   BUSINESS_NAME:        'Sri Krishna Condiments',
-  BUSINESS_TAGLINE:     'Pure, Fresh & Handcrafted',
+  BUSINESS_TAGLINE:     'Where Taste Meets Tradition',
   BUSINESS_DESCRIPTION: 'Handcrafted health foods — Chutney Powders, Masalas & more. Made fresh in small batches.',
 
   // ── Contact (from env) ─────────────────────────────────────
