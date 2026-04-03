@@ -34,8 +34,6 @@ jobs:
                   VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
                   VITE_WHATSAPP_NUMBER: ${{ secrets.VITE_WHATSAPP_NUMBER }}
                   VITE_WHATSAPP_DISPLAY: ${{ secrets.VITE_WHATSAPP_DISPLAY }}
-                  VITE_WHATSAPP_NUMBER2: ${{ secrets.VITE_WHATSAPP_NUMBER2 }}
-                  VITE_WHATSAPP_DISPLAY2: ${{ secrets.VITE_WHATSAPP_DISPLAY2 }}
                   VITE_UPI_ID: ${{ secrets.VITE_UPI_ID }}
                   VITE_UPI_NUMBER: ${{ secrets.VITE_UPI_NUMBER }}
                   VITE_UPI_DISPLAY: ${{ secrets.VITE_UPI_DISPLAY }}
