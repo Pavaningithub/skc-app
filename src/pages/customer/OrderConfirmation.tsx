@@ -195,7 +195,7 @@ export default function OrderConfirmation() {
 
         {/* Action buttons */}
         <div className="px-4 pb-6 space-y-2">
-          <a href={`https://wa.me/91${APP_CONFIG.WHATSAPP_NUMBER.replace(/^91/, '')}?text=${encodeURIComponent(`Hi, I just placed order #${order.orderNumber}`)}`}
+          <a href={`https://wa.me/${APP_CONFIG.WHATSAPP_NUMBER}?text=${encodeURIComponent(`Hi, I just placed order #${order.orderNumber}`)}`}
             target="_blank" rel="noreferrer"
             className="flex items-center justify-center gap-2 w-full bg-green-500 hover:bg-green-600 text-white py-3 rounded-xl text-sm font-semibold transition-colors">
             <MessageCircle className="w-4 h-4" /> Contact Us on WhatsApp
