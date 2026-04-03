@@ -797,11 +797,6 @@ export default function StoreFront() {
               className="underline" style={{ color: '#25d366' }}>
               {APP_CONFIG.WHATSAPP_DISPLAY}
             </a>
-            {' · '}
-            <a href={`https://wa.me/${APP_CONFIG.WHATSAPP_NUMBER2}`}
-              className="underline" style={{ color: '#25d366' }}>
-              {APP_CONFIG.WHATSAPP_DISPLAY2}
-            </a>
           </p>
           {/* <a href="/admin/login" className="block mt-5 text-xs" style={{ color: '#555' }}>Admin Login</a> */}
           <div className="flex justify-center gap-4 mt-3">
