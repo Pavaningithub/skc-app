@@ -37,3 +37,8 @@ scripts/
 
 # README — personal reference only, not for the repo
 README.md
+
+# AI tooling
+.agents/
+.claude/
+skills-lock.json
