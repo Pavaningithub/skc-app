@@ -924,6 +924,7 @@ export default function StoreFront() {
           form={orderForm}
           setForm={setOrderForm}
           submitting={submitting}
+          urlRefCode={urlRefCode}
           myReferralCode={myReferralCode}
           setMyReferralCode={setMyReferralCode}
           isReturningCustomer={isReturningCustomer}
@@ -1473,7 +1474,7 @@ function SampleModal({ products, selected, onToggle, step, setStep, form, setFor
 
 // ─── Order Form Modal ─────────────────────────────────────────────────────────
 function OrderFormModal({
-  isSample, cart, cartTotal, form, setForm, submitting,
+  isSample, cart, cartTotal, form, setForm, submitting, urlRefCode,
   myReferralCode, setMyReferralCode,
   isReturningCustomer, setIsReturningCustomer,
   availableCredit, setAvailableCredit, useCredit, setUseCredit,
@@ -1488,6 +1489,7 @@ function OrderFormModal({
   form: { name: string; whatsapp: string; place: string; notes: string; referralCode: string };
   setForm: React.Dispatch<React.SetStateAction<{ name: string; whatsapp: string; place: string; notes: string; referralCode: string }>>;
   submitting: boolean;
+  urlRefCode?: string;
   myReferralCode: string | null;
   setMyReferralCode: (v: string | null) => void;
   isReturningCustomer: boolean;
@@ -1510,15 +1512,18 @@ function OrderFormModal({
   const referralDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { config: referralConfig } = useReferralConfig();
 
-  // Auto-validate referral code 600ms after the user stops typing
+  // Auto-validate referral code 600ms after the user stops typing.
+  // Skip if: code came from URL (parent already validated it), submitting, returning customer, or standing discount active.
   useEffect(() => {
     const code = form.referralCode.trim();
-    if (!code || isReturningCustomer || standingDiscount > 0) return;
+    if (!code || isReturningCustomer || standingDiscount > 0 || submitting) return;
+    // URL ref code is already validated by the parent useEffect — don't re-validate and risk race conditions
+    if (urlRefCode && code === urlRefCode.trim().toUpperCase()) return;
     if (referralDebounceRef.current) clearTimeout(referralDebounceRef.current);
     referralDebounceRef.current = setTimeout(() => { handleReferralCodeBlur(); }, 600);
     return () => { if (referralDebounceRef.current) clearTimeout(referralDebounceRef.current); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form.referralCode]);
+  }, [form.referralCode, submitting]);
   const creditDiscount = (isReturningCustomer && useCredit)
     ? computeCreditRedemption(availableCredit, cartTotal, referralConfig.creditRedemptionPct, referralConfig.creditRedemptionCap) : 0;
   const standingDiscountAmt = standingDiscount > 0 ? Math.round(cartTotal * standingDiscount / 100) : 0;
