@@ -37,8 +37,8 @@ export default function FeedbackPage() {
     try {
       await feedbackService.add({
         orderId: orderId!,
-        orderNumber: order?.orderNumber,
-        customerId: order?.customerId,
+        ...(order?.orderNumber ? { orderNumber: order.orderNumber } : {}),
+        ...(order?.customerId  ? { customerId:  order.customerId  } : {}),
         customerName: order?.customerName || 'Customer',
         customerWhatsapp: order?.customerWhatsapp || '',
         rating,
