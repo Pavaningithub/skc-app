@@ -193,23 +193,20 @@ export default function StoreFront() {
 
       const enteredCode = orderForm.referralCode.trim().toUpperCase();
       if (enteredCode) {
-        // Referral benefit is for first-time orders only — skip silently for returning customers
+        // Final authoritative validation (UI already blocked bad codes pre-submit, this is the safety net)
         const isReturning = existing && (existing.totalOrders > 0 || existing.referredBy);
         const referrer = isReturning ? null : await customersService.getByReferralCode(enteredCode);
         const isSelfReferral = referrer && referrer.id === customerId;
 
-        if (isReturning || !referrer || isSelfReferral) {
-          // Invalid in some form — place the order at full price, no referral applied
-          setReferralDiscount(0);
-          setReferralError('');
-          // fall through — referralDiscountAmt stays 0, referralCodeUsed stays undefined
-        } else {
+        if (!isReturning && referrer && !isSelfReferral) {
+          // Valid referral — apply discount
           referralCodeUsed = enteredCode;
           const split = computeReferralDiscountFromTiers(cartTotal, referralConfig.tiers, referralConfig.splitReferrerPct);
-          referralDiscountAmt = split.customerDiscount;  // new customer gets 25% off
+          referralDiscountAmt = split.customerDiscount;
           referrerId = referrer.id;
-          referrerCreditAmt = split.referrerCredit;       // referrer earns 75% as credit
+          referrerCreditAmt = split.referrerCredit;
         }
+        // If invalid for any reason — fall through, order placed at full price (UI already warned them)
       } else if (useCredit && existing && (existing.referralCredit ?? 0) > 0) {
         // Credit redemption — returning customers only, capped by config
         creditUsedAmt = computeCreditRedemption(existing.referralCredit ?? 0, cartTotal, referralConfig.creditRedemptionPct, referralConfig.creditRedemptionCap);
@@ -1554,6 +1551,8 @@ function OrderFormModal({
           setReferralDiscount(0); setReferralError('');
         } else {
           setAvailableCredit(0);
+          // Re-validate referral code now that we know the phone — catches self-referral
+          if (form.referralCode.trim()) setTimeout(() => handleReferralCodeBlur(), 0);
         }
       } finally { setLookingUpPhone(false); }
     } else {
@@ -1809,10 +1808,13 @@ function OrderFormModal({
           </div>
         </div>
         <div className="sticky bottom-0 bg-white px-5 pb-6 pt-3 border-t" style={{ borderColor: '#f0d9c8' }}>
-          <button onClick={onSubmit} disabled={submitting}
+          {referralError && form.referralCode.trim() && (
+            <p className="text-center text-sm text-red-500 mb-2 font-medium">⚠️ Fix or remove the referral code to place your order.</p>
+          )}
+          <button onClick={onSubmit} disabled={submitting || validatingReferral || !!(referralError && form.referralCode.trim())}
             className="w-full text-white font-bold py-3.5 rounded-2xl text-sm disabled:opacity-50"
             style={{ background: '#c8821a' }}>
-            {submitting ? 'Sending…' : isSample ? '🎁 Request Sample' : `✅ Place Order${(standingDiscountAmt > 0 || liveReferralDiscount > 0 || (useCredit && creditDiscount > 0)) ? ` · ₹${finalTotal}` : ''}`}
+            {validatingReferral ? 'Validating code…' : submitting ? 'Sending…' : isSample ? '🎁 Request Sample' : `✅ Place Order${(standingDiscountAmt > 0 || liveReferralDiscount > 0 || (useCredit && creditDiscount > 0)) ? ` · ₹${finalTotal}` : ''}`}
           </button>
         </div>
       </div>
