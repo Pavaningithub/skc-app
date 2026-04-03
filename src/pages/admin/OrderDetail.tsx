@@ -253,7 +253,7 @@ export default function OrderDetail() {
   );
   if (!order) return <div className="p-6 text-gray-500">Order not found</div>;
 
-  const origin = window.location.origin;
+  const storeOrigin = 'https://YOUR_DOMAIN'; // Customer storefront domain (NOT admin)
 
   return (
     <div className="p-4 md:p-6 space-y-4 max-w-2xl animate-fade-in">
@@ -314,9 +314,9 @@ export default function OrderDetail() {
           <p className="text-xs text-gray-400 mb-2">Opens WhatsApp on your phone. Send message to customer from your number.</p>
           <div className="flex gap-2 flex-wrap">
             {([
-              { status: 'confirmed',        label: '✅ Order Confirmed',     url: buildCustomerWhatsAppUrl(order.customerWhatsapp, orderConfirmedToCustomer(order, order.agentId ? undefined : customerReferralCode, window.location.origin)) },
+              { status: 'confirmed',        label: '✅ Order Confirmed',     url: buildCustomerWhatsAppUrl(order.customerWhatsapp, orderConfirmedToCustomer(order, order.agentId ? undefined : customerReferralCode, storeOrigin)) },
               { status: 'out_for_delivery', label: '🚚 Out for Delivery',  url: buildCustomerWhatsAppUrl(order.customerWhatsapp, outForDeliveryToCustomer(order)) },
-              { status: 'delivered',        label: '🎉 Delivered',          url: buildCustomerWhatsAppUrl(order.customerWhatsapp, deliveredToCustomer(order, `${origin}/feedback/${order.id}`)) },
+              { status: 'delivered',        label: '🎉 Delivered',          url: buildCustomerWhatsAppUrl(order.customerWhatsapp, deliveredToCustomer(order, `${storeOrigin}/feedback/${order.id}`)) },
               { status: 'cancelled',        label: '❌ Cancelled',           url: buildCustomerWhatsAppUrl(order.customerWhatsapp, orderCancelledToCustomer(order)) },
             ] as const).map(({ status: s, label, url }) => (
               <a key={s} href={url} target="_blank" rel="noreferrer"
