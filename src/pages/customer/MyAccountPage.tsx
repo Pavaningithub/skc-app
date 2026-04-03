@@ -215,7 +215,7 @@ export default function MyAccountPage() {
               <p className="text-sm font-semibold text-gray-700">No account found for <strong>{phone}</strong></p>
               <p className="text-xs text-gray-400">Make sure you're using the same number you placed your order with.</p>
               <a
-                href={`https://wa.me/91${APP_CONFIG.WHATSAPP_NUMBER}?text=${encodeURIComponent('Hi, I placed an order and need help finding it. My number: ' + phone)}`}
+                href={`https://wa.me/${APP_CONFIG.WHATSAPP_NUMBER}?text=${encodeURIComponent('Hi, I placed an order and need help finding it. My number: ' + phone)}`}
                 target="_blank" rel="noreferrer"
                 className="inline-flex items-center gap-1.5 text-xs font-semibold px-4 py-2.5 rounded-xl text-white"
                 style={{ background: '#25d366' }}>
@@ -398,7 +398,7 @@ export default function MyAccountPage() {
                   <p className="text-sm font-semibold text-gray-700">No referral code yet</p>
                   <p className="text-xs text-gray-400">Referral codes are assigned after your first order. Contact us if you think this is an error.</p>
                   <a
-                    href={`https://wa.me/91${APP_CONFIG.WHATSAPP_NUMBER}?text=${encodeURIComponent('Hi, I placed an order but don\'t have a referral code. My number: ' + phone)}`}
+                    href={`https://wa.me/${APP_CONFIG.WHATSAPP_NUMBER}?text=${encodeURIComponent('Hi, I placed an order but don\'t have a referral code. My number: ' + phone)}`}
                     target="_blank" rel="noreferrer"
                     className="inline-flex items-center gap-1.5 text-xs font-semibold px-4 py-2.5 rounded-xl text-white"
                     style={{ background: '#25d366' }}>
