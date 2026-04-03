@@ -26,7 +26,7 @@ const VALUES = [
 ];
 
 export default function AboutPage() {
-  const waUrl = `https://wa.me/91${APP_CONFIG.WHATSAPP_NUMBER}?text=${encodeURIComponent('Hi! I\'d like to know more about Sri Krishna Condiments 🌿')}`;
+  const waUrl = `https://wa.me/${APP_CONFIG.WHATSAPP_NUMBER}?text=${encodeURIComponent('Hi! I\'d like to know more about Sri Krishna Condiments 🌿')}`;
 
   return (
     <div className="min-h-screen" style={{ background: '#fdf5e6' }}>
