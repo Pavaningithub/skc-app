@@ -442,7 +442,9 @@ export const feedbackService = {
     return snap.docs.map(d => ({ id: d.id, ...d.data() } as Feedback));
   },
   async add(feedback: Omit<Feedback, "id">): Promise<string> {
-    const ref = await addDoc(collection(db, COLLECTIONS.FEEDBACK), { ...feedback, createdAt: now() });
+    // Strip undefined fields — Firestore would drop them anyway but this makes intent explicit
+    const clean = Object.fromEntries(Object.entries(feedback).filter(([, v]) => v !== undefined));
+    const ref = await addDoc(collection(db, COLLECTIONS.FEEDBACK), { ...clean, createdAt: now() });
     return ref.id;
   },
   async getByOrder(orderId: string): Promise<Feedback | null> {
