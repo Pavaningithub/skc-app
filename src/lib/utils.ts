@@ -17,6 +17,17 @@ export function buildWhatsAppUrl(phone: string, message: string): string {
   return `https://wa.me/${number}?text=${encodeURIComponent(message)}`;
 }
 
+/**
+ * Admin-side WA links use api.whatsapp.com/send so the OS prompts to open
+ * WhatsApp Business (rather than regular WhatsApp) when both are installed.
+ */
+export function buildWABusinessUrl(phone: string, message?: string): string {
+  const clean = phone.replace(/\D/g, '');
+  const number = clean.startsWith('91') ? clean : `91${clean}`;
+  const base = `https://api.whatsapp.com/send?phone=${number}`;
+  return message ? `${base}&text=${encodeURIComponent(message)}` : base;
+}
+
 // Opens WA to admin number
 export function buildAdminWhatsAppUrl(message: string): string {
   return buildWhatsAppUrl(WHATSAPP_NUMBER, message);

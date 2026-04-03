@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { Search, ChevronDown, ChevronUp, Tag, ArrowUpDown, Copy, Share2 } from 'lucide-react';
 import { customersService, ordersService } from '../../lib/services';
 import { useRealtimeCollection } from '../../lib/useRealtimeCollection';
-import { formatCurrency, formatDate, referralShareMessage } from '../../lib/utils';
+import { formatCurrency, formatDate, referralShareMessage, buildWABusinessUrl } from '../../lib/utils';
 import type { Customer, Order } from '../../lib/types';
 import toast from 'react-hot-toast';
 
@@ -313,7 +313,7 @@ export default function CustomersPage() {
                         </div>
 
                         <div className="flex gap-2 flex-wrap">
-                          <a href={`https://wa.me/91${c.whatsapp}`} target="_blank" rel="noreferrer"
+                          <a href={buildWABusinessUrl(c.whatsapp)} target="_blank" rel="noreferrer"
                             className="text-xs bg-green-500 text-white px-3 py-1.5 rounded-lg hover:bg-green-600 transition-colors">
                             📱 WhatsApp
                           </a>
@@ -349,7 +349,7 @@ export default function CustomersPage() {
                             )}
                             <div className="flex gap-2">
                               <a
-                                href={`https://wa.me/91${c.whatsapp}?text=${encodeURIComponent(referralShareMessage(c.name, c.referralCode, window.location.origin))}`}
+                                href={buildWABusinessUrl(c.whatsapp, referralShareMessage(c.name, c.referralCode, window.location.origin))}
                                 target="_blank" rel="noreferrer"
                                 className="flex-1 flex items-center justify-center gap-1.5 text-xs font-semibold text-white py-2 rounded-lg transition-colors"
                                 style={{ background: '#25d366' }}>
