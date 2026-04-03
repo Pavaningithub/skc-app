@@ -5,7 +5,7 @@ import Portal from '../../components/Portal';
 import { subscriptionsService, subscriptionConfigService, productsService, customersService, ordersService } from '../../lib/services';
 import { useRealtimeCollection } from '../../lib/useRealtimeCollection';
 import { useSubscriptionConfig } from '../../lib/useSubscriptionConfig';
-import { formatCurrency, formatDate, generateSubscriptionOrderNumber } from '../../lib/utils';
+import { formatCurrency, formatDate, generateSubscriptionOrderNumber, buildWABusinessUrl } from '../../lib/utils';
 import type { Subscription, Product, OrderItem } from '../../lib/types';
 import type { SubscriptionDuration } from '../../lib/constants';
 
@@ -334,7 +334,7 @@ export default function SubscriptionsPage() {
 
                     {/* Actions */}
                     <div className="flex gap-2 flex-wrap">
-                      <a href={`https://wa.me/91${sub.customerWhatsapp}`} target="_blank" rel="noreferrer"
+                      <a href={buildWABusinessUrl(sub.customerWhatsapp)} target="_blank" rel="noreferrer"
                         className="text-xs border border-green-300 text-green-600 px-3 py-1.5 rounded-lg hover:bg-green-50">
                         📱 WhatsApp
                       </a>

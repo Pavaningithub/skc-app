@@ -4,7 +4,7 @@ import { Search, Plus, ArrowUpDown, Copy } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { ordersService } from '../../lib/services';
 import { useRealtimeCollection } from '../../lib/useRealtimeCollection';
-import { formatCurrency, formatDateTime } from '../../lib/utils';
+import { formatCurrency, formatDateTime, buildWABusinessUrl } from '../../lib/utils';
 import { ORDER_STATUS_COLORS, ORDER_STATUS_LABELS } from '../../lib/constants';
 import type { Order } from '../../lib/types';
 import type { OrderStatus } from '../../lib/constants';
@@ -250,7 +250,7 @@ export default function OrdersPage() {
                     Mark Paid
                   </button>
                 )}
-                <a href={`https://wa.me/91${order.customerWhatsapp}`} target="_blank" rel="noreferrer"
+                <a href={buildWABusinessUrl(order.customerWhatsapp)} target="_blank" rel="noreferrer"
                   className="border border-green-300 text-green-600 hover:bg-green-50 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">
                   📱 WhatsApp
                 </a>
