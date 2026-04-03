@@ -4,7 +4,7 @@ import { ArrowLeft, MessageCircle, ChevronDown, ChevronUp, TrendingUp, Trash2, X
 import toast from 'react-hot-toast';
 import { ordersService, productsService, customersService, activityService } from '../../lib/services';
 import {
-  formatCurrency, formatDateTime, buildCustomerWhatsAppUrl,
+  formatCurrency, formatDateTime, buildCustomerWhatsAppUrl, buildWABusinessUrl,
   orderConfirmedToCustomer, outForDeliveryToCustomer, deliveredToCustomer,
   orderCancelledToCustomer, formatQuantity,
 } from '../../lib/utils';
@@ -345,7 +345,7 @@ export default function OrderDetail() {
         <h2 className="font-semibold text-gray-800 text-sm uppercase tracking-wide text-gray-400">Customer</h2>
         <p className="font-semibold text-gray-800 text-lg">{order.customerName}</p>
         <div className="flex items-center gap-4 flex-wrap text-sm text-gray-600">
-          <a href={`https://wa.me/91${order.customerWhatsapp}`} target="_blank" rel="noreferrer"
+          <a href={buildWABusinessUrl(order.customerWhatsapp)} target="_blank" rel="noreferrer"
             className="flex items-center gap-1 text-green-600 hover:underline">
             📱 {order.customerWhatsapp}
           </a>
