@@ -38,6 +38,10 @@ scripts/
 # README — personal reference only, not for the repo
 README.md
 
+# Playwright test artifacts
+test-results/
+playwright-report/
+
 # AI tooling
 .agents/
 .claude/
