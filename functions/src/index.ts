@@ -68,9 +68,9 @@ export const notifyNewOrder = onDocumentCreated(
       return;
     }
 
-    // Format items list
+    // Format items list — no pricing
     const itemLines = (order.items ?? [])
-      .map((i) => `  • ${i.productName} × ${i.quantity} ${i.unit} — ₹${i.total}`)
+      .map((i) => `  • ${i.productName} × ${i.quantity} ${i.unit}`)
       .join("\n");
 
     // Format phone for display
@@ -91,20 +91,20 @@ export const notifyNewOrder = onDocumentCreated(
       "",
       `<b>Items:</b>`,
       itemLines,
-      "",
-      `💰 Subtotal: ₹${order.subtotal}`,
-      order.discount > 0 ? `🏷️ Discount: −₹${order.discount}${order.referralCodeUsed ? ` (${order.referralCodeUsed})` : ""}` : "",
-      `✅ <b>Total: ₹${order.total}</b>`,
       order.notes ? `\n📝 Notes: ${order.notes}` : "",
     ].filter(Boolean).join("\n");
 
-    // Build WhatsApp message to share in group
+    // Build WhatsApp message to share in group — same details as Telegram, no pricing
     const waText = [
       `${emoji} *${isSample ? "Sample Request" : "New Order"} — ${order.orderNumber}*`,
-      `👤 ${order.customerName} · ${phone}`,
+      "",
+      `👤 *${order.customerName}*`,
+      `📞 ${phone}`,
       `📍 ${order.customerPlace || "—"}`,
-      `✅ *Total: ₹${order.total}*`,
-      isSample ? "" : `\nPlease note your order and expect delivery soon! 🙏`,
+      "",
+      `*Items:*`,
+      itemLines,
+      order.notes ? `\n📝 Notes: ${order.notes}` : "",
     ].filter(Boolean).join("\n");
 
     const waUrl = `https://wa.me/?text=${encodeURIComponent(waText)}`;
