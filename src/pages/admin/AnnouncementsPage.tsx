@@ -3,6 +3,7 @@ import { Megaphone, Copy, Check, Users, ChevronDown, ChevronUp, Sparkles, Refres
 import toast from 'react-hot-toast';
 import { productsService, customersService } from '../../lib/services';
 import { APP_CONFIG } from '../../config';
+import { buildWABusinessUrl } from '../../lib/utils';
 import type { Product, Customer } from '../../lib/types';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -195,7 +196,7 @@ export default function AnnouncementsPage() {
 
   function openBroadcast() {
     // WhatsApp broadcast-style: open wa.me with the message so admin can paste/send
-    window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, '_blank');
+    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(message)}`, '_blank');
   }
 
   const filteredCustomers = customers.filter(c =>
@@ -415,7 +416,7 @@ export default function AnnouncementsPage() {
               {/* Customer list */}
               <div className="space-y-1.5 max-h-96 overflow-y-auto pr-1">
                 {filteredCustomers.map(c => {
-                  const waUrl = `https://wa.me/91${c.whatsapp}?text=${encodeURIComponent(message)}`;
+                  const waUrl = buildWABusinessUrl(c.whatsapp, message);
                   const sent = sentDMs.has(c.id);
                   return (
                     <div key={c.id}
