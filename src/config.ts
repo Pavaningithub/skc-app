@@ -12,8 +12,6 @@ export const APP_CONFIG = {
   // ── Contact (from env) ─────────────────────────────────────
   WHATSAPP_NUMBER:      import.meta.env.VITE_WHATSAPP_NUMBER  as string,   // with country code, no +
   WHATSAPP_DISPLAY:     import.meta.env.VITE_WHATSAPP_DISPLAY  as string,
-  WHATSAPP_NUMBER2:     import.meta.env.VITE_WHATSAPP_NUMBER2  as string,
-  WHATSAPP_DISPLAY2:    import.meta.env.VITE_WHATSAPP_DISPLAY2 as string,
 
   // ── Payments (from env) ────────────────────────────────────
   UPI_ID:               import.meta.env.VITE_UPI_ID      as string,
