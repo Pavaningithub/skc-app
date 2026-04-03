@@ -47,7 +47,7 @@ export default function Products() {
   function openEdit(p: Product) {
     setForm({
       name: p.name, nameKannada: p.nameKannada || '', description: p.description,
-      unit: p.unit, pricePerUnit: p.pricePerUnit, minOrderQty: p.minOrderQty ?? 100,
+      unit: p.unit, pricePerUnit: p.unit === 'gram' ? p.pricePerUnit * 1000 : p.pricePerUnit, minOrderQty: p.minOrderQty ?? 100,
       category: p.category, isActive: p.isActive, isOnDemand: p.isOnDemand ?? false,
       isPopular: p.isPopular ?? false,
       allowCustomization: p.allowCustomization ?? false,
@@ -60,13 +60,16 @@ export default function Products() {
   async function handleSave() {
     if (!form.name.trim()) return toast.error('Product name is required');
     if (form.pricePerUnit <= 0) return toast.error('Price must be greater than 0');
+    // gram-unit products: admin enters price per kg — convert to per gram for storage
+    const priceToStore = form.unit === 'gram' ? form.pricePerUnit / 1000 : form.pricePerUnit;
+    const formToSave = { ...form, pricePerUnit: priceToStore };
     setSaving(true);
     try {
       if (editId) {
-        await productsService.update(editId, form);
+        await productsService.update(editId, formToSave);
         toast.success('Product updated');
       } else {
-        await productsService.add(form as Omit<Product, 'id'>);
+        await productsService.add(formToSave as Omit<Product, 'id'>);
         toast.success('Product added');
       }
       setShowForm(false);
@@ -297,13 +300,21 @@ export default function Products() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Price (₹) per {form.unit} *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Price (₹) per {form.unit === 'gram' ? 'kg' : form.unit} *
+                    {form.unit === 'gram' && <span className="text-gray-400 font-normal ml-1">(entered as per kg, stored as per gram)</span>}
+                  </label>
                   <input
-                    type="number" min="0" step="0.01" value={form.pricePerUnit || ''}
+                    type="number" min="0" step={form.unit === 'gram' ? 10 : 0.01} value={form.pricePerUnit || ''}
                     onChange={e => setForm(f => ({ ...f, pricePerUnit: parseFloat(e.target.value) || 0 }))}
-                    placeholder="0.00"
+                    placeholder={form.unit === 'gram' ? 'e.g. 800 for ₹800/kg' : '0.00'}
                     className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-orange-400"
                   />
+                  {form.unit === 'gram' && form.pricePerUnit > 0 && (
+                    <p className="text-xs text-orange-500 mt-1">
+                      = ₹{Math.round(form.pricePerUnit / 4)}/250g · ₹{Math.round(form.pricePerUnit / 2)}/500g · ₹{form.pricePerUnit}/kg
+                    </p>
+                  )}
                 </div>
               </div>
 
