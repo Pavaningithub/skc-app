@@ -904,7 +904,7 @@ export default function StoreFront() {
                   <span className="text-xl font-bold" style={{ color: '#c8821a' }}>{formatCurrency(cartTotal)}</span>
                 </div>
                 <button
-                  onClick={() => { setShowCart(false); setShowOrderForm(true); setOrderForm({ name: '', whatsapp: '', place: '', notes: '', referralCode: '' }); }}
+                  onClick={() => { setShowCart(false); setShowOrderForm(true); setOrderForm({ name: '', whatsapp: '', place: '', notes: '', referralCode: urlRefCode }); }}
                   className="w-full text-white font-semibold py-3.5 rounded-2xl text-sm"
                   style={{ background: '#c8821a' }}>
                   Proceed to Order →
