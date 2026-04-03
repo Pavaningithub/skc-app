@@ -132,7 +132,7 @@ export default function MyReferralPage() {
             <p className="text-sm text-blue-700">
               This usually happens automatically after your first order is <strong>confirmed</strong>. If you've already ordered, please wait a few minutes or{' '}
               <a
-                href={`https://wa.me/91${APP_CONFIG.WHATSAPP_NUMBER}?text=${encodeURIComponent('Hi, I placed an order and need my referral code. My number is ' + phone)}`}
+                href={`https://wa.me/${APP_CONFIG.WHATSAPP_NUMBER}?text=${encodeURIComponent('Hi, I placed an order and need my referral code. My number is ' + phone)}`}
                 target="_blank" rel="noreferrer"
                 className="underline font-semibold text-blue-900"
               >contact us on WhatsApp</a>.
