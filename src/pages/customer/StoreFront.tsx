@@ -193,28 +193,23 @@ export default function StoreFront() {
 
       const enteredCode = orderForm.referralCode.trim().toUpperCase();
       if (enteredCode) {
-        // Block returning customers — referral benefit is for first-time orders only
-        if (existing && (existing.totalOrders > 0 || existing.referredBy)) {
-          setReferralError('Referral codes are only valid on your first order');
-          setSubmitting(false);
-          return;
+        // Referral benefit is for first-time orders only — skip silently for returning customers
+        const isReturning = existing && (existing.totalOrders > 0 || existing.referredBy);
+        const referrer = isReturning ? null : await customersService.getByReferralCode(enteredCode);
+        const isSelfReferral = referrer && referrer.id === customerId;
+
+        if (isReturning || !referrer || isSelfReferral) {
+          // Invalid in some form — place the order at full price, no referral applied
+          setReferralDiscount(0);
+          setReferralError('');
+          // fall through — referralDiscountAmt stays 0, referralCodeUsed stays undefined
+        } else {
+          referralCodeUsed = enteredCode;
+          const split = computeReferralDiscountFromTiers(cartTotal, referralConfig.tiers, referralConfig.splitReferrerPct);
+          referralDiscountAmt = split.customerDiscount;  // new customer gets 25% off
+          referrerId = referrer.id;
+          referrerCreditAmt = split.referrerCredit;       // referrer earns 75% as credit
         }
-        const referrer = await customersService.getByReferralCode(enteredCode);
-        if (!referrer) {
-          setReferralError('Invalid referral code — please check and try again');
-          setSubmitting(false);
-          return;
-        }
-        if (referrer.id === customerId) {
-          setReferralError("You can't use your own referral code");
-          setSubmitting(false);
-          return;
-        }
-        referralCodeUsed = enteredCode;
-        const split = computeReferralDiscountFromTiers(cartTotal, referralConfig.tiers, referralConfig.splitReferrerPct);
-        referralDiscountAmt = split.customerDiscount;  // new customer gets 25% off
-        referrerId = referrer.id;
-        referrerCreditAmt = split.referrerCredit;       // referrer earns 75% as credit
       } else if (useCredit && existing && (existing.referralCredit ?? 0) > 0) {
         // Credit redemption — returning customers only, capped by config
         creditUsedAmt = computeCreditRedemption(existing.referralCredit ?? 0, cartTotal, referralConfig.creditRedemptionPct, referralConfig.creditRedemptionCap);
