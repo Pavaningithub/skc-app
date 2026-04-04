@@ -27,7 +27,7 @@ const emptyForm: Omit<Product, 'id' | 'createdAt' | 'updatedAt'> = {
   name: '', nameKannada: '', description: '', unit: 'gram', pricePerUnit: 0,
   minOrderQty: 0, category: 'Other', isActive: true,
   isOnDemand: false, isPopular: false, allowCustomization: false, customizationHint: '', sortOrder: 0,
-  hasGarlicOption: false,
+  hasGarlicOption: false, isNewLaunch: false, newLaunchUntil: '', didYouKnow: '',
 };
 
 export default function Products() {
@@ -53,6 +53,9 @@ export default function Products() {
       allowCustomization: p.allowCustomization ?? false,
       customizationHint: p.customizationHint || '', sortOrder: p.sortOrder ?? 0,
       hasGarlicOption: p.hasGarlicOption ?? false,
+      isNewLaunch: p.isNewLaunch ?? false,
+      newLaunchUntil: p.newLaunchUntil ?? '',
+      didYouKnow: p.didYouKnow ?? '',
     });
     setEditId(p.id); setShowForm(true);
   }
@@ -62,7 +65,12 @@ export default function Products() {
     if (form.pricePerUnit <= 0) return toast.error('Price must be greater than 0');
     // gram-unit products: admin enters price per kg — convert to per gram for storage
     const priceToStore = form.unit === 'gram' ? form.pricePerUnit / 1000 : form.pricePerUnit;
-    const formToSave = { ...form, pricePerUnit: priceToStore };
+    const formToSave = {
+      ...form,
+      pricePerUnit: priceToStore,
+      ...(form.newLaunchUntil ? {} : { newLaunchUntil: undefined }),
+      ...(form.didYouKnow?.trim() ? {} : { didYouKnow: undefined }),
+    };
     setSaving(true);
     try {
       if (editId) {
@@ -378,6 +386,36 @@ export default function Products() {
                   className="w-4 h-4 accent-orange-500" />
                 <span className="text-sm text-gray-700">🧄 Garlic option <span className="text-gray-400">(customer picks With / Without Garlic)</span></span>
               </label>
+
+              {/* New Launch */}
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input type="checkbox" checked={form.isNewLaunch ?? false}
+                  onChange={e => setForm(f => ({ ...f, isNewLaunch: e.target.checked }))}
+                  className="w-4 h-4 accent-orange-500" />
+                <span className="text-sm text-gray-700">🆕 New Launch <span className="text-gray-400">(shows banner + badge on storefront)</span></span>
+              </label>
+              {form.isNewLaunch && (
+                <div className="ml-7">
+                  <label className="block text-xs text-gray-500 mb-1">Show "New!" until</label>
+                  <input type="date" value={form.newLaunchUntil ?? ''}
+                    onChange={e => setForm(f => ({ ...f, newLaunchUntil: e.target.value }))}
+                    min={new Date().toISOString().slice(0, 10)}
+                    className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm w-44 focus:outline-none focus:ring-2 focus:ring-orange-300" />
+                  <p className="text-xs text-gray-400 mt-1">Leave blank = show indefinitely</p>
+                </div>
+              )}
+            </div>
+
+            {/* Did You Know */}
+            <div className="px-5">
+              <label className="block text-sm font-medium text-gray-700 mb-1">💡 Did You Know? <span className="text-gray-400 font-normal">(optional — shown on product card)</span></label>
+              <textarea
+                value={form.didYouKnow ?? ''}
+                onChange={e => setForm(f => ({ ...f, didYouKnow: e.target.value }))}
+                placeholder="e.g. Traditionally made during Ugadi — our recipe uses pure ghee, no vanaspati."
+                rows={2}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-orange-300"
+              />
             </div>
 
             {/* Footer buttons */}
