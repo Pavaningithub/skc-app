@@ -81,39 +81,39 @@ export const notifyNewOrder = onDocumentCreated(
     // Build message
     const isSample = order.type === "sample";
     const emoji = isSample ? "🎁" : "🛒";
+    const orderLabel = isSample ? "Sample Request" : "New Order";
+    const adminLink = `${ADMIN_BASE_URL}/${orderId}`;
 
-    const lines = [
-      `${emoji} <b>${isSample ? "Sample Request" : "New Order"} — ${order.orderNumber}</b>`,
+    // ── Telegram message (HTML) ───────────────────────────────────────────────
+    const telegramLines = [
+      `${emoji} <b>${orderLabel} — ${order.orderNumber}</b>`,
       "",
       `👤 <b>${order.customerName}</b>`,
       `📞 ${phone}`,
       `📍 ${order.customerPlace || "—"}`,
       "",
-      `<b>Items:</b>`,
+      "<b>Items:</b>",
       itemLines,
-      order.notes ? `\n📝 Notes: ${order.notes}` : "",
+      order.notes ? `📝 ${order.notes}` : "",
+      "",
+      `💰 ${isSample ? "FREE SAMPLE" : `₹${order.total}`}`,
     ].filter(Boolean).join("\n");
 
-    // Build WhatsApp message to share in group — same details as Telegram, no pricing
-    const waText = [
-      `${emoji} *${isSample ? "Sample Request" : "New Order"} — ${order.orderNumber}*`,
-      "",
-      `👤 *${order.customerName}*`,
-      `📞 ${phone}`,
+    // ── WA group message — short plain text so URL stays under Telegram's 2048-char button limit ──
+    const waLines = [
+      `${emoji} ${orderLabel} — ${order.orderNumber}`,
+      `👤 ${order.customerName}  📞 ${phone}`,
       `📍 ${order.customerPlace || "—"}`,
-      "",
-      `*Items:*`,
       itemLines,
-      order.notes ? `\n📝 Notes: ${order.notes}` : "",
+      `💰 ${isSample ? "FREE SAMPLE" : `₹${order.total}`}`,
+      order.notes ? `📝 ${order.notes}` : "",
     ].filter(Boolean).join("\n");
 
-    const waUrl = `https://wa.me/?text=${encodeURIComponent(waText)}`;
+    const waUrl = `https://wa.me/?text=${encodeURIComponent(waLines)}`;
 
-    // Inline keyboard buttons
+    // ── Inline keyboard buttons ───────────────────────────────────────────────
     const buttons = [
-      [
-        {text: "📋 Open in Admin", url: `${ADMIN_BASE_URL}/${orderId}`},
-      ],
+      [{text: "📋 Open in Admin", url: adminLink}],
       [
         {text: "📲 Share to WA Group", url: waUrl},
         {text: "🔗 Join WA Group", url: WA_GROUP_LINK},
@@ -124,7 +124,7 @@ export const notifyNewOrder = onDocumentCreated(
       await sendTelegram(
         TELEGRAM_BOT_TOKEN.value(),
         TELEGRAM_CHAT_ID.value(),
-        lines,
+        telegramLines,
         buttons
       );
       logger.info("Telegram notification sent", {orderId, orderNumber: order.orderNumber});
