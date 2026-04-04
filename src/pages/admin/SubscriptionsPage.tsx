@@ -9,12 +9,6 @@ import { formatCurrency, formatDate, generateSubscriptionOrderNumber, buildWABus
 import type { Subscription, Product, OrderItem } from '../../lib/types';
 import type { SubscriptionDuration } from '../../lib/constants';
 
-// Quantity hints for known products (matched by lowercase product name)
-const QTY_HINTS: Record<string, string> = {
-  'millet malt': '500g/month (2 people × 1 serving/day)',
-  'dry fruit laddu': '1kg/month (2 people × 1 laddu/day ≈ 60 pcs)',
-};
-
 export default function SubscriptionsPage() {
   const [subs, subsLoading] = useRealtimeCollection<Subscription>(subscriptionsService.subscribe.bind(subscriptionsService));
   const [products, prodLoading] = useRealtimeCollection<Product>(productsService.subscribe.bind(productsService));
@@ -70,7 +64,7 @@ export default function SubscriptionsPage() {
   };
   const [form, setForm] = useState(emptyForm);
   const [selectedProductId, setSelectedProductId] = useState('');
-  const [selectedQty, setSelectedQty] = useState(100);
+  const [selectedQty, setSelectedQty] = useState(250);
 
   // Renewals due within 30 days
   const renewalsDue = useMemo(() => {
@@ -91,11 +85,6 @@ export default function SubscriptionsPage() {
       return duration === '3months' ? subConfig.monthlyThreeMonthPct : subConfig.monthlySixMonthPct;
     }
     return duration === '3months' ? subConfig.upfrontThreeMonthPct : subConfig.upfrontSixMonthPct;
-  }
-
-  function getHint(productName: string): string | undefined {
-    const key = Object.keys(QTY_HINTS).find(k => productName.toLowerCase().includes(k));
-    return key ? QTY_HINTS[key] : undefined;
   }
 
   function addItem() {
@@ -526,22 +515,17 @@ export default function SubscriptionsPage() {
                       <option value="">Select product…</option>
                       {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                     </select>
-                    <input type="number" value={selectedQty} onChange={e => setSelectedQty(Number(e.target.value))}
-                      className="w-20 border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none text-center" />
+                    <select value={selectedQty} onChange={e => setSelectedQty(Number(e.target.value))}
+                      className="w-24 border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none bg-white">
+                      <option value={250}>250 g</option>
+                      <option value={500}>500 g</option>
+                      <option value={1000}>1 kg</option>
+                    </select>
                     <button onClick={addItem} disabled={!selectedProductId}
                       className="bg-orange-500 text-white px-3 py-2 rounded-xl disabled:opacity-40">
                       <Plus className="w-4 h-4" />
                     </button>
                   </div>
-                  {/* Quantity hint */}
-                  {selectedProductId && (() => {
-                    const p = products.find(p => p.id === selectedProductId);
-                    const hint = p ? getHint(p.name) : undefined;
-                    return hint ? (
-                      <p className="text-xs text-blue-600 mt-1 ml-1">💡 Recommended: {hint}</p>
-                    ) : null;
-                  })()}
-
                   {/* Added items */}
                   {form.items.length > 0 && (
                     <div className="mt-3 space-y-1">
