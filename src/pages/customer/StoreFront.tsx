@@ -454,8 +454,8 @@ export default function StoreFront() {
             {featureFlags.subscriptionBanner && (
               <button
                 onClick={() => document.getElementById('subscribe')?.scrollIntoView({ behavior: 'smooth' })}
-                className="font-semibold px-5 py-2 rounded-xl text-sm"
-                style={{ background: 'rgba(200,130,26,0.3)', color: '#ffd700', border: '1.5px solid rgba(200,130,26,0.6)' }}>
+                className="font-semibold px-5 py-2 rounded-xl text-sm border-2 text-white"
+                style={{ borderColor: 'rgba(255,255,255,0.45)', background: 'rgba(255,255,255,0.1)' }}>
                 📦 Subscribe
               </button>
             )}
@@ -528,8 +528,8 @@ export default function StoreFront() {
             {featureFlags.subscriptionBanner && (
               <button
                 onClick={() => document.getElementById('subscribe')?.scrollIntoView({ behavior: 'smooth' })}
-                className="font-semibold px-6 py-2.5 rounded-2xl text-sm"
-                style={{ background: 'rgba(200,130,26,0.25)', color: '#ffd700', border: '1.5px solid rgba(200,130,26,0.6)' }}>
+                className="font-semibold px-6 py-2.5 rounded-2xl text-sm border-2 text-white"
+                style={{ borderColor: 'rgba(255,255,255,0.5)', background: 'rgba(255,255,255,0.1)' }}>
                 📦 Subscribe
               </button>
             )}
@@ -814,20 +814,7 @@ export default function StoreFront() {
             <span className="font-bold text-white text-base" style={{ fontFamily: 'Georgia, serif' }}>Sri Krishna Condiments</span>
           </div>
           <p className="text-xs mb-1" style={{ color: '#ffd700' }}>🙏 Hare Krishna — Pure · Fresh · Made with Devotion 🌿</p>
-          <p className="text-xs mt-3" style={{ color: '#d4a574' }}>
-            WhatsApp:{' '}
-            <a href={`https://wa.me/${APP_CONFIG.WHATSAPP_NUMBER}`}
-              className="underline" style={{ color: '#25d366' }}>
-              {APP_CONFIG.WHATSAPP_DISPLAY}
-            </a>
-          </p>
-          {/* <a href="/admin/login" className="block mt-5 text-xs" style={{ color: '#555' }}>Admin Login</a> */}
-          <div className="flex justify-center gap-4 mt-3 flex-wrap">
-            <a href="/my-orders" className="text-xs" style={{ color: '#c8821a' }}>My Account</a>
-            <a href={APP_CONFIG.WHATSAPP_GROUP_LINK} target="_blank" rel="noreferrer" className="text-xs" style={{ color: '#25d366' }}>📢 WA Group</a>
-            <a href={APP_CONFIG.WHATSAPP_CHANNEL_LINK} target="_blank" rel="noreferrer" className="text-xs" style={{ color: '#25d366' }}>📡 WA Channel</a>
-            {/* <a href="/my-orders?tab=referral" className="text-xs" style={{ color: '#d4a574' }}>🎟️ Referral</a> */}
-          </div>
+          <p className="text-xs mt-3" style={{ color: 'rgba(255,255,255,0.4)' }}>© 2026 Sri Krishna Condiments. All rights reserved.</p>
         </div>
       </footer>
 
