@@ -53,6 +53,34 @@ export function buildUPIGPayLink(amount: number, orderId: string): string {
   return `gpay://upi/pay?pa=${UPI_ID}&pn=${encodeURIComponent(BUSINESS_NAME)}&am=${amount}&tn=${encodeURIComponent(`Order ${orderId}`)}&cu=INR`;
 }
 
+/** WA message sent to customer requesting payment for a subscription month */
+export function subscriptionPaymentRequest(
+  customerName: string,
+  subNumber: string,
+  monthLabel: string,
+  amount: number,
+  upiId: string,
+  isUpfront = false,
+  durationMonths = 3
+): string {
+  const amountLine = isUpfront
+    ? `💳 Upfront total (${durationMonths} months): ₹${amount * durationMonths}`
+    : `💰 Amount due for ${monthLabel}: ₹${amount}`;
+  return (
+    `🌿 *Sri Krishna Condiments — Subscription Payment*\n\n` +
+    `Hi ${customerName}! Your Health Mix Subscription is confirmed 🎉\n\n` +
+    `📋 Sub #${subNumber}\n` +
+    `📅 Period: ${monthLabel}\n` +
+    `${amountLine}\n\n` +
+    `💳 *UPI Payment:*\n` +
+    `UPI ID: ${upiId}\n` +
+    `GPay / PhonePe / Paytm — pay to this ID\n\n` +
+    `Once you pay, please send us the screenshot on WhatsApp.\n` +
+    `We'll confirm and start/continue your delivery. 🙏\n\n` +
+    `— Sri Krishna Condiments 🪷`
+  );
+}
+
 // Sent TO CUSTOMER confirming their order
 export function orderConfirmedToCustomer(order: Order, referralCode?: string, storeUrl?: string): string {
   const items = order.items

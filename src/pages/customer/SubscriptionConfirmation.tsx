@@ -35,13 +35,23 @@ export default function SubscriptionConfirmation() {
   );
 
   const durationMonths = sub.duration === '6months' ? 6 : 3;
+  const paymentLabel = sub.paymentMode === 'monthly' ? 'Monthly' : 'Upfront';
+  const totalUpfront = sub.discountedAmount * durationMonths;
+
+  const itemLines = sub.items
+    .map(i => `  • ${i.productName} ×${i.quantity}g — ₹${i.totalPrice}/mo`)
+    .join('\n');
 
   const waText = encodeURIComponent(
-    `Hi! I just subscribed to Health Mix products on skctreats.in.\n` +
-    `Subscription #${sub.subscriptionNumber ?? sub.id.slice(0, 8).toUpperCase()}\n` +
-    `Name: ${sub.customerName}\n` +
-    `Plan: ${durationMonths}-month | ${sub.paymentMode === 'upfront' ? 'Upfront' : 'Monthly'} payment\n` +
-    `Please confirm my subscription. 🙏`
+    `🌿 Hi! I've subscribed to Health Mix at Sri Krishna Condiments.\n\n` +
+    `📋 Subscription #${sub.subscriptionNumber ?? sub.id.slice(0, 8).toUpperCase()}\n` +
+    `👤 Name: ${sub.customerName}\n` +
+    `📅 Plan: ${durationMonths}-Month | ${paymentLabel} payment | ${sub.discountPercent}% off\n\n` +
+    `🛒 Products:\n${itemLines}\n\n` +
+    (sub.paymentMode === 'upfront'
+      ? `💳 Total payable (upfront): ₹${totalUpfront}\n`
+      : `💰 Monthly amount: ₹${sub.discountedAmount}/mo\n`) +
+    `\nPlease confirm and share payment details. 🙏`
   );
 
   return (
@@ -136,9 +146,10 @@ export default function SubscriptionConfirmation() {
           <div className="rounded-xl p-4 space-y-2" style={{ background: '#fff4eb', border: '1px solid #f0d9c8' }}>
             <p className="text-xs font-semibold text-orange-800 uppercase tracking-wide">What happens next?</p>
             <ol className="space-y-1.5 text-sm text-gray-600">
-              <li className="flex items-start gap-2"><span className="text-orange-500 font-bold flex-shrink-0">1.</span>Our team reviews your subscription</li>
-              <li className="flex items-start gap-2"><span className="text-orange-500 font-bold flex-shrink-0">2.</span>We'll WhatsApp you to confirm the plan &amp; payment</li>
-              <li className="flex items-start gap-2"><span className="text-orange-500 font-bold flex-shrink-0">3.</span>First delivery arrives 1st–5th of next month</li>
+              <li className="flex items-start gap-2"><span className="text-orange-500 font-bold flex-shrink-0">1.</span>We review your request and confirm on WhatsApp</li>
+              <li className="flex items-start gap-2"><span className="text-orange-500 font-bold flex-shrink-0">2.</span>We send you a payment link via WhatsApp</li>
+              <li className="flex items-start gap-2"><span className="text-orange-500 font-bold flex-shrink-0">3.</span>Once payment is confirmed, deliveries begin 🎉</li>
+              <li className="flex items-start gap-2"><span className="text-orange-500 font-bold flex-shrink-0">4.</span>{sub.paymentMode === 'monthly' ? 'Payment requested each month before delivery' : 'No more payments — just sit back and enjoy!'}</li>
             </ol>
           </div>
 

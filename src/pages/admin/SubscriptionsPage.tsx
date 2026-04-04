@@ -1,13 +1,42 @@
 import { useState, useMemo } from 'react';
-import { Plus, Settings, Save, X, RefreshCw, ChevronDown, ChevronUp, AlertTriangle } from 'lucide-react';
+import { Plus, Settings, Save, X, RefreshCw, ChevronDown, ChevronUp, AlertTriangle, CheckCircle, Send } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Portal from '../../components/Portal';
 import { subscriptionsService, subscriptionConfigService, productsService, customersService, ordersService } from '../../lib/services';
 import { useRealtimeCollection } from '../../lib/useRealtimeCollection';
 import { useSubscriptionConfig } from '../../lib/useSubscriptionConfig';
-import { formatCurrency, formatDate, generateSubscriptionOrderNumber, buildWABusinessUrl } from '../../lib/utils';
-import type { Subscription, Product, OrderItem } from '../../lib/types';
-import type { SubscriptionDuration } from '../../lib/constants';
+import { formatCurrency, formatDate, generateSubscriptionOrderNumber, buildWABusinessUrl, subscriptionPaymentRequest } from '../../lib/utils';
+import { APP_CONFIG } from '../../config';
+import type { Subscription, MonthlyEntry, Product, OrderItem } from '../../lib/types';
+import type { SubscriptionDuration, SubscriptionStatus } from '../../lib/constants';
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+function statusBadge(status?: SubscriptionStatus) {
+  const map: Record<SubscriptionStatus, { label: string; cls: string }> = {
+    pending:           { label: '⏳ Pending',           cls: 'bg-yellow-100 text-yellow-700' },
+    confirmed:         { label: '✅ Confirmed',          cls: 'bg-blue-100 text-blue-700' },
+    payment_requested: { label: '💳 Payment Requested',  cls: 'bg-purple-100 text-purple-700' },
+    active:            { label: '🟢 Active',             cls: 'bg-green-100 text-green-700' },
+    cancelled:         { label: '❌ Cancelled',          cls: 'bg-red-100 text-red-500' },
+  };
+  const s = status ?? 'pending';
+  const { label, cls } = map[s] ?? map.pending;
+  return <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${cls}`}>{label}</span>;
+}
+
+function buildMonthlyTracking(sub: Subscription): MonthlyEntry[] {
+  const months = sub.duration === '6months' ? 6 : 3;
+  const start = new Date(sub.startDate);
+  return Array.from({ length: months }, (_, i) => {
+    const d = new Date(start.getFullYear(), start.getMonth() + i, 1);
+    return {
+      month: i + 1,
+      label: d.toLocaleString('en-IN', { month: 'long', year: 'numeric' }),
+      paymentStatus: 'pending' as const,
+      deliveryStatus: 'pending' as const,
+    };
+  });
+}
 
 export default function SubscriptionsPage() {
   const [subs, subsLoading] = useRealtimeCollection<Subscription>(subscriptionsService.subscribe.bind(subscriptionsService));
@@ -79,6 +108,7 @@ export default function SubscriptionsPage() {
 
   const activeSubs = useMemo(() => subs.filter(s => s.isActive), [subs]);
   const expiredSubs = useMemo(() => subs.filter(s => !s.isActive), [subs]);
+  const pendingSubs = useMemo(() => subs.filter(s => !s.isActive && (s.status === 'pending' || !s.status)), [subs]);
 
   function getDiscountPct(duration: SubscriptionDuration, paymentMode: 'upfront' | 'monthly' = 'upfront') {
     if (paymentMode === 'monthly') {
@@ -132,6 +162,13 @@ export default function SubscriptionsPage() {
         createdAt: new Date().toISOString(),
       });
 
+      const tracking = buildMonthlyTracking({
+        duration: form.duration,
+        paymentMode: form.paymentMode,
+        discountedAmount,
+        startDate: startDate.toISOString(),
+      } as any);
+
       const subId = await subscriptionsService.add({
         customerId: customerId || '',
         customerName: form.customerName,
@@ -145,6 +182,8 @@ export default function SubscriptionsPage() {
         endDate: endDate.toISOString(),
         isActive: true,
         paymentStatus: form.paymentStatus,
+        status: 'confirmed',
+        monthlyTracking: tracking,
         createdAt: new Date().toISOString(),
       });
 
@@ -199,9 +238,57 @@ export default function SubscriptionsPage() {
   }
 
   async function cancelSub(id: string) {
-    await subscriptionsService.update(id, { isActive: false });
+    await subscriptionsService.update(id, { isActive: false, status: 'cancelled' });
     toast.success('Subscription cancelled');
     setCancelConfirmId(null);
+  }
+
+  async function confirmSub(sub: Subscription) {
+    const tracking = buildMonthlyTracking(sub);
+    await subscriptionsService.update(sub.id, {
+      status: 'confirmed',
+      isActive: true,
+      monthlyTracking: tracking,
+    });
+    toast.success('Subscription confirmed!');
+  }
+
+  function requestPaymentWA(sub: Subscription, entry: MonthlyEntry) {
+    const subNum = sub.subscriptionNumber ?? sub.id.slice(0, 8).toUpperCase();
+    const durationMonths = sub.duration === '6months' ? 6 : 3;
+    const isUpfront = sub.paymentMode === 'upfront' && entry.month === 1;
+    const msg = subscriptionPaymentRequest(
+      sub.customerName, subNum, entry.label, sub.discountedAmount,
+      APP_CONFIG.UPI_ID, isUpfront, durationMonths
+    );
+    window.open(`https://wa.me/91${sub.customerWhatsapp}?text=${encodeURIComponent(msg)}`, '_blank');
+    const updated = (sub.monthlyTracking ?? []).map(e =>
+      e.month === entry.month
+        ? { ...e, paymentStatus: 'requested' as const, paymentRequestedAt: new Date().toISOString() }
+        : e
+    );
+    subscriptionsService.update(sub.id, { monthlyTracking: updated, status: 'payment_requested' });
+  }
+
+  async function markMonthPaid(sub: Subscription, monthNum: number) {
+    const updated = (sub.monthlyTracking ?? []).map(e =>
+      e.month === monthNum ? { ...e, paymentStatus: 'paid' as const, paidAt: new Date().toISOString() } : e
+    );
+    const allPaid = updated.every(e => e.paymentStatus === 'paid');
+    await subscriptionsService.update(sub.id, {
+      monthlyTracking: updated,
+      status: 'active',
+      ...(allPaid ? { paymentStatus: 'paid' } : {}),
+    });
+    toast.success(`Month ${monthNum} marked as paid`);
+  }
+
+  async function markMonthDelivered(sub: Subscription, monthNum: number) {
+    const updated = (sub.monthlyTracking ?? []).map(e =>
+      e.month === monthNum ? { ...e, deliveryStatus: 'delivered' as const, deliveredAt: new Date().toISOString() } : e
+    );
+    await subscriptionsService.update(sub.id, { monthlyTracking: updated });
+    toast.success(`Month ${monthNum} marked as delivered`);
   }
 
   // Price breakdown for form
@@ -216,7 +303,7 @@ export default function SubscriptionsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-800 font-display">Subscriptions</h1>
-          <p className="text-sm text-gray-500">{activeSubs.length} active · {expiredSubs.length} expired</p>
+          <p className="text-sm text-gray-500">{activeSubs.length} active · {pendingSubs.length} pending · {expiredSubs.length} expired</p>
         </div>
         <div className="flex gap-2">
           <button onClick={openConfigModal}
@@ -284,28 +371,27 @@ export default function SubscriptionsPage() {
           {subs.length === 0 && (
             <div className="text-center py-10 text-gray-400">No subscriptions yet</div>
           )}
-          {/* Active first, then expired */}
-          {[...activeSubs, ...expiredSubs].map(sub => {
-            const isExpired = !sub.isActive || new Date(sub.endDate) < new Date();
+          {/* Active first, then pending, then expired */}
+          {[...activeSubs, ...pendingSubs, ...expiredSubs].map(sub => {
+            const isExpired = !sub.isActive && sub.status !== 'pending' && sub.status !== undefined;
+            const isPending = !sub.isActive && (sub.status === 'pending' || !sub.status);
             const isExpanded = expandedId === sub.id;
+            const tracking = sub.monthlyTracking ?? [];
             return (
               <div key={sub.id} className={`bg-white border rounded-xl overflow-hidden
-                ${isExpired ? 'border-gray-200 opacity-80' : 'border-orange-200'}`}>
-                {/* Summary row — tap to expand */}
+                ${isPending ? 'border-yellow-300' : isExpired ? 'border-gray-200 opacity-80' : 'border-orange-200'}`}>
+                {/* Summary row */}
                 <button className="w-full text-left p-4" onClick={() => setExpandedId(isExpanded ? null : sub.id)}>
                   <div className="flex items-start justify-between">
-                    <div>
+                    <div className="flex-1 min-w-0">
                       <p className="font-semibold text-gray-800">{sub.customerName}</p>
                       <p className="text-xs text-gray-500">📱 {sub.customerWhatsapp}</p>
                       <p className="text-xs text-gray-400 mt-0.5">{formatDate(sub.startDate)} → {formatDate(sub.endDate)}</p>
+                      <div className="mt-1">{statusBadge(sub.status ?? (sub.isActive ? 'active' : 'pending'))}</div>
                     </div>
-                    <div className="flex flex-col items-end gap-1">
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium
-                        ${isExpired ? 'bg-gray-100 text-gray-500' : 'bg-green-100 text-green-700'}`}>
-                        {isExpired ? 'Expired' : '✅ Active'}
-                      </span>
-                      <p className="text-sm font-bold text-orange-600">{formatCurrency(sub.discountedAmount)}</p>
-                      <p className="text-xs text-gray-400 line-through">{formatCurrency(sub.baseAmount)}</p>
+                    <div className="flex flex-col items-end gap-1 ml-2">
+                      <p className="text-sm font-bold text-orange-600">{formatCurrency(sub.discountedAmount)}<span className="text-xs font-normal text-gray-400">/mo</span></p>
+                      <p className="text-xs text-gray-400 line-through">{formatCurrency(sub.baseAmount)}/mo</p>
                       {isExpanded ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
                     </div>
                   </div>
@@ -313,14 +399,11 @@ export default function SubscriptionsPage() {
 
                 {/* Expanded detail */}
                 {isExpanded && (
-                  <div className="border-t border-gray-100 px-4 pb-4 space-y-3">
+                  <div className="border-t border-gray-100 px-4 pb-4 space-y-4">
                     {/* Badges */}
                     <div className="flex gap-2 text-xs flex-wrap pt-2">
                       <span className="bg-blue-50 text-blue-600 px-2 py-1 rounded-full">
-                        {sub.duration === '3months' ? '3 Months' : '6 Months'} · {sub.discountPercent}% off
-                      </span>
-                      <span className={`px-2 py-1 rounded-full ${sub.paymentStatus === 'paid' ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}`}>
-                        {sub.paymentStatus === 'paid' ? '✅ Paid' : '💰 Pending'}
+                        {sub.duration === '3months' ? '3 Months' : '6 Months'} · {sub.discountPercent}% off · {sub.paymentMode === 'monthly' ? 'Monthly pay' : 'Upfront'}
                       </span>
                     </div>
 
@@ -334,20 +417,99 @@ export default function SubscriptionsPage() {
                       ))}
                     </div>
 
+                    {/* Monthly Tracking Table */}
+                    {tracking.length > 0 && (
+                      <div>
+                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Monthly Tracking</p>
+                        <div className="rounded-xl overflow-hidden border border-gray-200">
+                          <table className="w-full text-xs">
+                            <thead className="bg-gray-50">
+                              <tr>
+                                <th className="text-left px-3 py-2 text-gray-500 font-medium">Month</th>
+                                <th className="text-center px-2 py-2 text-gray-500 font-medium">Payment</th>
+                                <th className="text-center px-2 py-2 text-gray-500 font-medium">Delivery</th>
+                                <th className="text-right px-2 py-2 text-gray-500 font-medium">Actions</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {tracking.map((entry, idx) => (
+                                <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}>
+                                  <td className="px-3 py-2 font-medium text-gray-700">{entry.label}</td>
+                                  <td className="px-2 py-2 text-center">
+                                    {entry.paymentStatus === 'paid'
+                                      ? <span className="text-green-600 font-semibold">✅ Paid</span>
+                                      : entry.paymentStatus === 'requested'
+                                      ? <span className="text-purple-600">💳 Sent</span>
+                                      : <span className="text-yellow-600">⏳ Pending</span>}
+                                  </td>
+                                  <td className="px-2 py-2 text-center">
+                                    {entry.deliveryStatus === 'delivered'
+                                      ? <span className="text-green-600 font-semibold">📦 Done</span>
+                                      : <span className="text-gray-400">—</span>}
+                                  </td>
+                                  <td className="px-2 py-2">
+                                    <div className="flex justify-end gap-1.5 flex-wrap">
+                                      {entry.paymentStatus !== 'paid' && (
+                                        <button onClick={() => requestPaymentWA(sub, entry)}
+                                          className="text-xs bg-purple-500 text-white px-2 py-1 rounded-lg flex items-center gap-1 hover:bg-purple-600">
+                                          <Send className="w-2.5 h-2.5" /> Pay
+                                        </button>
+                                      )}
+                                      {entry.paymentStatus !== 'paid' && (
+                                        <button onClick={() => markMonthPaid(sub, entry.month)}
+                                          className="text-xs bg-green-500 text-white px-2 py-1 rounded-lg hover:bg-green-600">
+                                          ✓ Paid
+                                        </button>
+                                      )}
+                                      {entry.paymentStatus === 'paid' && entry.deliveryStatus !== 'delivered' && (
+                                        <button onClick={() => markMonthDelivered(sub, entry.month)}
+                                          className="text-xs bg-blue-500 text-white px-2 py-1 rounded-lg hover:bg-blue-600">
+                                          📦 Delivered
+                                        </button>
+                                      )}
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Actions */}
                     <div className="flex gap-2 flex-wrap">
                       <a href={buildWABusinessUrl(sub.customerWhatsapp)} target="_blank" rel="noreferrer"
                         className="text-xs border border-green-300 text-green-600 px-3 py-1.5 rounded-lg hover:bg-green-50">
                         📱 WhatsApp
                       </a>
-                      {sub.paymentStatus === 'pending' && (
+
+                      {/* Confirm pending */}
+                      {isPending && (
+                        <button onClick={() => confirmSub(sub)}
+                          className="text-xs bg-blue-500 text-white px-3 py-1.5 rounded-lg hover:bg-blue-600 flex items-center gap-1">
+                          <CheckCircle className="w-3 h-3" /> Confirm
+                        </button>
+                      )}
+
+                      {/* Request payment (upfront or first month) */}
+                      {sub.status === 'confirmed' && tracking.length > 0 && tracking[0].paymentStatus !== 'paid' && (
+                        <button onClick={() => requestPaymentWA(sub, tracking[0])}
+                          className="text-xs bg-purple-500 text-white px-3 py-1.5 rounded-lg hover:bg-purple-600 flex items-center gap-1">
+                          <Send className="w-3 h-3" /> Request Payment
+                        </button>
+                      )}
+
+                      {/* Legacy: no tracking yet */}
+                      {!tracking.length && sub.paymentStatus === 'pending' && (
                         <button onClick={async () => {
-                          await subscriptionsService.update(sub.id, { paymentStatus: 'paid' });
+                          await subscriptionsService.update(sub.id, { paymentStatus: 'paid', status: 'active' });
                           toast.success('Marked as paid');
                         }} className="text-xs bg-green-500 text-white px-3 py-1.5 rounded-lg hover:bg-green-600">
                           Mark Paid
                         </button>
                       )}
+
                       {isExpired ? (
                         <button onClick={() => openRenew(sub)}
                           className="text-xs bg-blue-500 text-white px-3 py-1.5 rounded-lg hover:bg-blue-600 flex items-center gap-1">
@@ -357,10 +519,8 @@ export default function SubscriptionsPage() {
                         cancelConfirmId === sub.id ? (
                           <div className="flex gap-2 items-center">
                             <span className="text-xs text-red-600 font-medium">Confirm cancel?</span>
-                            <button onClick={() => cancelSub(sub.id)}
-                              className="text-xs bg-red-500 text-white px-2 py-1 rounded-lg">Yes</button>
-                            <button onClick={() => setCancelConfirmId(null)}
-                              className="text-xs border border-gray-300 px-2 py-1 rounded-lg">No</button>
+                            <button onClick={() => cancelSub(sub.id)} className="text-xs bg-red-500 text-white px-2 py-1 rounded-lg">Yes</button>
+                            <button onClick={() => setCancelConfirmId(null)} className="text-xs border border-gray-300 px-2 py-1 rounded-lg">No</button>
                           </div>
                         ) : (
                           <button onClick={() => setCancelConfirmId(sub.id)}

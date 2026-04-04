@@ -1,4 +1,4 @@
-import type { Unit, OrderStatus, PaymentStatus, OrderType, ExpenseCategory, SubscriptionDuration } from "./constants";
+import type { Unit, OrderStatus, PaymentStatus, OrderType, ExpenseCategory, SubscriptionDuration, SubscriptionStatus } from "./constants";
 
 // ─── Admin User ──────────────────────────────────────────────────────────────
 type AdminRole = 'owner' | 'operator';
@@ -214,6 +214,16 @@ export interface Expense {
 }
 
 // ─── Subscription ─────────────────────────────────────────────────────────────
+export interface MonthlyEntry {
+  month: number;          // 1-based: month 1, 2, 3...
+  label: string;          // e.g. "May 2026"
+  paymentStatus: 'pending' | 'requested' | 'paid';
+  deliveryStatus: 'pending' | 'delivered';
+  paymentRequestedAt?: string;
+  paidAt?: string;
+  deliveredAt?: string;
+}
+
 export interface Subscription {
   id: string;
   subscriptionNumber?: string;
@@ -230,7 +240,9 @@ export interface Subscription {
   startDate: string;
   endDate: string;
   isActive: boolean;
+  status?: SubscriptionStatus;      // lifecycle status
   paymentStatus: PaymentStatus;
+  monthlyTracking?: MonthlyEntry[]; // one entry per month of the subscription
   notes?: string;
   createdAt: string;
 }
