@@ -22,10 +22,10 @@ export const APP_CONFIG = {
   DEFAULT_ADMIN_PIN:    import.meta.env.VITE_ADMIN_PIN   as string,
 
   // ── Subscription Discounts (static fallback — live values come from Firestore via admin) ──
-  SUBSCRIPTION_UPFRONT_3M_PCT:  5,    // upfront payment, 3-month plan
+  SUBSCRIPTION_UPFRONT_3M_PCT:  7,    // upfront payment, 3-month plan
   SUBSCRIPTION_UPFRONT_6M_PCT:  10,   // upfront payment, 6-month plan
   SUBSCRIPTION_MONTHLY_3M_PCT:  3,    // monthly payment, 3-month plan
-  SUBSCRIPTION_MONTHLY_6M_PCT:  7,    // monthly payment, 6-month plan
+  SUBSCRIPTION_MONTHLY_6M_PCT:  5,    // monthly payment, 6-month plan
 
   // ── Stock Alerts ─────────────────────────────────────────────────
   DEFAULT_LOW_STOCK_GRAMS:  500,        // Alert when stock < 500g
