@@ -38,15 +38,25 @@ const SAMPLE_NAME   = 'Sample Tester';
 /** Wait for products section to be populated (Firebase fetch can take a moment). */
 async function waitForProducts(page: Page, timeout = 15_000) {
   await page.waitForSelector('#products', { timeout });
-  // Wait until at least one "Add to Cart" button is visible
-  await page.locator('button').filter({ hasText: /add to cart/i }).first()
+  // Product cards have an "Add" button (opens detail sheet)
+  await page.locator('#products').locator('button').filter({ hasText: /^Add$/ }).first()
     .waitFor({ state: 'visible', timeout });
 }
 
-/** Add the first available product to the cart. */
+/**
+ * Add the first available product to the cart.
+ * Flow: click "Add" on the product card → detail sheet opens → click "Add to Cart" in the sheet.
+ */
 async function addFirstProductToCart(page: Page) {
   await waitForProducts(page);
-  await page.locator('button').filter({ hasText: /add to cart/i }).first().click();
+  // Click the "Add" button on the first product card (opens detail sheet)
+  await page.locator('#products').locator('button').filter({ hasText: /^Add$/ }).first().click();
+  // Wait for the detail sheet to appear, then click "Add to Cart"
+  const addToCartBtn = page.locator('button').filter({ hasText: /add to cart/i }).first();
+  await addToCartBtn.waitFor({ state: 'visible', timeout: 8_000 });
+  await addToCartBtn.click();
+  // Sheet auto-closes after adding; wait briefly for it to disappear
+  await addToCartBtn.waitFor({ state: 'hidden', timeout: 5_000 }).catch(() => {});
 }
 
 /** Open the cart drawer after adding an item. */
@@ -110,7 +120,7 @@ test.describe('Product browsing', () => {
   });
 
   test('products grid shows at least one product', async ({ page }) => {
-    const cards = page.locator('#products').locator('button').filter({ hasText: /add to cart/i });
+    const cards = page.locator('#products').locator('button').filter({ hasText: /^Add$/ });
     await expect(cards.first()).toBeVisible();
     expect(await cards.count()).toBeGreaterThan(0);
   });
@@ -121,7 +131,7 @@ test.describe('Product browsing', () => {
     await expect(allChip).toBeVisible();
     await allChip.click();
     // After clicking All, products are still shown
-    await expect(page.locator('button').filter({ hasText: /add to cart/i }).first()).toBeVisible();
+    await expect(page.locator('#products').locator('button').filter({ hasText: /^Add$/ }).first()).toBeVisible();
   });
 
   test('search filters products correctly', async ({ page }) => {
@@ -134,7 +144,7 @@ test.describe('Product browsing', () => {
 
     // Clear and confirm products come back
     await searchInput.fill('');
-    await expect(page.locator('button').filter({ hasText: /add to cart/i }).first()).toBeVisible();
+    await expect(page.locator('#products').locator('button').filter({ hasText: /^Add$/ }).first()).toBeVisible();
   });
 
   test('search is case-insensitive', async ({ page }) => {
@@ -143,9 +153,9 @@ test.describe('Product browsing', () => {
     await searchInput.fill('mix');
     // Should show some results (not "No products found")
     const noResult = page.getByText(/No products found/i);
-    const hasResults = page.locator('button').filter({ hasText: /add to cart/i }).first();
+    const hasResults = page.locator('#products').locator('button').filter({ hasText: /^Add$/ }).first();
     // Either some results exist or gracefully shows empty state
-    const resultCount = await page.locator('button').filter({ hasText: /add to cart/i }).count();
+    const resultCount = await page.locator('#products').locator('button').filter({ hasText: /^Add$/ }).count();
     if (resultCount === 0) {
       await expect(noResult).toBeVisible();
     } else {
@@ -336,14 +346,23 @@ test.describe('Order placement — happy path', () => {
     await page.goto('/');
     await waitForProducts(page);
 
-    const addBtns = page.locator('button').filter({ hasText: /add to cart/i });
+    const addBtns = page.locator('#products').locator('button').filter({ hasText: /^Add$/ });
     const count = await addBtns.count();
 
-    // Add up to 2 different products
+    // Add up to 2 different products (each click opens detail sheet → click Add to Cart)
     await addBtns.nth(0).click();
+    const addToCart0 = page.locator('button').filter({ hasText: /add to cart/i }).first();
+    await addToCart0.waitFor({ state: 'visible', timeout: 8_000 });
+    await addToCart0.click();
+    await addToCart0.waitFor({ state: 'hidden', timeout: 5_000 }).catch(() => {});
+
     if (count > 1) {
       await page.waitForTimeout(400);
       await addBtns.nth(1).click();
+      const addToCart1 = page.locator('button').filter({ hasText: /add to cart/i }).first();
+      await addToCart1.waitFor({ state: 'visible', timeout: 8_000 });
+      await addToCart1.click();
+      await addToCart1.waitFor({ state: 'hidden', timeout: 5_000 }).catch(() => {});
     }
 
     await openCart(page);
