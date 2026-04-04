@@ -811,7 +811,7 @@ export default function StoreFront() {
           </p>
           {/* <a href="/admin/login" className="block mt-5 text-xs" style={{ color: '#555' }}>Admin Login</a> */}
           <div className="flex justify-center gap-4 mt-3 flex-wrap">
-            <a href="/my-orders" className="text-xs" style={{ color: '#d4a574' }}>My Account</a>
+            <a href="/my-orders" className="text-xs" style={{ color: '#c8821a' }}>My Account</a>
             <a href={APP_CONFIG.WHATSAPP_GROUP_LINK} target="_blank" rel="noreferrer" className="text-xs" style={{ color: '#25d366' }}>📢 WA Group</a>
             <a href={APP_CONFIG.WHATSAPP_CHANNEL_LINK} target="_blank" rel="noreferrer" className="text-xs" style={{ color: '#25d366' }}>📡 WA Channel</a>
             {/* <a href="/my-orders?tab=referral" className="text-xs" style={{ color: '#d4a574' }}>🎟️ Referral</a> */}
