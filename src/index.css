@@ -44,4 +44,4 @@ body {
 .animate-marquee-up {
   animation: marquee-up 60s linear infinite;
 }
-.animate-marquee-up:hover { animation-play-state: paused; }
+/* pause handled via JS animationPlayState for both desktop + mobile */
