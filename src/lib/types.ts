@@ -248,6 +248,25 @@ export const DEFAULT_SUBSCRIPTION_CONFIG: SubscriptionConfig = {
   monthlySixMonthPct:   5,
 };
 
+// ─── Feature Flags ───────────────────────────────────────────────────────────
+export interface FeatureFlags {
+  // Customer storefront banners & sections
+  holigeBanner:       boolean;  // Festival: Holige / Obbattu promotional banner
+  subscriptionBanner: boolean;  // Health Mix Subscription plan section
+  sampleRequest:      boolean;  // "Free Sample" button & modal
+  referralProgram:    boolean;  // Referral code entry in order form
+  testimonials:       boolean;  // Customer testimonials marquee
+  updatedAt?: string;
+}
+
+export const DEFAULT_FEATURE_FLAGS: FeatureFlags = {
+  holigeBanner:       false,  // off by default — enable during festivals
+  subscriptionBanner: true,
+  sampleRequest:      true,
+  referralProgram:    true,
+  testimonials:       true,
+};
+
 // ─── Agent (Partner / Reseller) ────────────────────────────────────────────────────────────────
 export interface Agent {
   id: string;

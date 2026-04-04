@@ -30,6 +30,7 @@ const AgentsPage       = lazy(() => import('./pages/admin/AgentsPage'));
 const ReferralSettingsPage = lazy(() => import('./pages/admin/ReferralSettingsPage'));
 const AnalyticsPage        = lazy(() => import('./pages/admin/AnalyticsPage'));
 const SubscriptionAnalyticsPage = lazy(() => import('./pages/admin/SubscriptionAnalyticsPage'));
+const FeaturesPage         = lazy(() => import('./pages/admin/FeaturesPage'));
 
 // Agent portal
 const AgentLogin   = lazy(() => import('./pages/agent/AgentLogin'));
@@ -92,6 +93,7 @@ export default function App() {
               <Route path="announcements" element={<AnnouncementsPage />} />
               <Route path="agents" element={<AgentsPage />} />
               <Route path="referral-settings" element={<ReferralSettingsPage />} />
+              <Route path="features" element={<FeaturesPage />} />
               <Route path="settings" element={<SettingsPage />} />
             </Route>
 

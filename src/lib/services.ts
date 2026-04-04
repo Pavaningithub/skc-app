@@ -10,9 +10,9 @@ import { generateReferralCode } from "./utils";
 import type {
   Product, StockItem, RawMaterial, RawMaterialPurchase,
   Batch, Customer, Order, Expense, Subscription, Feedback, AdminAction, AdminActionType, AdminUser, Agent,
-  ReferralConfig, SubscriptionConfig,
+  ReferralConfig, SubscriptionConfig, FeatureFlags,
 } from "./types";
-import { DEFAULT_REFERRAL_CONFIG, DEFAULT_SUBSCRIPTION_CONFIG } from "./types";
+import { DEFAULT_REFERRAL_CONFIG, DEFAULT_SUBSCRIPTION_CONFIG, DEFAULT_FEATURE_FLAGS } from "./types";
 
 // ─── Collection Names ─────────────────────────────────────────────────────────
 export const COLLECTIONS = {
@@ -663,6 +663,29 @@ export const subscriptionConfigService = {
   subscribe(cb: (config: SubscriptionConfig) => void): Unsubscribe {
     return onSnapshot(doc(db, 'settings', 'subscription_config'), snap => {
       cb(snap.exists() ? (snap.data() as SubscriptionConfig) : { ...DEFAULT_SUBSCRIPTION_CONFIG });
+    });
+  },
+};
+
+// ─── Feature Flags ───────────────────────────────────────────────────────────
+export const featureFlagsService = {
+  async get(): Promise<FeatureFlags> {
+    try {
+      const snap = await getDoc(doc(db, 'settings', 'feature_flags'));
+      if (!snap.exists()) return { ...DEFAULT_FEATURE_FLAGS };
+      return { ...DEFAULT_FEATURE_FLAGS, ...(snap.data() as Partial<FeatureFlags>) };
+    } catch {
+      return { ...DEFAULT_FEATURE_FLAGS };
+    }
+  },
+  async save(flags: FeatureFlags): Promise<void> {
+    await setDoc(doc(db, 'settings', 'feature_flags'), { ...flags, updatedAt: now() });
+  },
+  subscribe(cb: (flags: FeatureFlags) => void): Unsubscribe {
+    return onSnapshot(doc(db, 'settings', 'feature_flags'), snap => {
+      cb(snap.exists()
+        ? { ...DEFAULT_FEATURE_FLAGS, ...(snap.data() as Partial<FeatureFlags>) }
+        : { ...DEFAULT_FEATURE_FLAGS });
     });
   },
 };
