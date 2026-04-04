@@ -438,6 +438,9 @@ export const subscriptionsService = {
   async update(id: string, data: Partial<Subscription>): Promise<void> {
     await updateDoc(doc(db, COLLECTIONS.SUBSCRIPTIONS, id), data);
   },
+  async delete(id: string): Promise<void> {
+    await deleteDoc(doc(db, COLLECTIONS.SUBSCRIPTIONS, id));
+  },
   subscribe(cb: (items: Subscription[]) => void): Unsubscribe {
     return onSnapshot(collection(db, COLLECTIONS.SUBSCRIPTIONS), snap => {
       const items = snap.docs.map(d => ({ id: d.id, ...d.data() } as Subscription));
