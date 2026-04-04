@@ -9,7 +9,6 @@ const OrderConfirmation        = lazy(() => import('./pages/customer/OrderConfir
 const SubscriptionConfirmation = lazy(() => import('./pages/customer/SubscriptionConfirmation'));
 const FeedbackPage             = lazy(() => import('./pages/customer/FeedbackPage'));
 const MyAccountPage     = lazy(() => import('./pages/customer/MyAccountPage'));
-const AboutPage         = lazy(() => import('./pages/customer/AboutPage'));
 
 // Admin pages
 const AdminLayout      = lazy(() => import('./pages/admin/AdminLayout'));
@@ -69,7 +68,6 @@ export default function App() {
             <Route path="/feedback/:orderId" element={<FeedbackPage />} />
             <Route path="/my-referral" element={<Navigate to="/my-orders?tab=referral" replace />} />
             <Route path="/my-orders" element={<MyAccountPage />} />
-            <Route path="/about" element={<AboutPage />} />
 
             {/* ── Agent portal ─────────────────────────────────────── */}
             <Route path="/agent/login" element={<AgentLogin />} />
