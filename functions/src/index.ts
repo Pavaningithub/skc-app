@@ -100,9 +100,10 @@ export const notifyNewOrder = onDocumentCreated(
     ].filter(Boolean).join("\n");
 
     // ── WA group message — short plain text so URL stays under Telegram's 2048-char button limit ──
+    const shortName = order.customerName.slice(0, 10);
     const waLines = [
       `${emoji} ${orderLabel} — ${order.orderNumber}`,
-      `👤 ${order.customerName}  📞 ${phone}`,
+      `👤 ${shortName}  📞 ${phone}`,
       `📍 ${order.customerPlace || "—"}`,
       itemLines,
       `💰 ${isSample ? "FREE SAMPLE" : `₹${order.total}`}`,
