@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ShoppingCart, Star, Plus, Minus,
-  Trash2, X, ChevronRight, Flame,
+  Trash2, X, Flame,
   Search
 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -50,8 +50,28 @@ export default function StoreFront() {
   const [standingDiscount, setStandingDiscount] = useState(0); // auto-applied from customer's discountApplyToNew
   const { config: referralConfig } = useReferralConfig();
   const { flags: featureFlags } = useFeatureFlags();
+  const [scrolledPastHero, setScrolledPastHero] = useState(false);
+  const [headerHeight, setHeaderHeight] = useState(0);
+  const headerRef = useRef<HTMLElement>(null);
 
   useEffect(() => { load(); }, []);
+
+  // Measure header height once mounted (and on resize)
+  useEffect(() => {
+    const measure = () => {
+      if (headerRef.current) setHeaderHeight(headerRef.current.offsetHeight);
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, []);
+
+  // Show sticky CTA bar once user scrolls past the hero (~180px)
+  useEffect(() => {
+    const onScroll = () => setScrolledPastHero(window.scrollY > 180);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
 
   // When the order form opens and there's a URL ref code, auto-validate it
   useEffect(() => {
@@ -344,7 +364,7 @@ export default function StoreFront() {
     <div className="min-h-screen font-sans" style={{ background: '#fdf5e6' }}>
 
       {/* Header */}
-      <header className="sticky top-0 z-40 shadow-md" style={{ background: 'linear-gradient(90deg, #3d1c02 0%, #7a4010 50%, #3d1c02 100%)', borderBottom: '2px solid #c8821a' }}>
+      <header ref={headerRef} className="sticky top-0 z-40 shadow-md" style={{ background: 'linear-gradient(90deg, #3d1c02 0%, #7a4010 50%, #3d1c02 100%)', borderBottom: '2px solid #c8821a' }}>
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 text-2xl"
@@ -416,7 +436,35 @@ export default function StoreFront() {
         </div>
       </header>
 
-      {/* Hero */}
+      {/* ── Sticky "Shop Now + Free Sample" bar — slides in below header on scroll ── */}
+      {headerHeight > 0 && (
+        <div
+          className="fixed left-0 right-0 z-[39] transition-transform duration-300 ease-in-out"
+          style={{
+            top: headerHeight,
+            transform: scrolledPastHero ? 'translateY(0)' : 'translateY(-200%)',
+            background: 'linear-gradient(90deg, #3d1c02 0%, #7a4010 100%)',
+            borderBottom: '2px solid #c8821a',
+          }}
+        >
+          <div className="max-w-4xl mx-auto px-4 py-2 flex items-center justify-center gap-3">
+            <button
+              onClick={() => document.getElementById('products')?.scrollIntoView({ behavior: 'smooth' })}
+              className="font-bold px-5 py-2 rounded-xl text-sm shadow-md"
+              style={{ background: '#c8821a', color: '#fff', border: '1.5px solid #e8c87a' }}>
+              🛍️ Shop Now
+            </button>
+            {featureFlags.sampleRequest && (
+              <button
+                onClick={openSampleForm}
+                className="font-semibold px-5 py-2 rounded-xl text-sm border-2 text-white"
+                style={{ borderColor: 'rgba(255,255,255,0.45)', background: 'rgba(255,255,255,0.1)' }}>
+                🎁 Free Sample
+              </button>
+            )}
+          </div>
+        </div>
+      )}
       <div className="relative overflow-hidden" style={{ background: 'linear-gradient(160deg, #3d1c02 0%, #7a4010 40%, #c8821a 75%, #e8a000 100%)' }}>
         {/* Decorative pattern */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
@@ -625,23 +673,10 @@ export default function StoreFront() {
               </div>
             )}
 
-            {/* ── RIGHT: Subscription + Free Sample ── */}
+            {/* ── RIGHT: Subscription ── */}
             <div>
               {featureFlags.subscriptionBanner && (
                 <SubscriptionBanner healthProducts={products.filter(p => p.category === 'Health Mix')} />
-              )}
-              {featureFlags.sampleRequest && (
-                <button onClick={openSampleForm}
-                  className="w-full flex items-center gap-3 bg-white rounded-2xl px-4 py-3 shadow-sm text-left mt-4"
-                  style={{ border: '1.5px dashed #c8821a' }}>
-                  <div className="w-9 h-9 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
-                    style={{ background: '#fff4eb' }}>🎁</div>
-                  <div>
-                    <p className="text-sm font-semibold text-gray-800">Request a Free Sample</p>
-                    <p className="text-xs text-gray-500">Try before you buy — 50g of 2 products</p>
-                  </div>
-                  <ChevronRight className="w-5 h-5 text-gray-400 ml-auto" />
-                </button>
               )}
             </div>
 
