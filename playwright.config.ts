@@ -5,7 +5,7 @@ export default defineConfig({
   timeout: 30_000,
   retries: 1,
   use: {
-    baseURL: 'http://localhost:5173',
+    baseURL: process.env.BASE_URL ?? 'http://localhost:5173',
     headless: true,
     viewport: { width: 390, height: 844 }, // iPhone 14 — matches your primary use case
     screenshot: 'only-on-failure',
