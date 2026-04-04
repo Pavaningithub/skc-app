@@ -73,7 +73,7 @@ jobs:
     e2e-customer:
         name: 🧪 Customer E2E Tests
         runs-on: ubuntu-latest
-        needs: deploy-staging          # waits for preview URL to be live
+        needs: deploy-staging # waits for preview URL to be live
         timeout-minutes: 20
 
         steps:
