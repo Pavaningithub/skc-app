@@ -9,6 +9,7 @@ const TELEGRAM_BOT_TOKEN = defineSecret("TELEGRAM_BOT_TOKEN");
 const TELEGRAM_CHAT_ID = defineSecret("TELEGRAM_CHAT_ID");
 
 const ADMIN_BASE_URL = "https://YOUR_DOMAIN/admin/orders";
+const ADMIN_SUBS_URL = "https://YOUR_DOMAIN/admin/subscriptions";
 const WA_GROUP_LINK = "https://chat.whatsapp.com/***REMOVED***";
 
 interface OrderItem {
@@ -131,6 +132,97 @@ export const notifyNewOrder = onDocumentCreated(
       logger.info("Telegram notification sent", {orderId, orderNumber: order.orderNumber});
     } catch (err) {
       logger.error("Failed to send Telegram notification", {orderId, err});
+    }
+  }
+);
+
+interface SubscriptionItem {
+  productName: string;
+  quantity: number;
+  unit: string;
+  totalPrice: number;
+}
+
+interface SubscriptionDoc {
+  subscriptionNumber?: string;
+  customerName: string;
+  customerWhatsapp: string;
+  customerPlace?: string;
+  items: SubscriptionItem[];
+  duration: string;
+  paymentMode?: string;
+  discountPercent: number;
+  baseAmount: number;
+  discountedAmount: number;
+  startDate: string;
+  endDate: string;
+  notes?: string;
+}
+
+// Fires whenever a new document is created in the 'subscriptions' collection
+export const notifyNewSubscription = onDocumentCreated(
+  {
+    document: "subscriptions/{subId}",
+    secrets: [TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID],
+    region: "asia-south1",
+  },
+  async (event) => {
+    const sub = event.data?.data() as SubscriptionDoc | undefined;
+    const subId = event.params.subId;
+
+    if (!sub) {
+      logger.warn("notifyNewSubscription: no data", {subId});
+      return;
+    }
+
+    const phone = sub.customerWhatsapp
+      ? `+91 ${sub.customerWhatsapp.slice(0, 5)} ${sub.customerWhatsapp.slice(5)}`
+      : "—";
+
+    const durationMonths = sub.duration === "6months" ? 6 : 3;
+    const paymentLabel = sub.paymentMode === "monthly" ? "Monthly" : "Upfront";
+    const subNum = sub.subscriptionNumber ?? subId.slice(0, 8).toUpperCase();
+
+    const itemLines = (sub.items ?? [])
+      .map((i) => `  • ${i.productName} × ${i.quantity}g — ₹${i.totalPrice}/mo`)
+      .join("\n");
+
+    const adminLink = `${ADMIN_SUBS_URL}`;
+
+    const telegramText = [
+      `🌿 <b>New Subscription — ${subNum}</b>`,
+      "",
+      `👤 <b>${sub.customerName}</b>`,
+      `📞 ${phone}`,
+      sub.customerPlace ? `📍 ${sub.customerPlace}` : "",
+      "",
+      `📅 Plan: <b>${durationMonths}-Month | ${paymentLabel}</b>`,
+      `🏷 Discount: ${sub.discountPercent}%`,
+      "",
+      "<b>Products / Month:</b>",
+      itemLines,
+      "",
+      `💰 Monthly: ₹${sub.discountedAmount}  (was ₹${sub.baseAmount})`,
+      sub.paymentMode === "upfront"
+        ? `💳 Upfront total: ₹${sub.discountedAmount * durationMonths}`
+        : `📅 Pay ₹${sub.discountedAmount} each month`,
+      sub.notes ? `📝 ${sub.notes}` : "",
+    ].filter(Boolean).join("\n");
+
+    const buttons = [
+      [{text: "📋 Open Subscriptions", url: adminLink}],
+    ];
+
+    try {
+      await sendTelegram(
+        TELEGRAM_BOT_TOKEN.value(),
+        TELEGRAM_CHAT_ID.value(),
+        telegramText,
+        buttons
+      );
+      logger.info("Subscription Telegram notification sent", {subId, subNum});
+    } catch (err) {
+      logger.error("Failed to send subscription Telegram notification", {subId, err});
     }
   }
 );
