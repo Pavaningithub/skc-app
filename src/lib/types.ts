@@ -217,6 +217,8 @@ export interface Expense {
 export interface MonthlyEntry {
   month: number;          // 1-based: month 1, 2, 3...
   label: string;          // e.g. "May 2026"
+  startDate: string;      // ISO — start of this month window (admin-editable)
+  endDate: string;        // ISO — end of this month window (+30 days)
   paymentStatus: 'pending' | 'requested' | 'paid';
   deliveryStatus: 'pending' | 'delivered';
   paymentRequestedAt?: string;
