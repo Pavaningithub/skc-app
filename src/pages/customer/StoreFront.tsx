@@ -431,8 +431,8 @@ export default function StoreFront() {
         <div
           className="fixed left-0 right-0 z-[39] transition-transform duration-300 ease-in-out"
           style={{
-            top: headerHeight,
-            transform: scrolledPastHero ? 'translateY(0)' : 'translateY(-200%)',
+            top: 0,
+            transform: scrolledPastHero ? `translateY(${headerHeight}px)` : 'translateY(-100%)',
             background: 'linear-gradient(90deg, #3d1c02 0%, #7a4010 100%)',
             borderBottom: '2px solid #c8821a',
           }}
