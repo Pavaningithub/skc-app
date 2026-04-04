@@ -36,3 +36,12 @@ body {
   animation: marquee 90s linear infinite;
 }
 .animate-marquee:hover { animation-play-state: paused; }
+
+@keyframes marquee-up {
+  0%   { transform: translateY(0); }
+  100% { transform: translateY(-50%); }
+}
+.animate-marquee-up {
+  animation: marquee-up 30s linear infinite;
+}
+.animate-marquee-up:hover { animation-play-state: paused; }

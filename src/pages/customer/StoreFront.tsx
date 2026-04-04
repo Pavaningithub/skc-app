@@ -542,133 +542,112 @@ export default function StoreFront() {
         </div>
       )}
 
-      {/* ── Testimonials Marquee — WhatsApp style ───────────────────── */}
-      {featureFlags.testimonials && testimonials.length > 0 && (
-        <div className="py-5 overflow-hidden" style={{ background: '#e5ddd5' }}>
-          {/* WhatsApp-like chat header */}
-          <div className="flex items-center gap-3 px-4 pb-4 border-b mb-4" style={{ borderColor: '#d1c4b8' }}>
-            <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0"
-              style={{ background: '#c8821a' }}>
-              <span className="text-white text-sm font-bold">SKC</span>
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-bold" style={{ color: '#1a1a1a' }}>Sri Krishna Condiments</p>
-              <p className="text-xs" style={{ color: '#667781' }}>
-                {feedbackStats
-                  ? `${feedbackStats.total} verified reviews · ⭐ ${feedbackStats.avg} avg`
-                  : 'Customer Reviews'}
-              </p>
-            </div>
-            <span className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold flex-shrink-0"
-              style={{ background: '#25d366', color: '#fff' }}>
-              <Star className="w-3 h-3" style={{ fill: '#fff', color: '#fff' }} /> Verified
-            </span>
-          </div>
+      {/* ── Testimonials + Subscription — side by side ───────────────── */}
+      {(featureFlags.testimonials || featureFlags.subscriptionBanner || featureFlags.sampleRequest) && (
+        <div className="max-w-4xl mx-auto px-4 py-6">
+          <div className={`grid gap-6 items-start ${
+            featureFlags.testimonials && testimonials.length > 0
+              ? 'grid-cols-1 lg:grid-cols-2'
+              : 'grid-cols-1'
+          }`}>
 
-          {/* ── Latest review — pinned featured card ── */}
-          {(() => {
-            const latest = testimonials[0];
-            if (!latest) return null;
-            const initials = latest.customerName.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase();
-            return (
-              <div className="mx-4 mb-4 rounded-2xl p-3.5 shadow-sm flex gap-3 items-start"
-                style={{ background: '#fff', border: '2px solid #c8821a' }}>
-                <div className="w-9 h-9 rounded-full flex-shrink-0 flex items-center justify-center text-white text-sm font-bold"
-                  style={{ background: '#128c7e' }}>{initials}</div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap mb-1">
-                    <span className="text-xs font-bold" style={{ color: '#075e54' }}>{latest.customerName}</span>
-                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: '#fff3e0', color: '#c8821a' }}>🆕 Latest</span>
-                    {latest.orderNumber && (
-                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: '#e8f5e9', color: '#256029' }}>✓ Order #{latest.orderNumber}</span>
-                    )}
+            {/* ── LEFT: Testimonials — vertical scroll ── */}
+            {featureFlags.testimonials && testimonials.length > 0 && (
+              <div className="rounded-2xl overflow-hidden" style={{ background: '#e5ddd5' }}>
+                {/* WhatsApp-like chat header */}
+                <div className="flex items-center gap-3 px-4 py-3 border-b" style={{ borderColor: '#d1c4b8' }}>
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+                    style={{ background: '#c8821a' }}>
+                    <span className="text-white text-xs font-bold">SKC</span>
                   </div>
-                  <div className="flex gap-0.5 mb-1">
-                    {[1,2,3,4,5].map(s => (
-                      <Star key={s} className="w-3 h-3" style={{ fill: s <= latest.rating ? '#f59e0b' : '#e5e7eb', color: s <= latest.rating ? '#f59e0b' : '#e5e7eb' }} />
-                    ))}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold" style={{ color: '#1a1a1a' }}>Sri Krishna Condiments</p>
+                    <p className="text-xs" style={{ color: '#667781' }}>
+                      {feedbackStats
+                        ? `${feedbackStats.total} verified reviews · ⭐ ${feedbackStats.avg} avg`
+                        : 'Customer Reviews'}
+                    </p>
                   </div>
-                  <p className="text-sm leading-snug" style={{ color: '#1a1a1a' }}>"{latest.whatYouLiked}"</p>
+                  <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold flex-shrink-0"
+                    style={{ background: '#25d366', color: '#fff' }}>
+                    <Star className="w-3 h-3" style={{ fill: '#fff', color: '#fff' }} /> Verified
+                  </span>
+                </div>
+
+                {/* Vertically scrolling review bubbles */}
+                <div className="overflow-hidden" style={{ height: 380 }}>
+                  <div className="flex flex-col gap-3 px-3 py-3 animate-marquee-up" style={{ height: 'max-content' }}>
+                    {[...testimonials, ...testimonials].map((t, i) => {
+                      const initials = t.customerName.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase();
+                      const avatarColors = ['#128c7e', '#075e54', '#c8821a', '#7a4010', '#34b7f1', '#9c27b0'];
+                      const avatarBg = avatarColors[i % avatarColors.length];
+                      const timeStr = new Date(t.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+                      return (
+                        <div key={i} className="flex items-end gap-2">
+                          {/* Avatar */}
+                          <div className="w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center mb-0.5"
+                            style={{ background: avatarBg }}>
+                            <span className="text-white text-xs font-bold">{initials}</span>
+                          </div>
+                          {/* Bubble */}
+                          <div className="relative rounded-2xl rounded-bl-sm px-3 py-2 shadow-sm flex-1"
+                            style={{ background: '#fff' }}>
+                            <div className="flex items-center justify-between gap-2 mb-0.5 flex-wrap">
+                              <span className="text-xs font-bold" style={{ color: '#075e54' }}>{t.customerName}</span>
+                              {t.orderNumber && (
+                                <span className="px-1.5 py-0.5 rounded-full flex-shrink-0"
+                                  style={{ background: '#e8f5e9', color: '#256029', fontSize: '9px', fontWeight: 700 }}>
+                                  ✓ #{t.orderNumber}
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex gap-0.5 mb-1">
+                              {[1,2,3,4,5].map(s => (
+                                <Star key={s} className="w-2.5 h-2.5"
+                                  style={{ fill: s <= t.rating ? '#f59e0b' : '#e5e7eb', color: s <= t.rating ? '#f59e0b' : '#e5e7eb' }} />
+                              ))}
+                            </div>
+                            <p className="text-xs leading-snug" style={{ color: '#1a1a1a' }}>"{t.whatYouLiked}"</p>
+                            <div className="flex items-center justify-end gap-1 mt-1">
+                              <span style={{ color: '#667781', fontSize: '10px' }}>{timeStr}</span>
+                              <svg className="w-3.5 h-2.5 flex-shrink-0" viewBox="0 0 18 11" fill="none">
+                                <path d="M1 5.5L5.5 10L12 1" stroke="#53bdeb" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                                <path d="M7 10L17 1" stroke="#53bdeb" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                                <path d="M5 10L15 1" stroke="#53bdeb" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                              </svg>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
-            );
-          })()}
-          <div className="relative">
-            <div className="flex gap-4 px-4 animate-marquee" style={{ width: 'max-content' }}>
-              {[...testimonials, ...testimonials].map((t, i) => {
-                const initials = t.customerName.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase();
-                const avatarColors = ['#128c7e', '#075e54', '#c8821a', '#7a4010', '#34b7f1', '#9c27b0'];
-                const avatarBg = avatarColors[i % avatarColors.length];
-                const timeStr = new Date(t.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
-                return (
-                  <div key={i} className="flex items-end gap-2 flex-shrink-0" style={{ maxWidth: 280 }}>
-                    {/* Avatar */}
-                    <div className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center mb-0.5"
-                      style={{ background: avatarBg }}>
-                      <span className="text-white text-xs font-bold">{initials}</span>
-                    </div>
-                    {/* Bubble */}
-                    <div className="relative rounded-2xl rounded-bl-sm px-3 py-2 shadow-sm"
-                      style={{ background: '#fff', minWidth: 190, maxWidth: 265 }}>
-                      {/* Sender name + verified order badge */}
-                      <div className="flex items-center justify-between gap-2 mb-1 flex-wrap">
-                        <span className="text-xs font-bold" style={{ color: '#075e54' }}>{t.customerName}</span>
-                        {t.orderNumber && (
-                          <span className="text-xs px-1.5 py-0.5 rounded-full flex-shrink-0"
-                            style={{ background: '#e8f5e9', color: '#256029', fontSize: '9px', fontWeight: 700 }}>
-                            ✓ Order #{t.orderNumber}
-                          </span>
-                        )}
-                      </div>
-                      {/* Stars */}
-                      <div className="flex gap-0.5 mb-1">
-                        {[1,2,3,4,5].map(s => (
-                          <Star key={s} className="w-3 h-3"
-                            style={{ fill: s <= t.rating ? '#f59e0b' : '#e5e7eb', color: s <= t.rating ? '#f59e0b' : '#e5e7eb' }} />
-                        ))}
-                      </div>
-                      {/* Message */}
-                      <p className="text-sm leading-snug" style={{ color: '#1a1a1a' }}>"{t.whatYouLiked}"</p>
-                      {/* Timestamp + double blue ticks */}
-                      <div className="flex items-center justify-end gap-1 mt-1.5">
-                        <span className="text-xs" style={{ color: '#667781', fontSize: '10px' }}>{timeStr}</span>
-                        <svg className="w-3.5 h-2.5 flex-shrink-0" viewBox="0 0 18 11" fill="none">
-                          <path d="M1 5.5L5.5 10L12 1" stroke="#53bdeb" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                          <path d="M7 10L17 1" stroke="#53bdeb" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                          <path d="M5 10L15 1" stroke="#53bdeb" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                      </div>
-                    </div>
+            )}
+
+            {/* ── RIGHT: Subscription + Free Sample ── */}
+            <div>
+              {featureFlags.subscriptionBanner && (
+                <SubscriptionBanner healthProducts={products.filter(p => p.category === 'Health Mix')} />
+              )}
+              {featureFlags.sampleRequest && (
+                <button onClick={openSampleForm}
+                  className="w-full flex items-center gap-3 bg-white rounded-2xl px-4 py-3 shadow-sm text-left mt-4"
+                  style={{ border: '1.5px dashed #c8821a' }}>
+                  <div className="w-9 h-9 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
+                    style={{ background: '#fff4eb' }}>🎁</div>
+                  <div>
+                    <p className="text-sm font-semibold text-gray-800">Request a Free Sample</p>
+                    <p className="text-xs text-gray-500">Try before you buy — 50g of 2 products</p>
                   </div>
-                );
-              })}
+                  <ChevronRight className="w-5 h-5 text-gray-400 ml-auto" />
+                </button>
+              )}
             </div>
+
           </div>
         </div>
       )}
-
-      {/* ── Subscription ───────────────────────────────────────────────────── */}
-      <div className="max-w-4xl mx-auto px-4 py-6">
-        {/* Subscription — full width */}
-        {featureFlags.subscriptionBanner && (
-          <SubscriptionBanner healthProducts={products.filter(p => p.category === 'Health Mix')} />
-        )}
-
-        {/* Free sample CTA — compact card below subscription */}
-        {featureFlags.sampleRequest && (
-          <button onClick={openSampleForm}
-            className="w-full flex items-center gap-3 bg-white rounded-2xl px-4 py-3 shadow-sm text-left mt-4"
-            style={{ border: '1.5px dashed #c8821a' }}>
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
-              style={{ background: '#fff4eb' }}>🎁</div>
-            <div>
-              <p className="text-sm font-semibold text-gray-800">Request a Free Sample</p>
-              <p className="text-xs text-gray-500">Try before you buy — 50g of 2 products</p>
-            </div>
-            <ChevronRight className="w-5 h-5 text-gray-400 ml-auto" />
-          </button>
-        )}
-      </div>
 
       {/* ── Products Section (scroll target) ─────────────────────────────── */}
       <div id="products" className="max-w-4xl mx-auto px-4 pt-6 pb-28">
