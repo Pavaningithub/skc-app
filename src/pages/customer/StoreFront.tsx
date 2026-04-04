@@ -52,6 +52,7 @@ export default function StoreFront() {
   const { flags: featureFlags } = useFeatureFlags();
   const [scrolledPastHero, setScrolledPastHero] = useState(false);
   const [headerHeight, setHeaderHeight] = useState(0);
+  const [marqueesPaused, setMarqueesPaused] = useState(false);
   const headerRef = useRef<HTMLElement>(null);
 
   useEffect(() => { load(); }, []);
@@ -613,8 +614,26 @@ export default function StoreFront() {
                 </div>
 
                 {/* Vertically scrolling review bubbles */}
-                <div className="overflow-hidden" style={{ height: 380 }}>
-                  <div className="flex flex-col gap-3 px-3 py-3 animate-marquee-up" style={{ height: 'max-content' }}>
+                <div
+                  className="overflow-hidden relative cursor-pointer select-none"
+                  style={{ height: 380 }}
+                  onPointerDown={() => setMarqueesPaused(true)}
+                  onPointerUp={() => setMarqueesPaused(false)}
+                  onPointerLeave={() => setMarqueesPaused(false)}
+                >
+                  {/* Pause hint — fades out when paused */}
+                  <div
+                    className="absolute bottom-2 left-0 right-0 flex justify-center z-10 transition-opacity duration-300 pointer-events-none"
+                    style={{ opacity: marqueesPaused ? 0 : 0.7 }}
+                  >
+                    <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(0,0,0,0.35)', color: '#fff' }}>
+                      Hold to pause
+                    </span>
+                  </div>
+                  <div
+                    className="flex flex-col gap-3 px-3 py-3 animate-marquee-up"
+                    style={{ height: 'max-content', animationPlayState: marqueesPaused ? 'paused' : 'running' }}
+                  >
                     {[...testimonials, ...testimonials].map((t, i) => {
                       const initials = t.customerName.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase();
                       const avatarColors = ['#128c7e', '#075e54', '#c8821a', '#7a4010', '#34b7f1', '#9c27b0'];
