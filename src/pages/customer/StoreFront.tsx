@@ -10,6 +10,7 @@ import { productsService, feedbackService, ordersService, customersService, stoc
 import { generateOrderNumber, formatCurrency, computeReferralDiscountFromTiers, computeCreditRedemption, normalizeWhatsapp } from '../../lib/utils';
 import { useReferralConfig } from '../../lib/useReferralConfig';
 import { useSubscriptionConfig } from '../../lib/useSubscriptionConfig';
+import { useFeatureFlags } from '../../lib/useFeatureFlags';
 import { APP_CONFIG } from '../../config';
 import type { Product, Feedback, OrderItem, Order } from '../../lib/types';
 
@@ -31,7 +32,6 @@ export default function StoreFront() {
   const [showOrderForm, setShowOrderForm]   = useState(false);
   const [showSampleForm, setShowSampleForm] = useState(false);
   const [activeCategory, setActiveCategory] = useState('All');
-  const [garlicOnly, setGarlicOnly]         = useState(false);
   const [searchQuery, setSearchQuery]       = useState('');
   const [submitting, setSubmitting]     = useState(false);
   // Sample: max 2 products, only powders + Dry Fruit Laddu
@@ -49,6 +49,7 @@ export default function StoreFront() {
   const [referralError, setReferralError] = useState('');
   const [standingDiscount, setStandingDiscount] = useState(0); // auto-applied from customer's discountApplyToNew
   const { config: referralConfig } = useReferralConfig();
+  const { flags: featureFlags } = useFeatureFlags();
 
   useEffect(() => { load(); }, []);
 
@@ -102,7 +103,7 @@ export default function StoreFront() {
 
   const filtered = products
     .filter(p => activeCategory === 'All' || p.category === activeCategory)
-    .filter(p => !garlicOnly || !!p.hasGarlicOption)
+
     .filter(p => {
       if (!searchQuery.trim()) return true;
       const q = searchQuery.toLowerCase();
@@ -453,12 +454,14 @@ export default function StoreFront() {
               style={{ background: '#c8821a', color: '#fff', border: '1.5px solid #e8c87a', boxShadow: '0 4px 15px rgba(200,130,26,0.4)' }}>
               🛍️ Shop Now
             </button>
+            {featureFlags.sampleRequest && (
             <button
               onClick={openSampleForm}
               className="border-2 text-white font-semibold px-7 py-3 rounded-2xl text-sm"
               style={{ borderColor: 'rgba(255,255,255,0.5)', background: 'rgba(255,255,255,0.1)' }}>
               🎁 Free Sample
             </button>
+            )}
           </div>
         </div>
       </div>
@@ -487,7 +490,7 @@ export default function StoreFront() {
       )}
 
       {/* ── Festival Special: Holige Banner ─────────────────────────────── */}
-      {siteStats && siteStats.holige > 0 && (
+      {featureFlags.holigeBanner && siteStats && siteStats.holige > 0 && (
         <div className="mx-4 my-4 rounded-2xl overflow-hidden shadow-md"
           style={{ background: 'linear-gradient(135deg, #3d1c02 0%, #7a4010 50%, #c8821a 100%)', border: '2px solid #c8821a' }}>
           <div className="px-5 py-4 flex items-center gap-4">
@@ -522,7 +525,7 @@ export default function StoreFront() {
       )}
 
       {/* ── Testimonials Marquee — WhatsApp style ───────────────────── */}
-      {testimonials.length > 0 && (
+      {featureFlags.testimonials && testimonials.length > 0 && (
         <div className="py-5 overflow-hidden" style={{ background: '#e5ddd5' }}>
           {/* WhatsApp-like chat header */}
           <div className="flex items-center gap-3 px-4 pb-4 border-b mb-4" style={{ borderColor: '#d1c4b8' }}>
@@ -629,7 +632,9 @@ export default function StoreFront() {
       {/* ── Subscription + WhatsApp ─────────────────────────────────────── */}
       <div className="max-w-4xl mx-auto px-4 py-6 grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
         {/* Subscription */}
-        <SubscriptionBanner healthProducts={products.filter(p => p.category === 'Health Mix')} />
+        {featureFlags.subscriptionBanner && (
+          <SubscriptionBanner healthProducts={products.filter(p => p.category === 'Health Mix')} />
+        )}
 
         {/* WhatsApp CTAs */}
         <div className="space-y-3">
@@ -742,14 +747,7 @@ export default function StoreFront() {
                 {cat}
               </button>
             ))}
-            <button
-              onClick={() => setGarlicOnly(v => !v)}
-              className="flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-medium transition-colors"
-              style={garlicOnly
-                ? { background: '#d97706', color: '#fff' }
-                : { background: '#fef3c7', color: '#92400e', border: '1px solid #fcd34d' }}>
-              🧄 With/Without Garlic
-            </button>
+
           </div>
 
         </div>
@@ -774,20 +772,7 @@ export default function StoreFront() {
           </div>
         )}
 
-        {/* Garlic hygiene notice — shown whenever any garlic-option product is visible */}
-        {filtered.some(p => p.hasGarlicOption) && (
-          <div className="mb-4 flex items-start gap-3 rounded-xl px-4 py-3"
-            style={{ background: 'linear-gradient(135deg, #fffbeb, #fef3c7)', border: '1px solid #fcd34d' }}>
-            <span className="text-xl flex-shrink-0">🧄</span>
-            <div className="text-xs">
-              <p className="font-bold text-amber-900 mb-0.5">Garlic &amp; Non-Garlic variants available</p>
-              <p className="text-amber-800 leading-relaxed">
-                Select products are made in both <strong>With Garlic</strong> and <strong>Without Garlic</strong> versions.
-                We use <strong>separate utensils &amp; cutleries</strong> for each — safe for those who avoid garlic.
-              </p>
-            </div>
-          </div>
-        )}
+
 
         {/* Product grid — 2 col mobile, 3 col tablet, 4 col desktop */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
@@ -954,6 +939,7 @@ export default function StoreFront() {
           setReferralError={setReferralError}
           standingDiscount={standingDiscount}
           setStandingDiscount={setStandingDiscount}
+          showReferral={featureFlags.referralProgram}
           onClose={() => setShowOrderForm(false)}
           onSubmit={handlePlaceOrder}
         />
@@ -1578,6 +1564,7 @@ function OrderFormModal({
   referralDiscount, setReferralDiscount,
   referralError, setReferralError,
   standingDiscount, setStandingDiscount,
+  showReferral,
   onClose, onSubmit
 }: {
   isSample: boolean;
@@ -1601,6 +1588,7 @@ function OrderFormModal({
   setReferralError: (v: string) => void;
   standingDiscount: number;
   setStandingDiscount: (v: number) => void;
+  showReferral: boolean;
   onClose: () => void;
   onSubmit: () => void;
 }) {
@@ -1793,7 +1781,7 @@ function OrderFormModal({
           )}
 
           {/* Referral Code entry — only for real orders, only for first-time customers, only when no standing discount */}
-          {!isSample && !isReturningCustomer && !standingDiscountAmt && (
+          {!isSample && !isReturningCustomer && !standingDiscountAmt && showReferral && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
                 🎟️ Have a referral code? <span className="text-gray-400 font-normal">(first order only)</span>
