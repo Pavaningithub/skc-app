@@ -432,25 +432,25 @@ export default function StoreFront() {
           ))}
         </div>
 
-        <div className="relative max-w-4xl mx-auto px-4 py-10 md:py-14">
+        <div className="relative max-w-4xl mx-auto px-4 py-6 md:py-8">
           {/* Sacred greeting */}
-          <div className="text-center mb-6">
-            <div className="inline-flex items-center gap-2 rounded-full px-5 py-2 mb-4 text-sm font-semibold"
+          <div className="text-center mb-4">
+            <div className="inline-flex items-center gap-2 rounded-full px-4 py-1 mb-3 text-xs font-semibold"
               style={{ background: 'rgba(255,215,0,0.18)', border: '1px solid rgba(255,215,0,0.4)', color: '#ffd700' }}>
               🙏 Hare Krishna — Hare Rama 🙏
             </div>
-            <h1 className="text-3xl md:text-4xl font-bold text-white mb-1.5"
+            <h1 className="text-2xl md:text-3xl font-bold text-white mb-1"
               style={{ fontFamily: 'Georgia, serif', textShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>
               ಶ್ರೀ ಕೃಷ್ಣ ಕಾಂಡಿಮೆಂಟ್ಸ್
             </h1>
-            <p className="text-white/90 font-medium mb-1" style={{ letterSpacing: '1px' }}>Sri Krishna Condiments</p>
-            <p className="text-white/70 text-sm mb-6 max-w-sm mx-auto">
+            <p className="text-white/90 font-medium mb-0.5 text-sm" style={{ letterSpacing: '1px' }}>Sri Krishna Condiments</p>
+            <p className="text-white/70 text-xs mb-4 max-w-xs mx-auto">
               Authentic Karnataka &amp; Andhra flavours — Chutney Powders, Masalas &amp; Health Mixes made at home with love &amp; devotion.
             </p>
           </div>
 
-          {/* Trust badges */}
-          <div className="flex flex-wrap justify-center gap-2 mb-6">
+          {/* Trust badges — compact inline tags */}
+          <div className="flex flex-wrap justify-center gap-x-3 gap-y-1 mb-5">
             {[
               { icon: '🌿', text: 'No Preservatives' },
               { icon: '🏠', text: 'Home Made' },
@@ -458,9 +458,9 @@ export default function StoreFront() {
               { icon: '❤️', text: 'Made with Love' },
             ].map(b => (
               <span key={b.text}
-                className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full"
-                style={{ background: 'rgba(255,255,255,0.15)', color: '#fff', border: '1px solid rgba(255,255,255,0.25)' }}>
-                {b.icon} {b.text}
+                className="flex items-center gap-1 text-xs font-medium"
+                style={{ color: 'rgba(255,255,255,0.75)' }}>
+                <span>{b.icon}</span>{b.text}
               </span>
             ))}
           </div>
@@ -468,14 +468,14 @@ export default function StoreFront() {
           <div className="flex gap-3 justify-center flex-wrap">
             <button
               onClick={() => document.getElementById('products')?.scrollIntoView({ behavior: 'smooth' })}
-              className="font-bold px-7 py-3 rounded-2xl text-sm shadow-lg"
+              className="font-bold px-6 py-2.5 rounded-2xl text-sm shadow-lg"
               style={{ background: '#c8821a', color: '#fff', border: '1.5px solid #e8c87a', boxShadow: '0 4px 15px rgba(200,130,26,0.4)' }}>
               🛍️ Shop Now
             </button>
             {featureFlags.sampleRequest && (
             <button
               onClick={openSampleForm}
-              className="border-2 text-white font-semibold px-7 py-3 rounded-2xl text-sm"
+              className="border-2 text-white font-semibold px-6 py-2.5 rounded-2xl text-sm"
               style={{ borderColor: 'rgba(255,255,255,0.5)', background: 'rgba(255,255,255,0.1)' }}>
               🎁 Free Sample
             </button>
