@@ -444,13 +444,21 @@ export default function StoreFront() {
             borderBottom: '2px solid #c8821a',
           }}
         >
-          <div className="max-w-4xl mx-auto px-4 py-2 flex items-center justify-center gap-3">
+          <div className="max-w-4xl mx-auto px-4 py-2 flex items-center justify-center gap-2 flex-wrap">
             <button
               onClick={() => document.getElementById('products')?.scrollIntoView({ behavior: 'smooth' })}
               className="font-bold px-5 py-2 rounded-xl text-sm shadow-md"
               style={{ background: '#c8821a', color: '#fff', border: '1.5px solid #e8c87a' }}>
               🛍️ Shop Now
             </button>
+            {featureFlags.subscriptionBanner && (
+              <button
+                onClick={() => document.getElementById('subscribe')?.scrollIntoView({ behavior: 'smooth' })}
+                className="font-semibold px-5 py-2 rounded-xl text-sm"
+                style={{ background: 'rgba(200,130,26,0.3)', color: '#ffd700', border: '1.5px solid rgba(200,130,26,0.6)' }}>
+                📦 Subscribe
+              </button>
+            )}
             {featureFlags.sampleRequest && (
               <button
                 onClick={openSampleForm}
@@ -517,6 +525,14 @@ export default function StoreFront() {
               style={{ background: '#c8821a', color: '#fff', border: '1.5px solid #e8c87a', boxShadow: '0 4px 15px rgba(200,130,26,0.4)' }}>
               🛍️ Shop Now
             </button>
+            {featureFlags.subscriptionBanner && (
+              <button
+                onClick={() => document.getElementById('subscribe')?.scrollIntoView({ behavior: 'smooth' })}
+                className="font-semibold px-6 py-2.5 rounded-2xl text-sm"
+                style={{ background: 'rgba(200,130,26,0.25)', color: '#ffd700', border: '1.5px solid rgba(200,130,26,0.6)' }}>
+                📦 Subscribe
+              </button>
+            )}
             {featureFlags.sampleRequest && (
             <button
               onClick={openSampleForm}
@@ -587,117 +603,100 @@ export default function StoreFront() {
         </div>
       )}
 
-      {/* ── Testimonials + Subscription — side by side ───────────────── */}
-      {(featureFlags.testimonials || featureFlags.subscriptionBanner || featureFlags.sampleRequest) && (
-        <div className="max-w-4xl mx-auto px-4 py-6">
-          <div className={`grid gap-6 items-start ${
-            featureFlags.testimonials && testimonials.length > 0
-              ? 'grid-cols-1 lg:grid-cols-2'
-              : 'grid-cols-1'
-          }`}>
-
-            {/* ── LEFT: Testimonials — vertical scroll ── */}
-            {featureFlags.testimonials && testimonials.length > 0 && (
-              <div className="rounded-2xl overflow-hidden" style={{ background: '#e5ddd5' }}>
-                {/* WhatsApp-like chat header */}
-                <div className="flex items-center gap-3 px-4 py-3 border-b" style={{ borderColor: '#d1c4b8' }}>
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
-                    style={{ background: '#c8821a' }}>
-                    <span className="text-white text-xs font-bold">SKC</span>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-bold" style={{ color: '#1a1a1a' }}>Sri Krishna Condiments</p>
-                    <p className="text-xs" style={{ color: '#667781' }}>
-                      {feedbackStats
-                        ? `${feedbackStats.total} verified reviews · ⭐ ${feedbackStats.avg} avg`
-                        : 'Customer Reviews'}
-                    </p>
-                  </div>
-                  <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold flex-shrink-0"
-                    style={{ background: '#25d366', color: '#fff' }}>
-                    <Star className="w-3 h-3" style={{ fill: '#fff', color: '#fff' }} /> Verified
-                  </span>
-                </div>
-
-                {/* Vertically scrolling review bubbles */}
-                <div
-                  className="overflow-hidden relative cursor-pointer select-none"
-                  style={{ height: 380 }}
-                  onPointerDown={() => setMarqueesPaused(true)}
-                  onPointerUp={() => setMarqueesPaused(false)}
-                  onPointerLeave={() => setMarqueesPaused(false)}
-                >
-                  {/* Pause hint — fades out when paused */}
-                  <div
-                    className="absolute bottom-2 left-0 right-0 flex justify-center z-10 transition-opacity duration-300 pointer-events-none"
-                    style={{ opacity: marqueesPaused ? 0 : 0.7 }}
-                  >
-                    <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(0,0,0,0.35)', color: '#fff' }}>
-                      Hold to pause
-                    </span>
-                  </div>
-                  <div
-                    className="flex flex-col gap-3 px-3 py-3 animate-marquee-up"
-                    style={{ height: 'max-content', animationPlayState: marqueesPaused ? 'paused' : 'running' }}
-                  >
-                    {[...testimonials, ...testimonials].map((t, i) => {
-                      const initials = t.customerName.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase();
-                      const avatarColors = ['#128c7e', '#075e54', '#c8821a', '#7a4010', '#34b7f1', '#9c27b0'];
-                      const avatarBg = avatarColors[i % avatarColors.length];
-                      const timeStr = new Date(t.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
-                      return (
-                        <div key={i} className="flex items-end gap-2">
-                          {/* Avatar */}
-                          <div className="w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center mb-0.5"
-                            style={{ background: avatarBg }}>
-                            <span className="text-white text-xs font-bold">{initials}</span>
-                          </div>
-                          {/* Bubble */}
-                          <div className="relative rounded-2xl rounded-bl-sm px-3 py-2 shadow-sm flex-1"
-                            style={{ background: '#fff' }}>
-                            <div className="flex items-center justify-between gap-2 mb-0.5 flex-wrap">
-                              <span className="text-xs font-bold" style={{ color: '#075e54' }}>{t.customerName}</span>
-                              {t.orderNumber && (
-                                <span className="px-1.5 py-0.5 rounded-full flex-shrink-0"
-                                  style={{ background: '#e8f5e9', color: '#256029', fontSize: '9px', fontWeight: 700 }}>
-                                  ✓ #{t.orderNumber}
-                                </span>
-                              )}
-                            </div>
-                            <div className="flex gap-0.5 mb-1">
-                              {[1,2,3,4,5].map(s => (
-                                <Star key={s} className="w-2.5 h-2.5"
-                                  style={{ fill: s <= t.rating ? '#f59e0b' : '#e5e7eb', color: s <= t.rating ? '#f59e0b' : '#e5e7eb' }} />
-                              ))}
-                            </div>
-                            <p className="text-xs leading-snug" style={{ color: '#1a1a1a' }}>"{t.whatYouLiked}"</p>
-                            <div className="flex items-center justify-end gap-1 mt-1">
-                              <span style={{ color: '#667781', fontSize: '10px' }}>{timeStr}</span>
-                              <svg className="w-3.5 h-2.5 flex-shrink-0" viewBox="0 0 18 11" fill="none">
-                                <path d="M1 5.5L5.5 10L12 1" stroke="#53bdeb" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                                <path d="M7 10L17 1" stroke="#53bdeb" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                                <path d="M5 10L15 1" stroke="#53bdeb" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                              </svg>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
+      {/* ── Testimonials ─────────────────────────────────────────────── */}
+      {featureFlags.testimonials && testimonials.length > 0 && (() => {
+        const latest = testimonials[0];
+        const latestInitials = latest.customerName.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase();
+        const scrollItems = testimonials.length > 1 ? testimonials.slice(1) : testimonials;
+        const avatarColors = ['#128c7e', '#075e54', '#c8821a', '#7a4010', '#34b7f1', '#9c27b0'];
+        return (
+          <div className="rounded-2xl overflow-hidden mx-4" style={{ background: '#e5ddd5' }}>
+            {/* Chat header */}
+            <div className="flex items-center gap-3 px-4 py-3 border-b" style={{ borderColor: '#d1c4b8' }}>
+              <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: '#c8821a' }}>
+                <span className="text-white text-xs font-bold">SKC</span>
               </div>
-            )}
-
-            {/* ── RIGHT: Subscription ── */}
-            <div>
-              {featureFlags.subscriptionBanner && (
-                <SubscriptionBanner healthProducts={products.filter(p => p.category === 'Health Mix')} />
-              )}
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold" style={{ color: '#1a1a1a' }}>Sri Krishna Condiments</p>
+                <p className="text-xs" style={{ color: '#667781' }}>
+                  {feedbackStats ? `${feedbackStats.total} verified reviews · ⭐ ${feedbackStats.avg} avg` : 'Customer Reviews'}
+                </p>
+              </div>
+              <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold flex-shrink-0" style={{ background: '#25d366', color: '#fff' }}>
+                <Star className="w-3 h-3" style={{ fill: '#fff', color: '#fff' }} /> Verified
+              </span>
             </div>
 
+            {/* ── Pinned latest review ── */}
+            <div className="px-3 pt-3 pb-2">
+              <p className="text-xs font-semibold mb-1.5 px-1" style={{ color: '#667781' }}>📌 Latest review</p>
+              <div className="flex items-end gap-2">
+                <div className="w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center mb-0.5" style={{ background: '#c8821a' }}>
+                  <span className="text-white text-xs font-bold">{latestInitials}</span>
+                </div>
+                <div className="relative rounded-2xl rounded-bl-sm px-3 py-2 shadow-sm flex-1" style={{ background: '#fff' }}>
+                  <div className="flex items-center justify-between gap-2 mb-0.5 flex-wrap">
+                    <span className="text-xs font-bold" style={{ color: '#075e54' }}>{latest.customerName}</span>
+                    {latest.orderNumber && (
+                      <span className="px-1.5 py-0.5 rounded-full flex-shrink-0"
+                        style={{ background: '#e8f5e9', color: '#256029', fontSize: '9px', fontWeight: 700 }}>✓ #{latest.orderNumber}</span>
+                    )}
+                  </div>
+                  <div className="flex gap-0.5 mb-1">
+                    {[1,2,3,4,5].map(s => (
+                      <Star key={s} className="w-2.5 h-2.5"
+                        style={{ fill: s <= latest.rating ? '#f59e0b' : '#e5e7eb', color: s <= latest.rating ? '#f59e0b' : '#e5e7eb' }} />
+                    ))}
+                  </div>
+                  <p className="text-xs leading-snug" style={{ color: '#1a1a1a' }}>"{latest.whatYouLiked}"</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Divider */}
+            <div className="mx-4 border-t" style={{ borderColor: '#d1c4b8' }} />
+
+            {/* ── Horizontal scrolling marquee of older reviews ── */}
+            <div
+              className="overflow-hidden cursor-pointer select-none py-3"
+              onPointerDown={() => setMarqueesPaused(true)}
+              onPointerUp={() => setMarqueesPaused(false)}
+              onPointerLeave={() => setMarqueesPaused(false)}
+            >
+              <div
+                className="flex gap-3 px-3 animate-marquee-reviews"
+                style={{ width: 'max-content', animationPlayState: marqueesPaused ? 'paused' : 'running' }}
+              >
+                {[...scrollItems, ...scrollItems].map((t, i) => {
+                  const initials = t.customerName.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase();
+                  const avatarBg = avatarColors[i % avatarColors.length];
+                  return (
+                    <div key={i} className="flex-shrink-0 w-56 rounded-2xl px-3 py-2.5 shadow-sm" style={{ background: '#fff' }}>
+                      <div className="flex items-center gap-2 mb-1">
+                        <div className="w-6 h-6 rounded-full flex-shrink-0 flex items-center justify-center" style={{ background: avatarBg }}>
+                          <span className="text-white" style={{ fontSize: '9px', fontWeight: 700 }}>{initials}</span>
+                        </div>
+                        <span className="text-xs font-bold truncate" style={{ color: '#075e54' }}>{t.customerName}</span>
+                        {t.orderNumber && (
+                          <span className="ml-auto flex-shrink-0 px-1 py-0.5 rounded-full"
+                            style={{ background: '#e8f5e9', color: '#256029', fontSize: '8px', fontWeight: 700 }}>✓</span>
+                        )}
+                      </div>
+                      <div className="flex gap-0.5 mb-1">
+                        {[1,2,3,4,5].map(s => (
+                          <Star key={s} className="w-2.5 h-2.5"
+                            style={{ fill: s <= t.rating ? '#f59e0b' : '#e5e7eb', color: s <= t.rating ? '#f59e0b' : '#e5e7eb' }} />
+                        ))}
+                      </div>
+                      <p className="text-xs leading-snug line-clamp-3" style={{ color: '#1a1a1a' }}>"{t.whatYouLiked}"</p>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* ── Products Section (scroll target) ─────────────────────────────── */}
       <div id="products" className="max-w-4xl mx-auto px-4 pt-6 pb-28">
@@ -791,6 +790,13 @@ export default function StoreFront() {
           )}
         </div>
       </div>
+
+      {/* ── Subscription ─────────────────────────────────────────────── */}
+      {featureFlags.subscriptionBanner && (
+        <div id="subscribe" className="max-w-4xl mx-auto px-4 pb-6">
+          <SubscriptionBanner healthProducts={products.filter(p => p.category === 'Health Mix')} />
+        </div>
+      )}
 
       {/* Version badge — fixed bottom-right */}
       <div className="fixed bottom-3 right-3 z-50 flex items-center gap-1.5 px-2.5 py-1 rounded-full shadow-md text-white text-xs font-mono"
