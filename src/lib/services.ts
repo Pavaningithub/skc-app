@@ -303,6 +303,17 @@ export const ordersService = {
     const items = snap.docs.map(d => ({ id: d.id, ...d.data() } as Order));
     return items.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   },
+  /** Returns true if this phone number already has a non-cancelled sample order */
+  async hasSampleByWhatsapp(whatsapp: string): Promise<boolean> {
+    const snap = await getDocs(
+      query(
+        collection(db, COLLECTIONS.ORDERS),
+        where('customerWhatsapp', '==', whatsapp),
+        where('type', '==', 'sample'),
+      )
+    );
+    return snap.docs.some(d => d.data().status !== 'cancelled');
+  },
   async getById(id: string): Promise<Order | null> {
     const docSnap = await getDoc(doc(db, COLLECTIONS.ORDERS, id));
     if (!docSnap.exists()) return null;
