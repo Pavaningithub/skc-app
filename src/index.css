@@ -42,6 +42,6 @@ body {
   100% { transform: translateY(-50%); }
 }
 .animate-marquee-up {
-  animation: marquee-up 30s linear infinite;
+  animation: marquee-up 60s linear infinite;
 }
 .animate-marquee-up:hover { animation-play-state: paused; }
