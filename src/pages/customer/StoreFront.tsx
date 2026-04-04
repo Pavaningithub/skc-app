@@ -465,20 +465,20 @@ export default function StoreFront() {
 
       {/* ── Social Proof Stats Strip ─────────────────────────────────────── */}
       {siteStats && (
-        <div className="py-5" style={{ background: '#3d1c02', borderBottom: '2px solid #c8821a' }}>
+        <div className="py-2.5" style={{ background: '#3d1c02', borderBottom: '1px solid rgba(200,130,26,0.5)' }}>
           <div className="max-w-4xl mx-auto px-4">
-            <div className="grid grid-cols-3 divide-x" style={{ borderColor: 'rgba(200,130,26,0.3)' }}>
+            <div className="flex items-center justify-center gap-0 divide-x" style={{ borderColor: 'rgba(200,130,26,0.3)' }}>
               {[
                 { value: siteStats.customers, suffix: '+', label: 'Happy Customers', icon: '😊' },
                 { value: siteStats.orders,    suffix: '+', label: 'Orders Served',    icon: '📦' },
                 { value: siteStats.holige,    suffix: '+', label: 'Holige Served 🪔', icon: '🍯' },
               ].map(stat => (
-                <div key={stat.label} className="flex flex-col items-center py-1 px-2 text-center">
-                  <span className="text-xl mb-0.5">{stat.icon}</span>
-                  <span className="text-2xl md:text-3xl font-bold" style={{ color: '#c8821a', fontFamily: 'Georgia, serif' }}>
+                <div key={stat.label} className="flex items-center gap-1.5 px-4 py-0.5">
+                  <span className="text-base leading-none">{stat.icon}</span>
+                  <span className="text-sm font-bold leading-none" style={{ color: '#c8821a', fontFamily: 'Georgia, serif' }}>
                     {stat.value}{stat.suffix}
                   </span>
-                  <span className="text-xs font-medium mt-0.5 leading-tight" style={{ color: 'rgba(255,255,255,0.7)' }}>{stat.label}</span>
+                  <span className="text-xs leading-none" style={{ color: 'rgba(255,255,255,0.65)' }}>{stat.label}</span>
                 </div>
               ))}
             </div>
@@ -982,14 +982,25 @@ export default function StoreFront() {
 }
 
 // ─── Subscription Banner (Health Mix products) ───────────────────────────────
+const SUB_QTYS = [250, 500, 1000] as const;
+type SubQty = typeof SUB_QTYS[number];
+function qtyLabel(g: SubQty) { return g === 1000 ? '1 kg' : `${g} g`; }
+
 function SubscriptionBanner({ healthProducts }: { healthProducts: Product[] }) {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [quantities, setQuantities] = useState<Record<string, SubQty>>({});
   const [plan, setPlan] = useState<3 | 6>(6);
   const [paymentMode, setPaymentMode] = useState<'upfront' | 'monthly'>('upfront');
   const { config: subConfig } = useSubscriptionConfig();
 
-  const toggle = (id: string) =>
+  const toggle = (id: string) => {
     setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+    // default quantity to 250g on first selection
+    setQuantities(prev => ({ ...prev, [id]: prev[id] ?? 250 }));
+  };
+
+  const setQty = (id: string, qty: SubQty) =>
+    setQuantities(prev => ({ ...prev, [id]: qty }));
 
   const discountPct = paymentMode === 'upfront'
     ? (plan === 6 ? subConfig.upfrontSixMonthPct : subConfig.upfrontThreeMonthPct)
@@ -1002,7 +1013,12 @@ function SubscriptionBanner({ healthProducts }: { healthProducts: Product[] }) {
     ? `Hi! I'm interested in the Health Mix Subscription (${plan} months, ${paymentMode} payment). Can you share more details?`
     : [
         `Hi! I'd like to subscribe to the following Health Mix products for ${plan} months:`,
-        ...selectedProducts.map(p => `• ${p.name} — 250g/month`),
+        ...selectedProducts.map(p => {
+          const g = quantities[p.id] ?? 250;
+          const base = Math.round(p.pricePerUnit * g);
+          const discounted = Math.round(base * (1 - discount));
+          return `• ${p.name} — ${qtyLabel(g as SubQty)}/month (₹${discounted}/mo after ${discountPct}% off)`;
+        }),
         ``,
         `Plan: ${plan}-month | ${paymentMode === 'upfront' ? 'Upfront' : 'Monthly'} payment | ${discountPct}% off`,
         `Please confirm pricing and delivery dates.`,
@@ -1071,27 +1087,47 @@ function SubscriptionBanner({ healthProducts }: { healthProducts: Product[] }) {
           <div className="space-y-2 mb-4">
             {healthProducts.map(p => {
               const isSelected = selectedIds.includes(p.id);
-              const pricePerMonth = Math.round(p.pricePerUnit * 250);
-              const discountedPrice = Math.round(pricePerMonth * (1 - discount));
+              const selectedQty: SubQty = (quantities[p.id] ?? 250) as SubQty;
+              const basePrice = Math.round(p.pricePerUnit * selectedQty);
+              const discountedPrice = Math.round(basePrice * (1 - discount));
               return (
-                <button key={p.id} onClick={() => toggle(p.id)}
-                  className={`w-full flex items-center gap-3 p-3 rounded-xl border-2 text-left transition-all ${
-                    isSelected ? 'border-yellow-300 bg-white/20' : 'border-white/15 bg-white/10 hover:border-white/40'
+                <div key={p.id}
+                  className={`rounded-xl border-2 overflow-hidden transition-all ${
+                    isSelected ? 'border-yellow-300 bg-white/20' : 'border-white/15 bg-white/10'
                   }`}>
-                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
-                    isSelected ? 'border-yellow-300 bg-yellow-300' : 'border-white/40'
-                  }`}>
-                    {isSelected && <span className="text-green-900 text-xs font-bold">✓</span>}
+                  {/* Product row — tap to select */}
+                  <button onClick={() => toggle(p.id)}
+                    className="w-full flex items-center gap-3 p-3 text-left">
+                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
+                      isSelected ? 'border-yellow-300 bg-yellow-300' : 'border-white/40'
+                    }`}>
+                      {isSelected && <span className="text-green-900 text-xs font-bold">✓</span>}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold">{p.name}</p>
+                      {p.nameKannada && <p className="text-xs text-green-200">{p.nameKannada}</p>}
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <div className="text-xs line-through text-white/50">₹{basePrice}</div>
+                      <div className="text-sm font-bold text-yellow-300">₹{discountedPrice}<span className="text-xs font-normal text-green-200">/mo</span></div>
+                    </div>
+                  </button>
+                  {/* Quantity picker — always visible */}
+                  <div className="flex items-center gap-1 px-3 pb-2.5">
+                    <span className="text-xs text-green-200 mr-1">Qty/month:</span>
+                    {SUB_QTYS.map(g => (
+                      <button key={g}
+                        onClick={e => { e.stopPropagation(); setQty(p.id, g); if (!isSelected) toggle(p.id); }}
+                        className={`flex-1 py-1 rounded-lg text-xs font-semibold border transition-all ${
+                          selectedQty === g && isSelected
+                            ? 'border-yellow-300 bg-yellow-300 text-green-900'
+                            : 'border-white/25 bg-white/10 text-white/80'
+                        }`}>
+                        {qtyLabel(g)}
+                      </button>
+                    ))}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold">{p.name}</p>
-                    {p.nameKannada && <p className="text-xs text-green-200">{p.nameKannada}</p>}
-                  </div>
-                  <div className="text-right flex-shrink-0">
-                    <div className="text-xs line-through text-white/50">₹{pricePerMonth}</div>
-                    <div className="text-sm font-bold text-yellow-300">₹{discountedPrice}<span className="text-xs font-normal text-green-200">/mo</span></div>
-                  </div>
-                </button>
+                </div>
               );
             })}
           </div>
