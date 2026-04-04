@@ -87,8 +87,10 @@ export default function OrderConfirmation() {
             {isSample ? 'Sample Requested! 🎁' : 'Order Placed! 🎉'}
           </h1>
           <p className="text-gray-500 text-sm mb-4">
-            {isSample
+            {isSample && order.total === 0
               ? "We'll contact you on WhatsApp to arrange delivery of your free sample."
+              : isSample && order.total > 0
+              ? `We'll contact you on WhatsApp to arrange delivery. A sample charge of ₹${order.total} is due on delivery.`
               : "We'll send you updates on WhatsApp."}
           </p>
 
@@ -101,7 +103,7 @@ export default function OrderConfirmation() {
               <span className="text-gray-500">Name:</span>
               <span className="font-medium text-gray-800">{order.customerName}</span>
             </div>
-            {!isSample && (
+            {(!isSample || order.total > 0) && (
               <>
                 {order.referralDiscount > 0 && (
                   <div className="flex justify-between text-sm">
@@ -110,14 +112,14 @@ export default function OrderConfirmation() {
                   </div>
                 )}
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">Amount:</span>
+                  <span className="text-gray-500">{isSample ? 'Sample charge:' : 'Amount:'}</span>
                   <span className="font-bold text-orange-600">{formatCurrency(order.total)}</span>
                 </div>
               </>
             )}
           </div>
 
-          {!isSample && !isAgentOrder && (
+          {(!isSample || order.total > 0) && !isAgentOrder && (
             <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-left mb-4">
               <p className="text-sm font-semibold text-blue-800 mb-2">💳 Payment Instructions</p>
               <p className="text-xs text-blue-700 mb-1">Pay via GPay / PhonePe / UPI:</p>

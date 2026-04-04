@@ -29,9 +29,13 @@ export const APP_CONFIG = {
   DEFAULT_LOW_STOCK_GRAMS:  500,        // Alert when stock < 500g
   DEFAULT_LOW_STOCK_PIECES: 5,          // Alert when stock < 5 pieces
 
-  // ── Sample Orders ────────────────────────────────────────────────
+  // ── Sample Orders ────────────────────────────────────────────────────
   SAMPLE_SIZE_OPTIONS: ['50g', '100g'],  // Available sample sizes
   SAMPLE_MESSAGE:      'Free sample — no payment required',
+
+  // Flat charge for all sample requests (set to 0 for free, e.g. 50 to enable ₹50 charge)
+  // When non-zero: payment is required, paymentStatus becomes 'unpaid', UPI link is shown
+  SAMPLE_CHARGE: 0,
 
   // ── WhatsApp Links (from env) ──────────────────────────────────
   SHOW_WHATSAPP_GROUP_LINK:   true,

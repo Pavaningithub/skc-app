@@ -264,6 +264,14 @@ export default function StoreFront() {
     if (sampleSelected.length === 0) return toast.error('Please select at least one product');
     setSubmitting(true);
     try {
+      // Block duplicate sample requests by phone number
+      const alreadyRequested = await ordersService.hasSampleByWhatsapp(wa);
+      if (alreadyRequested) {
+        toast.error("You've already requested a sample. Each number is eligible for one sample only. 🙏", { duration: 5000 });
+        setSubmitting(false);
+        return;
+      }
+
       let customerId: string | undefined;
       const existing = await customersService.getByWhatsapp(wa);
       if (existing) customerId = existing.id;
@@ -274,6 +282,7 @@ export default function StoreFront() {
       });
 
       const orderNumber = generateOrderNumber();
+      const charge = APP_CONFIG.SAMPLE_CHARGE;
       const sampleItems = sampleSelected.map(p => ({
         productId: p.id, productName: p.name,
         unit: p.unit as 'gram', quantity: 50, pricePerUnit: 0, totalPrice: 0,
@@ -284,8 +293,9 @@ export default function StoreFront() {
         customerName: orderForm.name.trim(), customerWhatsapp: wa,
         customerPlace: orderForm.place.trim(),
         items: sampleItems,
-        subtotal: 0, discount: 0, total: 0,
-        status: 'pending', paymentStatus: 'na',
+        subtotal: charge, discount: 0, total: charge,
+        status: 'pending',
+        paymentStatus: charge > 0 ? 'pending' : 'na',
         notes: `Sample request: ${sampleSelected.map(p => p.name).join(', ')}${orderForm.notes ? '. ' + orderForm.notes : ''}`,
         hasOnDemandItems: false,
         referralDiscount: 0,

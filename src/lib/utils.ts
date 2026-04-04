@@ -70,8 +70,8 @@ Order No: *#${order.orderNumber}*
 *Items:*
 ${items}
 ${order.discount > 0 ? `\nDiscount: -₹${order.discount}` : ''}
-*Total: ₹${order.total}*
-${order.type === 'sample' ? '\n✅ This is a *FREE SAMPLE* — no payment needed.' : ''}
+*Total: ${order.type === 'sample' && order.total === 0 ? 'FREE SAMPLE' : `₹${order.total}`}*
+${order.type === 'sample' && order.total === 0 ? '\n✅ This is a *FREE SAMPLE* — no payment needed.' : order.type === 'sample' && order.total > 0 ? `\n💳 *Sample Charge: ₹${order.total}* — payment due on delivery.` : ''}
 
 We will keep you updated on your order.
 Thank you for choosing ${BUSINESS_NAME}! 🌿${referralLine}`;
@@ -85,7 +85,9 @@ export function outForDeliveryToCustomer(order: Order): string {
 Hi *${order.customerName}*, your order is on the way! 🚀
 
 Order No: *#${order.orderNumber}*
-${order.type === 'sample' ? '\n✅ FREE SAMPLE — no payment needed.' : `\n💳 *Payment Due: ₹${order.total}*
+${order.type === 'sample' && order.total === 0
+  ? '\n✅ FREE SAMPLE — no payment needed.'
+  : `\n💳 *Payment Due: ₹${order.total}*${order.type === 'sample' ? ' (sample charge)' : ''}
 
 Pay via GPay / PhonePe / any UPI app:
 📲 UPI ID: \`${APP_CONFIG.UPI_ID}\`
