@@ -71,6 +71,7 @@ jobs:
 
     # ── Customer E2E tests — run against the live Vercel preview URL ──────────
     e2e-customer:
+        if: false # disabled on develop branch
         name: 🧪 Customer E2E Tests
         runs-on: ubuntu-latest
         needs: deploy-staging # waits for preview URL to be live

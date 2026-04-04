@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Plus, Settings, Save, X, ChevronDown, ChevronUp, AlertTriangle, CheckCircle, Send, Copy, Search, Filter } from 'lucide-react';
+import { Plus, Settings, Save, X, ChevronDown, ChevronUp, AlertTriangle, CheckCircle, Send, Copy, Search, Filter, Pencil, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Portal from '../../components/Portal';
 import { subscriptionsService, subscriptionConfigService, productsService, customersService, ordersService } from '../../lib/services';
@@ -70,6 +70,9 @@ export default function SubscriptionsPage() {
   const [cancelConfirmId, setCancelConfirmId] = useState<string | null>(null);
   const [editMonthIdx, setEditMonthIdx]       = useState<{ subId: string; month: number } | null>(null);
   const [editMonthDate, setEditMonthDate]     = useState('');
+  const [editingSub, setEditingSub]           = useState<Subscription | null>(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [deleting, setDeleting]               = useState(false);
 
   // Filter / sort state
   const [search, setSearch]               = useState('');
@@ -211,6 +214,63 @@ export default function SubscriptionsPage() {
     await subscriptionsService.update(id, { isActive: false, status: 'cancelled' });
     toast.success('Subscription cancelled');
     setCancelConfirmId(null);
+  }
+
+  function openEditSub(sub: Subscription) {
+    setEditingSub(sub);
+    setForm({
+      customerName:    sub.customerName,
+      customerWhatsapp: sub.customerWhatsapp,
+      duration:        sub.duration,
+      paymentMode:     sub.paymentMode ?? 'upfront',
+      items:           sub.items,
+      paymentStatus:   (sub.paymentStatus === 'paid' ? 'paid' : 'pending') as 'pending' | 'paid',
+    });
+    setShowForm(true);
+  }
+
+  async function handleEditSave() {
+    if (!editingSub) return handleSave();
+    if (!form.customerName.trim()) return toast.error('Customer name required');
+    if (!form.customerWhatsapp.trim()) return toast.error('WhatsApp number required');
+    if (form.items.length === 0) return toast.error('Add at least one product');
+    setSaving(true);
+    try {
+      const baseAmount       = form.items.reduce((s, i) => s + i.totalPrice, 0);
+      const discountPct      = editingSub.discountPercent; // keep original discount on edit
+      const discountedAmount = baseAmount * (1 - discountPct / 100);
+      const durationMonths   = form.duration === '3months' ? 3 : 6;
+      const endDate          = new Date(
+        new Date(editingSub.startDate).getTime() + durationMonths * 30 * 24 * 60 * 60 * 1000
+      );
+
+      await subscriptionsService.update(editingSub.id, {
+        customerName:     form.customerName,
+        customerWhatsapp: form.customerWhatsapp.replace(/\D/g, ''),
+        duration:         form.duration,
+        paymentMode:      form.paymentMode,
+        items:            form.items,
+        baseAmount,
+        discountedAmount,
+        endDate:          endDate.toISOString(),
+        paymentStatus:    form.paymentStatus,
+      });
+
+      toast.success('Subscription updated!');
+      setShowForm(false);
+      setEditingSub(null);
+      setForm(emptyForm);
+    } finally { setSaving(false); }
+  }
+
+  async function deleteSub(id: string) {
+    setDeleting(true);
+    try {
+      await subscriptionsService.delete(id);
+      toast.success('Subscription deleted');
+      setDeleteConfirmId(null);
+      setExpandedId(null);
+    } finally { setDeleting(false); }
   }
 
   async function confirmSub(sub: Subscription) {
@@ -672,6 +732,30 @@ export default function SubscriptionsPage() {
                         )
                       )}
 
+                      {/* Edit */}
+                      <button onClick={() => openEditSub(sub)}
+                        className="text-xs border border-blue-300 text-blue-600 px-3 py-1.5 rounded-lg hover:bg-blue-50 flex items-center gap-1">
+                        <Pencil className="w-3 h-3" /> Edit
+                      </button>
+
+                      {/* Delete */}
+                      {deleteConfirmId === sub.id ? (
+                        <div className="flex gap-2 items-center">
+                          <span className="text-xs text-red-700 font-semibold">Permanently delete?</span>
+                          <button onClick={() => deleteSub(sub.id)} disabled={deleting}
+                            className="text-xs bg-red-600 text-white px-2 py-1 rounded-lg disabled:opacity-50">
+                            {deleting ? '…' : 'Delete'}
+                          </button>
+                          <button onClick={() => setDeleteConfirmId(null)}
+                            className="text-xs border border-gray-300 px-2 py-1 rounded-lg">No</button>
+                        </div>
+                      ) : (
+                        <button onClick={() => setDeleteConfirmId(sub.id)}
+                          className="text-xs border border-red-200 text-red-400 px-3 py-1.5 rounded-lg hover:bg-red-50 flex items-center gap-1">
+                          <Trash2 className="w-3 h-3" /> Delete
+                        </button>
+                      )}
+
                       {/* Copy sub summary */}
                       <button
                         onClick={() => copyText(
@@ -751,14 +835,16 @@ export default function SubscriptionsPage() {
         </Portal>
       )}
 
-      {/* ── Create Subscription Modal ── */}
+      {/* ── Create / Edit Subscription Modal ── */}
       {showForm && (
         <Portal>
           <div className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center sm:items-center sm:p-4">
             <div className="bg-white rounded-t-3xl sm:rounded-2xl w-full max-w-lg flex flex-col" style={{ maxHeight: '92dvh' }}>
               <div className="border-b border-gray-100 px-5 py-4 flex items-center justify-between flex-shrink-0">
-                <h2 className="font-bold text-gray-800">New Subscription</h2>
-                <button onClick={() => { setShowForm(false); setForm(emptyForm); }}
+                <h2 className="font-bold text-gray-800">
+                  {editingSub ? '✏️ Edit Subscription' : 'New Subscription'}
+                </h2>
+                <button onClick={() => { setShowForm(false); setEditingSub(null); setForm(emptyForm); }}
                   className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
               </div>
               <div className="overflow-y-auto flex-1 p-5 space-y-4">
@@ -810,7 +896,9 @@ export default function SubscriptionsPage() {
                     ))}
                   </div>
                   <p className="text-xs text-gray-400 mt-1">
-                    {form.paymentMode === 'upfront'
+                    {editingSub
+                      ? `Discount locked at ${editingSub.discountPercent}% (set at creation)`
+                      : form.paymentMode === 'upfront'
                       ? `${getDiscountPct(form.duration, 'upfront')}% off — pay full ${durationMonths}-month total upfront`
                       : `${getDiscountPct(form.duration, 'monthly')}% off — pay each month separately`}
                   </p>
@@ -899,11 +987,11 @@ export default function SubscriptionsPage() {
               </div>
 
               <div className="border-t border-gray-100 p-5 flex gap-3 flex-shrink-0">
-                <button onClick={() => { setShowForm(false); setForm(emptyForm); }}
+                <button onClick={() => { setShowForm(false); setEditingSub(null); setForm(emptyForm); }}
                   className="flex-1 border border-gray-200 text-gray-600 py-3 rounded-xl text-sm">Cancel</button>
-                <button onClick={handleSave} disabled={saving}
+                <button onClick={handleEditSave} disabled={saving}
                   className="flex-1 bg-orange-500 hover:bg-orange-600 text-white py-3 rounded-xl text-sm font-semibold disabled:opacity-50">
-                  {saving ? 'Saving…' : 'Create Subscription'}
+                  {saving ? 'Saving…' : editingSub ? 'Save Changes' : 'Create Subscription'}
                 </button>
               </div>
             </div>
