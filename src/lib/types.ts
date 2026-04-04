@@ -242,10 +242,10 @@ export interface SubscriptionConfig {
 }
 
 export const DEFAULT_SUBSCRIPTION_CONFIG: SubscriptionConfig = {
-  upfrontThreeMonthPct: 5,
+  upfrontThreeMonthPct: 7,
   upfrontSixMonthPct:   10,
   monthlyThreeMonthPct: 3,
-  monthlySixMonthPct:   7,
+  monthlySixMonthPct:   5,
 };
 
 // ─── Agent (Partner / Reseller) ────────────────────────────────────────────────────────────────
