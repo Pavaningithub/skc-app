@@ -426,6 +426,11 @@ export const subscriptionsService = {
     const items = snap.docs.map(d => ({ id: d.id, ...d.data() } as Subscription));
     return items.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   },
+  async getById(id: string): Promise<Subscription | null> {
+    const snap = await getDoc(doc(db, COLLECTIONS.SUBSCRIPTIONS, id));
+    if (!snap.exists()) return null;
+    return { id: snap.id, ...snap.data() } as Subscription;
+  },
   async add(sub: Omit<Subscription, "id">): Promise<string> {
     const ref = await addDoc(collection(db, COLLECTIONS.SUBSCRIPTIONS), { ...sub, createdAt: now() });
     return ref.id;
