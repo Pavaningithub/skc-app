@@ -44,7 +44,7 @@ export const EXPENSE_CATEGORY_LABELS: Record<ExpenseCategory, string> =
 export type SubscriptionDuration = '3months' | '6months';
 
 // Status lifecycle: pending → confirmed → payment_requested → active (each monthly cycle)
-export type SubscriptionStatus = 'pending' | 'confirmed' | 'payment_requested' | 'active' | 'cancelled';
+export type SubscriptionStatus = 'pending' | 'confirmed' | 'payment_requested' | 'active' | 'in_progress' | 'completed' | 'cancelled';
 
 // Static fallback discounts — live values come from Firestore via useSubscriptionConfig
 export const SUBSCRIPTION_DISCOUNTS: Record<SubscriptionDuration, number> = {
