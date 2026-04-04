@@ -32,12 +32,20 @@ export default function SubscriptionsPage() {
   const [renewSub, setRenewSub] = useState<Subscription | null>(null);
 
   // Config edit state
-  const [configDraft, setConfigDraft] = useState({ threeMonthPct: 5, sixMonthPct: 10 });
+  const [configDraft, setConfigDraft] = useState({
+    upfrontThreeMonthPct: 5, upfrontSixMonthPct: 10,
+    monthlyThreeMonthPct: 3, monthlySixMonthPct:  7,
+  });
   const [savingConfig, setSavingConfig] = useState(false);
 
   // Sync draft when modal opens
   function openConfigModal() {
-    setConfigDraft({ threeMonthPct: subConfig.threeMonthPct, sixMonthPct: subConfig.sixMonthPct });
+    setConfigDraft({
+      upfrontThreeMonthPct: subConfig.upfrontThreeMonthPct,
+      upfrontSixMonthPct:   subConfig.upfrontSixMonthPct,
+      monthlyThreeMonthPct: subConfig.monthlyThreeMonthPct,
+      monthlySixMonthPct:   subConfig.monthlySixMonthPct,
+    });
     setShowConfigModal(true);
   }
 
@@ -56,6 +64,7 @@ export default function SubscriptionsPage() {
     customerName: '',
     customerWhatsapp: '',
     duration: '3months' as SubscriptionDuration,
+    paymentMode: 'upfront' as 'upfront' | 'monthly',
     items: [] as OrderItem[],
     paymentStatus: 'pending' as 'pending' | 'paid',
   };
@@ -77,8 +86,11 @@ export default function SubscriptionsPage() {
   const activeSubs = useMemo(() => subs.filter(s => s.isActive), [subs]);
   const expiredSubs = useMemo(() => subs.filter(s => !s.isActive), [subs]);
 
-  function getDiscountPct(duration: SubscriptionDuration) {
-    return duration === '3months' ? subConfig.threeMonthPct : subConfig.sixMonthPct;
+  function getDiscountPct(duration: SubscriptionDuration, paymentMode: 'upfront' | 'monthly' = 'upfront') {
+    if (paymentMode === 'monthly') {
+      return duration === '3months' ? subConfig.monthlyThreeMonthPct : subConfig.monthlySixMonthPct;
+    }
+    return duration === '3months' ? subConfig.upfrontThreeMonthPct : subConfig.upfrontSixMonthPct;
   }
 
   function getHint(productName: string): string | undefined {
@@ -111,7 +123,7 @@ export default function SubscriptionsPage() {
     setSaving(true);
     try {
       const baseAmount = form.items.reduce((s, i) => s + i.totalPrice, 0);
-      const discountPct = getDiscountPct(form.duration);
+      const discountPct = getDiscountPct(form.duration, form.paymentMode);
       const discountedAmount = baseAmount * (1 - discountPct / 100);
       const durationMonths = form.duration === '3months' ? 3 : 6;
 
@@ -166,7 +178,7 @@ export default function SubscriptionsPage() {
         total: discountedAmount,
         status: 'confirmed',
         paymentStatus: form.paymentStatus,
-        notes: `Subscription ${form.duration} (${discountPct}% off)`,
+        notes: `Subscription ${form.duration} — ${form.paymentMode === 'upfront' ? 'Upfront' : 'Monthly'} payment (${discountPct}% off)`,
         subscriptionId: subId,
         subscriptionDuration: form.duration,
         hasOnDemandItems: false,
@@ -189,6 +201,7 @@ export default function SubscriptionsPage() {
       customerName: sub.customerName,
       customerWhatsapp: sub.customerWhatsapp,
       duration: sub.duration,
+      paymentMode: 'upfront',
       items: sub.items,
       paymentStatus: 'pending',
     });
@@ -204,7 +217,7 @@ export default function SubscriptionsPage() {
 
   // Price breakdown for form
   const baseAmount = form.items.reduce((s, i) => s + i.totalPrice, 0);
-  const discountPct = getDiscountPct(form.duration);
+  const discountPct = getDiscountPct(form.duration, form.paymentMode);
   const discountedAmount = baseAmount * (1 - discountPct / 100);
   const durationMonths = form.duration === '3months' ? 3 : 6;
 
@@ -233,13 +246,13 @@ export default function SubscriptionsPage() {
         <div className="grid grid-cols-2 gap-3">
           <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
             <p className="text-sm font-bold text-blue-800">3-Month Plan</p>
-            <p className="text-2xl font-bold text-blue-600">{subConfig.threeMonthPct}% OFF</p>
-            <p className="text-xs text-blue-600">Upfront payment</p>
+            <p className="text-xs text-blue-700 mt-1">Upfront: <span className="font-bold text-blue-600 text-base">{subConfig.upfrontThreeMonthPct}% OFF</span></p>
+            <p className="text-xs text-blue-700">Monthly: <span className="font-bold text-blue-500">{subConfig.monthlyThreeMonthPct}% OFF</span></p>
           </div>
           <div className="bg-green-50 border border-green-200 rounded-xl p-4">
             <p className="text-sm font-bold text-green-800">6-Month Plan</p>
-            <p className="text-2xl font-bold text-green-600">{subConfig.sixMonthPct}% OFF</p>
-            <p className="text-xs text-green-600">Upfront payment</p>
+            <p className="text-xs text-green-700 mt-1">Upfront: <span className="font-bold text-green-600 text-base">{subConfig.upfrontSixMonthPct}% OFF</span></p>
+            <p className="text-xs text-green-700">Monthly: <span className="font-bold text-green-500">{subConfig.monthlySixMonthPct}% OFF</span></p>
           </div>
         </div>
       )}
@@ -395,18 +408,39 @@ export default function SubscriptionsPage() {
                   <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
                   <span>Changes apply to <strong>new subscriptions only</strong>. Existing subscriptions keep their original discount.</span>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">3-Month Plan Discount (%)</label>
-                  <input type="number" min={0} max={50} value={configDraft.threeMonthPct}
-                    onChange={e => setConfigDraft(d => ({ ...d, threeMonthPct: Number(e.target.value) }))}
-                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-orange-400" />
+
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">💳 Upfront Payment (pay in full)</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">3-Month (%)</label>
+                    <input type="number" min={0} max={50} value={configDraft.upfrontThreeMonthPct}
+                      onChange={e => setConfigDraft(d => ({ ...d, upfrontThreeMonthPct: Number(e.target.value) }))}
+                      className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-orange-400" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">6-Month (%)</label>
+                    <input type="number" min={0} max={50} value={configDraft.upfrontSixMonthPct}
+                      onChange={e => setConfigDraft(d => ({ ...d, upfrontSixMonthPct: Number(e.target.value) }))}
+                      className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-orange-400" />
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">6-Month Plan Discount (%)</label>
-                  <input type="number" min={0} max={50} value={configDraft.sixMonthPct}
-                    onChange={e => setConfigDraft(d => ({ ...d, sixMonthPct: Number(e.target.value) }))}
-                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-orange-400" />
+
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">📅 Monthly Payment (pay each month)</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">3-Month (%)</label>
+                    <input type="number" min={0} max={50} value={configDraft.monthlyThreeMonthPct}
+                      onChange={e => setConfigDraft(d => ({ ...d, monthlyThreeMonthPct: Number(e.target.value) }))}
+                      className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-orange-400" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">6-Month (%)</label>
+                    <input type="number" min={0} max={50} value={configDraft.monthlySixMonthPct}
+                      onChange={e => setConfigDraft(d => ({ ...d, monthlySixMonthPct: Number(e.target.value) }))}
+                      className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-orange-400" />
+                  </div>
                 </div>
+
                 <div className="flex gap-3">
                   <button onClick={() => setShowConfigModal(false)}
                     className="flex-1 border border-gray-200 text-gray-600 py-2.5 rounded-xl text-sm">Cancel</button>
@@ -457,11 +491,30 @@ export default function SubscriptionsPage() {
                         className={`py-3 rounded-xl border text-sm font-medium transition-colors
                           ${form.duration === d ? 'bg-orange-500 text-white border-orange-500' : 'bg-white text-gray-600 border-gray-200'}`}>
                         {d === '3months'
-                          ? `3 Months — ${subConfig.threeMonthPct}% Off`
-                          : `6 Months — ${subConfig.sixMonthPct}% Off`}
+                          ? `3 Months — ${getDiscountPct('3months', form.paymentMode)}% Off`
+                          : `6 Months — ${getDiscountPct('6months', form.paymentMode)}% Off`}
                       </button>
                     ))}
                   </div>
+                </div>
+
+                {/* Payment Mode */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Payment Mode</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {(['upfront', 'monthly'] as const).map(mode => (
+                      <button key={mode} onClick={() => setForm(f => ({ ...f, paymentMode: mode }))}
+                        className={`py-2.5 rounded-xl border text-sm font-medium transition-colors
+                          ${form.paymentMode === mode ? 'bg-orange-500 text-white border-orange-500' : 'bg-white text-gray-600 border-gray-200'}`}>
+                        {mode === 'upfront' ? '💳 Pay Upfront' : '📅 Pay Monthly'}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">
+                    {form.paymentMode === 'upfront'
+                      ? `Upfront discount: ${getDiscountPct(form.duration, 'upfront')}% — customer pays full ${durationMonths}m total at once`
+                      : `Monthly discount: ${getDiscountPct(form.duration, 'monthly')}% — customer pays each month`}
+                  </p>
                 </div>
 
                 {/* Products */}
@@ -514,17 +567,27 @@ export default function SubscriptionsPage() {
                       <span>Per month</span>
                       <span>{formatCurrency(baseAmount)}</span>
                     </div>
-                    <div className="flex justify-between text-gray-600">
-                      <span>× {durationMonths} months</span>
-                      <span>{formatCurrency(baseAmount * durationMonths)}</span>
-                    </div>
+                    {form.paymentMode === 'upfront' && (
+                      <div className="flex justify-between text-gray-600">
+                        <span>× {durationMonths} months</span>
+                        <span>{formatCurrency(baseAmount * durationMonths)}</span>
+                      </div>
+                    )}
                     <div className="flex justify-between text-green-600">
                       <span>Discount ({discountPct}%)</span>
-                      <span>− {formatCurrency((baseAmount * durationMonths) * discountPct / 100)}</span>
+                      <span>− {formatCurrency(
+                        form.paymentMode === 'upfront'
+                          ? (baseAmount * durationMonths) * discountPct / 100
+                          : baseAmount * discountPct / 100
+                      )}</span>
                     </div>
                     <div className="flex justify-between font-bold text-gray-800 border-t border-gray-200 pt-1.5">
-                      <span>Total upfront</span>
-                      <span className="text-orange-600">{formatCurrency(discountedAmount * durationMonths)}</span>
+                      <span>{form.paymentMode === 'upfront' ? 'Total upfront' : 'Per month (discounted)'}</span>
+                      <span className="text-orange-600">{formatCurrency(
+                        form.paymentMode === 'upfront'
+                          ? discountedAmount * durationMonths
+                          : discountedAmount
+                      )}</span>
                     </div>
                   </div>
                 )}
