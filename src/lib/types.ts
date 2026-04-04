@@ -60,6 +60,9 @@ export interface Product {
   hasGarlicOption?: boolean;      // show With Garlic / Without Garlic radio
   stockId?: string;
   sortOrder: number;              // for manual ordering in storefront
+  isNewLaunch?: boolean;          // show "New!" badge and launch banner on storefront
+  newLaunchUntil?: string;        // ISO date — badge/banner hidden after this date
+  didYouKnow?: string;            // short 1–2 line fact shown on product card (expandable)
   createdAt: string;
   updatedAt: string;
 }

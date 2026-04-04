@@ -53,6 +53,9 @@ export default function StoreFront() {
   const [scrolledPastHero, setScrolledPastHero] = useState(false);
   const [headerHeight, setHeaderHeight] = useState(0);
   const [marqueesPaused, setMarqueesPaused] = useState(false);
+  const [dismissedLaunches, setDismissedLaunches] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem('skc_dismissed_launches') ?? '[]'); } catch { return []; }
+  });
   const headerRef = useRef<HTMLElement>(null);
 
   useEffect(() => { load(); }, []);
@@ -171,6 +174,22 @@ export default function StoreFront() {
   const cartTotal = cart.reduce((s, i) => s + i.totalPrice, 0);
   const cartCount = cart.length;
   const hasOnDemand = cart.some(i => i.isOnDemand);
+
+  // New launches: active, within date window, not dismissed by this customer
+  const today = new Date().toISOString().slice(0, 10);
+  const activeLaunches = products.filter(p =>
+    p.isNewLaunch &&
+    p.isActive &&
+    (!p.newLaunchUntil || p.newLaunchUntil >= today) &&
+    !dismissedLaunches.includes(p.id)
+  );
+  const bannerLaunch = activeLaunches[0] ?? null; // show most-recent undismissed launch
+
+  function dismissLaunch(productId: string) {
+    const updated = [...dismissedLaunches, productId];
+    setDismissedLaunches(updated);
+    try { localStorage.setItem('skc_dismissed_launches', JSON.stringify(updated)); } catch {}
+  }
 
   // Products eligible for sampling: any active product EXCEPT occasion-only (Sweets category) and made-fresh (isOnDemand)
   const sampleEligible = products.filter(p =>
@@ -704,6 +723,28 @@ export default function StoreFront() {
           <h2 className="text-xl font-bold" style={{ color: '#3d1c02', fontFamily: 'Georgia, serif' }}>🌿 Our Products</h2>
         </div>
         <p className="text-xs text-gray-400 mb-4">Tap any product to add to cart · Made fresh in small batches 🙏</p>
+
+        {/* ── New Launch Banner ── */}
+        {bannerLaunch && (
+          <div className="mb-4 flex items-center gap-3 rounded-2xl px-4 py-3 relative"
+            style={{ background: 'linear-gradient(135deg, #fff8e6, #fff1cc)', border: '1.5px solid #f59e0b' }}>
+            <span className="text-2xl flex-shrink-0">🎉</span>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-bold" style={{ color: '#92400e' }}>
+                🆕 Just Launched — {bannerLaunch.name}!
+              </p>
+              <p className="text-xs mt-0.5" style={{ color: '#b45309' }}>
+                {bannerLaunch.description || 'Fresh off the batch — be the first to try it!'}
+              </p>
+            </div>
+            <button
+              onClick={() => dismissLaunch(bannerLaunch.id)}
+              className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-full text-amber-600 hover:bg-amber-100 transition-colors"
+              aria-label="Dismiss">
+              ✕
+            </button>
+          </div>
+        )}
 
         {/* Referral auto-apply banner — shown when page opened via a referral link */}
         {urlRefCode && (
@@ -1372,7 +1413,11 @@ function ProductCard({ product, onAddToCart }: {
   const minQty    = product.unit === 'kg' && rawMinQty >= 100 ? rawMinQty / 1000 : rawMinQty;
   const [qty, setQty]       = useState(minQty);
   const [showDetail, setShowDetail] = useState(false);
+  const [showFact, setShowFact]     = useState(false);
   const price = qty * product.pricePerUnit;
+
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const isNewLaunch = product.isNewLaunch && (!product.newLaunchUntil || product.newLaunchUntil >= todayStr);
 
   const qtyLabel = product.unit === 'piece'
     ? `${qty} pc${qty !== 1 ? 's' : ''}`
@@ -1408,7 +1453,11 @@ function ProductCard({ product, onAddToCart }: {
             <span className="absolute top-2 right-2 text-xs font-bold px-1.5 py-0.5 rounded-full"
               style={{ background: '#fef3c7', color: '#d97706', fontSize: '9px' }}>⭐ Popular</span>
           )}
-          {product.isOnDemand && (
+          {isNewLaunch && (
+            <span className="absolute top-2 left-2 text-xs font-bold px-1.5 py-0.5 rounded-full"
+              style={{ background: '#fef9c3', color: '#854d0e', fontSize: '9px', border: '1px solid #fde047' }}>🆕 New!</span>
+          )}
+          {!isNewLaunch && product.isOnDemand && (
             <span className="absolute top-2 left-2 text-xs font-bold px-1.5 py-0.5 rounded-full"
               style={{ background: '#fff3e0', color: '#e65100', fontSize: '9px' }}>🔥 Fresh</span>
           )}
@@ -1430,6 +1479,21 @@ function ProductCard({ product, onAddToCart }: {
           )}
           {product.description && (
             <p className="text-xs text-gray-400 mt-1 leading-snug line-clamp-2">{product.description}</p>
+          )}
+          {product.didYouKnow && (
+            <button
+              className="mt-1.5 flex items-center gap-1 text-left w-full"
+              onClick={e => { e.stopPropagation(); setShowFact(f => !f); }}
+            >
+              <span className="text-xs font-semibold" style={{ color: '#c8821a' }}>💡 Did you know?</span>
+              <span className="text-xs" style={{ color: '#c8821a' }}>{showFact ? '▲' : '▼'}</span>
+            </button>
+          )}
+          {showFact && product.didYouKnow && (
+            <p className="text-xs leading-snug mt-1 px-2 py-1.5 rounded-lg"
+              style={{ background: '#fffbeb', color: '#92400e', border: '1px solid #fde68a' }}>
+              {product.didYouKnow}
+            </p>
           )}
           <p className="font-bold text-sm mt-2" style={{ color: '#c8821a' }}>{priceDisplay}</p>
         </div>
