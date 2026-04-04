@@ -14,6 +14,8 @@ export default function OrderConfirmation() {
   const [order, setOrder] = useState<Order | null>(null);
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [loading, setLoading] = useState(true);
+  // Must be called unconditionally before any early returns (Rules of Hooks)
+  const { config: referralConfig } = useReferralConfig();
 
   useEffect(() => {
     if (!orderId) return;
@@ -50,7 +52,6 @@ export default function OrderConfirmation() {
   const isAgentOrder = !!order.agentId;
   const referralCode = !isAgentOrder ? customer?.referralCode : undefined;
   const storeUrl = typeof window !== 'undefined' ? window.location.origin : 'https://skctreats.in';
-  const { config: referralConfig } = useReferralConfig();
   // Derive top tier hint for the WA share message (guard against empty tiers array)
   const topTier = referralConfig.tiers.length > 0
     ? referralConfig.tiers.reduce((best, t) => t.minOrder > best.minOrder ? t : best, referralConfig.tiers[0])
