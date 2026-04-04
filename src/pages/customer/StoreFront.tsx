@@ -2,12 +2,12 @@ import { useEffect, useState, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ShoppingCart, Star, Plus, Minus,
-  Trash2, X, MessageCircle, Users, ChevronRight, Flame,
+  Trash2, X, ChevronRight, Flame,
   Search
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { productsService, feedbackService, ordersService, customersService, stockService } from '../../lib/services';
-import { generateOrderNumber, formatCurrency, computeReferralDiscountFromTiers, computeCreditRedemption, normalizeWhatsapp } from '../../lib/utils';
+import { productsService, feedbackService, ordersService, customersService, stockService, subscriptionsService } from '../../lib/services';
+import { generateOrderNumber, generateSubscriptionOrderNumber, formatCurrency, computeReferralDiscountFromTiers, computeCreditRedemption, normalizeWhatsapp } from '../../lib/utils';
 import { useReferralConfig } from '../../lib/useReferralConfig';
 import { useSubscriptionConfig } from '../../lib/useSubscriptionConfig';
 import { useFeatureFlags } from '../../lib/useFeatureFlags';
@@ -360,6 +360,13 @@ export default function StoreFront() {
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
             {/* Nav links — hidden on very small screens */}
+            <a href={APP_CONFIG.WHATSAPP_GROUP_LINK} target="_blank" rel="noreferrer"
+              className="hidden sm:flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-full transition-colors"
+              style={{ color: '#ffd700', border: '1px solid rgba(200,130,26,0.5)' }}
+              title="Join our WhatsApp Group">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/></svg>
+              Group
+            </a>
             <a href="/about"
               className="hidden sm:flex items-center text-xs font-medium px-3 py-1.5 rounded-full transition-colors"
               style={{ color: '#ffd700', border: '1px solid rgba(200,130,26,0.5)' }}>
@@ -384,7 +391,18 @@ export default function StoreFront() {
           </div>
         </div>
         {/* Mobile nav row — visible only on small screens */}
-        <div className="sm:hidden flex gap-3 px-4 pb-2">
+        <div className="sm:hidden flex gap-2 px-4 pb-2 flex-wrap">
+          <a href={APP_CONFIG.WHATSAPP_GROUP_LINK} target="_blank" rel="noreferrer"
+            className="text-xs font-medium px-3 py-1 rounded-full flex items-center gap-1"
+            style={{ color: '#ffd700', border: '1px solid rgba(200,130,26,0.5)' }}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/></svg>
+            WA Group
+          </a>
+          <a href={APP_CONFIG.WHATSAPP_CHANNEL_LINK} target="_blank" rel="noreferrer"
+            className="text-xs font-medium px-3 py-1 rounded-full"
+            style={{ color: '#ffd700', border: '1px solid rgba(200,130,26,0.5)' }}>
+            Channel
+          </a>
           <a href="/about"
             className="text-xs font-medium px-3 py-1 rounded-full"
             style={{ color: '#ffd700', border: '1px solid rgba(200,130,26,0.5)' }}>
@@ -629,47 +647,17 @@ export default function StoreFront() {
         </div>
       )}
 
-      {/* ── Subscription + WhatsApp ─────────────────────────────────────── */}
-      <div className="max-w-4xl mx-auto px-4 py-6 grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-        {/* Subscription */}
+      {/* ── Subscription ───────────────────────────────────────────────────── */}
+      <div className="max-w-4xl mx-auto px-4 py-6">
+        {/* Subscription — full width */}
         {featureFlags.subscriptionBanner && (
           <SubscriptionBanner healthProducts={products.filter(p => p.category === 'Health Mix')} />
         )}
 
-        {/* WhatsApp CTAs */}
-        <div className="space-y-3">
-          <h2 className="text-sm font-bold" style={{ color: '#3d1c02' }}>Stay Connected</h2>
-          <a href={APP_CONFIG.WHATSAPP_GROUP_LINK} target="_blank" rel="noreferrer"
-            className="flex items-center justify-between bg-white rounded-2xl px-4 py-3 shadow-sm"
-            style={{ border: '1px solid #c8e6c9' }}>
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: '#25d366' }}>
-                <Users className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-gray-800">Join Our WhatsApp Group</p>
-                <p className="text-xs text-gray-500">Offers, new products &amp; updates</p>
-              </div>
-            </div>
-            <ChevronRight className="w-5 h-5 text-gray-400" />
-          </a>
-          <a href={APP_CONFIG.WHATSAPP_CHANNEL_LINK} target="_blank" rel="noreferrer"
-            className="flex items-center justify-between bg-white rounded-2xl px-4 py-3 shadow-sm"
-            style={{ border: '1px solid #c8e6c9' }}>
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: '#075e54' }}>
-                <MessageCircle className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-gray-800">Follow Our Channel</p>
-                <p className="text-xs text-gray-500">Latest news &amp; announcements</p>
-              </div>
-            </div>
-            <ChevronRight className="w-5 h-5 text-gray-400" />
-          </a>
-          {/* Free sample CTA card */}
+        {/* Free sample CTA — compact card below subscription */}
+        {featureFlags.sampleRequest && (
           <button onClick={openSampleForm}
-            className="w-full flex items-center gap-3 bg-white rounded-2xl px-4 py-3 shadow-sm text-left"
+            className="w-full flex items-center gap-3 bg-white rounded-2xl px-4 py-3 shadow-sm text-left mt-4"
             style={{ border: '1.5px dashed #c8821a' }}>
             <div className="w-9 h-9 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
               style={{ background: '#fff4eb' }}>🎁</div>
@@ -679,20 +667,7 @@ export default function StoreFront() {
             </div>
             <ChevronRight className="w-5 h-5 text-gray-400 ml-auto" />
           </button>
-
-          {/* Referral code lookup */}
-          {/* <a href="/my-orders?tab=referral"
-            className="flex items-center gap-3 bg-white rounded-2xl px-4 py-3 shadow-sm"
-            style={{ border: '1px solid #fde68a' }}>
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
-              style={{ background: '#fef9c3' }}>🎟️</div>
-            <div>
-              <p className="text-sm font-semibold text-gray-800">Find My Referral Code</p>
-              <p className="text-xs text-gray-500">Look up your code &amp; share to earn credit</p>
-            </div>
-            <ChevronRight className="w-5 h-5 text-gray-400 ml-auto" />
-          </a> */}
-        </div>
+        )}
       </div>
 
       {/* ── Products Section (scroll target) ─────────────────────────────── */}
@@ -812,9 +787,11 @@ export default function StoreFront() {
             </a>
           </p>
           {/* <a href="/admin/login" className="block mt-5 text-xs" style={{ color: '#555' }}>Admin Login</a> */}
-          <div className="flex justify-center gap-4 mt-3">
+          <div className="flex justify-center gap-4 mt-3 flex-wrap">
             <a href="/about" className="text-xs" style={{ color: '#d4a574' }}>About Us</a>
             <a href="/my-orders" className="text-xs" style={{ color: '#d4a574' }}>My Account</a>
+            <a href={APP_CONFIG.WHATSAPP_GROUP_LINK} target="_blank" rel="noreferrer" className="text-xs" style={{ color: '#25d366' }}>📢 WA Group</a>
+            <a href={APP_CONFIG.WHATSAPP_CHANNEL_LINK} target="_blank" rel="noreferrer" className="text-xs" style={{ color: '#25d366' }}>📡 WA Channel</a>
             {/* <a href="/my-orders?tab=referral" className="text-xs" style={{ color: '#d4a574' }}>🎟️ Referral</a> */}
           </div>
         </div>
@@ -970,18 +947,23 @@ export default function StoreFront() {
 // ─── Subscription Banner (Health Mix products) ───────────────────────────────
 const SUB_QTYS = [250, 500, 1000] as const;
 type SubQty = typeof SUB_QTYS[number];
-function qtyLabel(g: SubQty) { return g === 1000 ? '1 kg' : `${g} g`; }
+function subQtyLabel(g: SubQty) { return g === 1000 ? '1 kg' : `${g} g`; }
 
 function SubscriptionBanner({ healthProducts }: { healthProducts: Product[] }) {
+  const navigate = useNavigate();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [quantities, setQuantities] = useState<Record<string, SubQty>>({});
   const [plan, setPlan] = useState<3 | 6>(6);
   const [paymentMode, setPaymentMode] = useState<'upfront' | 'monthly'>('upfront');
   const { config: subConfig } = useSubscriptionConfig();
 
+  // Subscribe form modal state
+  const [showForm, setShowForm] = useState(false);
+  const [subForm, setSubForm] = useState({ name: '', whatsapp: '', place: '', notes: '' });
+  const [subSubmitting, setSubSubmitting] = useState(false);
+
   const toggle = (id: string) => {
     setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
-    // default quantity to 250g on first selection
     setQuantities(prev => ({ ...prev, [id]: prev[id] ?? 250 }));
   };
 
@@ -994,24 +976,80 @@ function SubscriptionBanner({ healthProducts }: { healthProducts: Product[] }) {
   const discount = discountPct / 100;
   const selectedProducts = healthProducts.filter(p => selectedIds.includes(p.id));
 
-  // Build WhatsApp message
-  const waMessage = selectedProducts.length === 0
-    ? `Hi! I'm interested in the Health Mix Subscription (${plan} months, ${paymentMode} payment). Can you share more details?`
-    : [
-        `Hi! I'd like to subscribe to the following Health Mix products for ${plan} months:`,
-        ...selectedProducts.map(p => {
-          const g = quantities[p.id] ?? 250;
-          const base = Math.round(p.pricePerUnit * g);
-          const discounted = Math.round(base * (1 - discount));
-          return `• ${p.name} — ${qtyLabel(g as SubQty)}/month (₹${discounted}/mo after ${discountPct}% off)`;
-        }),
-        ``,
-        `Plan: ${plan}-month | ${paymentMode === 'upfront' ? 'Upfront' : 'Monthly'} payment | ${discountPct}% off`,
-        `Please confirm pricing and delivery dates.`,
-      ].join('\n');
+  // Live cost calculations
+  const totalBasePerMonth = selectedProducts.reduce((sum, p) => {
+    const g = quantities[p.id] ?? 250;
+    return sum + Math.round(p.pricePerUnit * g);
+  }, 0);
+  const totalDiscountedPerMonth = Math.round(totalBasePerMonth * (1 - discount));
+  const totalSavingsPerMonth = totalBasePerMonth - totalDiscountedPerMonth;
+  const totalForDuration = totalDiscountedPerMonth * plan;
+  const totalSavingsForDuration = totalSavingsPerMonth * plan;
+
+  async function handleSubscribe() {
+    if (!subForm.name.trim() || !subForm.whatsapp.trim()) {
+      toast.error('Please fill in your name and WhatsApp number');
+      return;
+    }
+    const digits = subForm.whatsapp.replace(/\D/g, '').replace(/^(91|0)/, '').slice(0, 10);
+    if (digits.length !== 10) {
+      toast.error('Enter a valid 10-digit WhatsApp number');
+      return;
+    }
+    if (selectedProducts.length === 0) {
+      toast.error('Please select at least one product');
+      return;
+    }
+    setSubSubmitting(true);
+    try {
+      const items = selectedProducts.map(p => {
+        const g = quantities[p.id] ?? 250;
+        const basePrice = Math.round(p.pricePerUnit * g);
+        const discountedPrice = Math.round(basePrice * (1 - discount));
+        return {
+          productId: p.id,
+          productName: p.name,
+          quantity: g,
+          unit: 'gram' as const,
+          pricePerUnit: p.pricePerUnit,
+          totalPrice: discountedPrice,
+        };
+      });
+      const now = new Date();
+      const startDate = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString().split('T')[0];
+      const endDate = new Date(now.getFullYear(), now.getMonth() + 1 + plan, 0).toISOString().split('T')[0];
+
+      const subId = await subscriptionsService.add({
+        subscriptionNumber: generateSubscriptionOrderNumber(),
+        customerId: digits,
+        customerName: subForm.name.trim(),
+        customerWhatsapp: digits,
+        ...(subForm.place.trim() ? { customerPlace: subForm.place.trim() } : {}),
+        items,
+        duration: (plan === 6 ? '6months' : '3months') as import('../../lib/constants').SubscriptionDuration,
+        paymentMode,
+        discountPercent: discountPct,
+        baseAmount: totalBasePerMonth,
+        discountedAmount: totalDiscountedPerMonth,
+        startDate,
+        endDate,
+        isActive: false,
+        paymentStatus: 'pending',
+        ...(subForm.notes.trim() ? { notes: subForm.notes.trim() } : {}),
+        createdAt: new Date().toISOString(),
+      });
+      navigate(`/subscription-confirmation/${subId}`);
+    } catch (err) {
+      console.error('Subscription submit failed:', err);
+      toast.error('Something went wrong. Please try again.');
+    } finally {
+      setSubSubmitting(false);
+    }
+  }
 
   return (
-    <div className="mt-8 mb-2 rounded-2xl overflow-hidden"
+    <>
+    <div className="rounded-2xl overflow-hidden"
       style={{ background: 'linear-gradient(135deg, #1b5e20 0%, #2e7d32 60%, #388e3c 100%)', border: '1px solid #1b5e20' }}>
       <div className="px-5 pt-5 pb-4 text-white">
 
@@ -1081,7 +1119,7 @@ function SubscriptionBanner({ healthProducts }: { healthProducts: Product[] }) {
                   className={`rounded-xl border-2 overflow-hidden transition-all ${
                     isSelected ? 'border-yellow-300 bg-white/20' : 'border-white/15 bg-white/10'
                   }`}>
-                  {/* Product row — tap to select */}
+                  {/* Product row */}
                   <button onClick={() => toggle(p.id)}
                     className="w-full flex items-center gap-3 p-3 text-left">
                     <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
@@ -1094,11 +1132,11 @@ function SubscriptionBanner({ healthProducts }: { healthProducts: Product[] }) {
                       {p.nameKannada && <p className="text-xs text-green-200">{p.nameKannada}</p>}
                     </div>
                     <div className="text-right flex-shrink-0">
-                      <div className="text-xs line-through text-white/50">₹{basePrice}</div>
+                      <div className="text-xs line-through text-white/50">₹{basePrice}/mo</div>
                       <div className="text-sm font-bold text-yellow-300">₹{discountedPrice}<span className="text-xs font-normal text-green-200">/mo</span></div>
                     </div>
                   </button>
-                  {/* Quantity picker — always visible */}
+                  {/* Qty picker */}
                   <div className="flex items-center gap-1 px-3 pb-2.5">
                     <span className="text-xs text-green-200 mr-1">Qty/month:</span>
                     {SUB_QTYS.map(g => (
@@ -1109,13 +1147,58 @@ function SubscriptionBanner({ healthProducts }: { healthProducts: Product[] }) {
                             ? 'border-yellow-300 bg-yellow-300 text-green-900'
                             : 'border-white/25 bg-white/10 text-white/80'
                         }`}>
-                        {qtyLabel(g)}
+                        {subQtyLabel(g)}
                       </button>
                     ))}
                   </div>
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {/* ── Live cost summary ── */}
+        {selectedProducts.length > 0 && (
+          <div className="rounded-xl mb-4 overflow-hidden" style={{ background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(255,255,255,0.15)' }}>
+            <div className="px-4 py-3 space-y-1.5">
+              <p className="text-xs text-green-200 font-semibold uppercase tracking-wide mb-2">Your Cost Summary</p>
+              {/* Per product breakdown */}
+              {selectedProducts.map(p => {
+                const g = quantities[p.id] ?? 250;
+                const base = Math.round(p.pricePerUnit * g);
+                const disc = Math.round(base * (1 - discount));
+                return (
+                  <div key={p.id} className="flex justify-between items-center text-xs">
+                    <span className="text-green-100">{p.name} ({subQtyLabel(g as SubQty)})</span>
+                    <span className="text-yellow-300 font-semibold">₹{disc}/mo</span>
+                  </div>
+                );
+              })}
+              <div className="border-t border-white/15 pt-2 mt-2 space-y-1">
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-green-100">Monthly total</span>
+                  <div className="text-right">
+                    <span className="line-through text-white/40 text-xs mr-1">₹{totalBasePerMonth}</span>
+                    <span className="text-white font-bold">₹{totalDiscountedPerMonth}/mo</span>
+                  </div>
+                </div>
+                {paymentMode === 'upfront' ? (
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-green-100">Total upfront ({plan} mo)</span>
+                    <span className="text-yellow-300 font-bold text-base">₹{totalForDuration}</span>
+                  </div>
+                ) : (
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-green-100">Pay monthly for {plan} mo</span>
+                    <span className="text-yellow-300 font-bold">₹{totalDiscountedPerMonth}/mo × {plan}</span>
+                  </div>
+                )}
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-green-200">You save vs regular price</span>
+                  <span className="text-green-300 font-bold">₹{totalSavingsForDuration} total ({discountPct}% off)</span>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
@@ -1133,19 +1216,128 @@ function SubscriptionBanner({ healthProducts }: { healthProducts: Product[] }) {
         </div>
 
         {/* CTA */}
-        <a href={`https://wa.me/${APP_CONFIG.WHATSAPP_NUMBER}?text=${encodeURIComponent(waMessage)}`}
-          target="_blank" rel="noreferrer"
-          className="flex items-center justify-center gap-2 w-full py-3 rounded-xl font-bold text-sm"
-          style={{ background: '#25d366', color: '#fff' }}>
-          <span>💬</span>
+        <button
+          onClick={() => {
+            if (selectedProducts.length === 0) {
+              toast.error('Please select at least one product first');
+              return;
+            }
+            setShowForm(true);
+          }}
+          className="flex items-center justify-center gap-2 w-full py-3 rounded-xl font-bold text-sm transition-opacity"
+          style={{ background: selectedProducts.length > 0 ? '#c8821a' : 'rgba(255,255,255,0.2)', color: '#fff' }}>
           {selectedProducts.length > 0
-            ? `Subscribe — ${selectedProducts.length} product${selectedProducts.length > 1 ? 's' : ''}, ${plan} months`
-            : 'Ask about Subscription'}
-        </a>
+            ? `🛒 Subscribe — ${selectedProducts.length} product${selectedProducts.length > 1 ? 's' : ''}, ${plan} months`
+            : 'Select products to subscribe'}
+        </button>
       </div>
     </div>
+
+    {/* ── Subscribe contact form modal ── */}
+    {showForm && (
+      <div className="fixed inset-0 bg-black/60 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+        <div className="bg-white rounded-t-3xl sm:rounded-2xl w-full max-w-md flex flex-col" style={{ maxHeight: '95dvh' }}>
+          {/* Header */}
+          <div className="flex items-center justify-between px-5 py-4 border-b flex-shrink-0" style={{ borderColor: '#d1fae5' }}>
+            <div>
+              <h2 className="font-bold text-gray-800">🌿 Confirm Subscription</h2>
+              <p className="text-xs text-gray-500 mt-0.5">
+                {selectedProducts.length} product{selectedProducts.length > 1 ? 's' : ''} · {plan} months ·{' '}
+                {paymentMode === 'upfront' ? `₹${totalForDuration} upfront` : `₹${totalDiscountedPerMonth}/mo`} · {discountPct}% off
+              </p>
+            </div>
+            <button onClick={() => setShowForm(false)} className="p-2 hover:bg-gray-100 rounded-xl">
+              <X className="w-5 h-5 text-gray-400" />
+            </button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-5 space-y-4">
+            {/* Order summary */}
+            <div className="rounded-xl overflow-hidden" style={{ border: '1px solid #d1fae5' }}>
+              {selectedProducts.map((p, i) => {
+                const g = quantities[p.id] ?? 250;
+                const base = Math.round(p.pricePerUnit * g);
+                const disc = Math.round(base * (1 - discount));
+                return (
+                  <div key={p.id}
+                    className={`flex justify-between items-center px-4 py-2.5 text-sm ${i > 0 ? 'border-t' : ''}`}
+                    style={{ borderColor: '#ecfdf5' }}>
+                    <span className="text-gray-700 flex-1 truncate mr-2">
+                      {p.name} <span className="text-gray-400 text-xs">× {subQtyLabel(g as SubQty)}/mo</span>
+                    </span>
+                    <div className="text-right flex-shrink-0">
+                      <span className="line-through text-gray-300 text-xs mr-1">₹{base}</span>
+                      <span className="font-semibold text-green-700">₹{disc}/mo</span>
+                    </div>
+                  </div>
+                );
+              })}
+              <div className="px-4 py-3 space-y-1 border-t" style={{ background: '#f0fdf4', borderColor: '#d1fae5' }}>
+                <div className="flex justify-between text-sm font-bold">
+                  <span className="text-gray-700">Monthly total</span>
+                  <span className="text-green-700">₹{totalDiscountedPerMonth}/mo</span>
+                </div>
+                {paymentMode === 'upfront' && (
+                  <div className="flex justify-between text-sm font-bold">
+                    <span className="text-gray-700">Upfront total ({plan} mo)</span>
+                    <span className="text-green-800">₹{totalForDuration}</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-xs text-green-600">
+                  <span>You save</span>
+                  <span className="font-semibold">₹{totalSavingsForDuration} ({discountPct}% off)</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Contact fields */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Your Name <span className="text-red-400">*</span></label>
+              <input type="text" value={subForm.name} onChange={e => setSubForm(f => ({ ...f, name: e.target.value }))}
+                placeholder="Full name"
+                className="w-full border rounded-xl px-4 py-3 text-sm outline-none" style={{ borderColor: '#e0d0c0' }} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">WhatsApp Number <span className="text-red-400">*</span></label>
+              <input type="tel" value={subForm.whatsapp} onChange={e => setSubForm(f => ({ ...f, whatsapp: e.target.value }))}
+                placeholder="10-digit number"
+                className="w-full border rounded-xl px-4 py-3 text-sm outline-none" style={{ borderColor: '#e0d0c0' }} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Your Area / Place</label>
+              <input type="text" value={subForm.place} onChange={e => setSubForm(f => ({ ...f, place: e.target.value }))}
+                placeholder="e.g. Bangalore, JP Nagar"
+                className="w-full border rounded-xl px-4 py-3 text-sm outline-none" style={{ borderColor: '#e0d0c0' }} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Notes (optional)</label>
+              <textarea value={subForm.notes} onChange={e => setSubForm(f => ({ ...f, notes: e.target.value }))}
+                rows={2} placeholder="Any special requests or questions…"
+                className="w-full border rounded-xl px-4 py-3 text-sm outline-none resize-none" style={{ borderColor: '#e0d0c0' }} />
+            </div>
+            <div className="rounded-xl px-4 py-3 text-xs" style={{ background: '#f0fdf4', color: '#166534' }}>
+              📲 We'll WhatsApp you to confirm your subscription &amp; arrange payment.<br />
+              🔒 Your details are kept private.
+            </div>
+          </div>
+
+          <div className="p-4 border-t flex-shrink-0 space-y-2" style={{ borderColor: '#f0d9c8' }}>
+            <button onClick={handleSubscribe} disabled={subSubmitting}
+              className="w-full text-white font-bold py-3.5 rounded-2xl text-sm disabled:opacity-50 transition-opacity"
+              style={{ background: '#1b5e20' }}>
+              {subSubmitting ? 'Placing subscription…' : '✅ Confirm Subscription'}
+            </button>
+            <button onClick={() => setShowForm(false)} className="w-full text-gray-500 text-sm py-1">
+              ← Go back
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 }
+
 
 // ─── Product Card (Swiggy/Zomato-style 2-col) ────────────────────────────────
 function ProductCard({ product, onAddToCart }: {

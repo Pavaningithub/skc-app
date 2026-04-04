@@ -216,11 +216,14 @@ export interface Expense {
 // ─── Subscription ─────────────────────────────────────────────────────────────
 export interface Subscription {
   id: string;
+  subscriptionNumber?: string;
   customerId: string;
   customerName: string;
   customerWhatsapp: string;
+  customerPlace?: string;
   items: OrderItem[];
   duration: SubscriptionDuration;
+  paymentMode?: 'upfront' | 'monthly';
   discountPercent: number;
   baseAmount: number;
   discountedAmount: number;
@@ -228,6 +231,7 @@ export interface Subscription {
   endDate: string;
   isActive: boolean;
   paymentStatus: PaymentStatus;
+  notes?: string;
   createdAt: string;
 }
 
