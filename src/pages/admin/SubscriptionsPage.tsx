@@ -515,16 +515,23 @@ export default function SubscriptionsPage() {
                       <option value="">Select product…</option>
                       {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                     </select>
-                    <select value={selectedQty} onChange={e => setSelectedQty(Number(e.target.value))}
-                      className="w-24 border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none bg-white">
-                      <option value={250}>250 g</option>
-                      <option value={500}>500 g</option>
-                      <option value={1000}>1 kg</option>
-                    </select>
                     <button onClick={addItem} disabled={!selectedProductId}
                       className="bg-orange-500 text-white px-3 py-2 rounded-xl disabled:opacity-40">
                       <Plus className="w-4 h-4" />
                     </button>
+                  </div>
+                  {/* Size chips */}
+                  <div className="flex gap-2 mt-2">
+                    {([250, 500, 1000] as const).map(qty => (
+                      <button key={qty} type="button" onClick={() => setSelectedQty(qty)}
+                        className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+                          selectedQty === qty
+                            ? 'bg-orange-500 text-white border-orange-500'
+                            : 'bg-white text-gray-600 border-gray-300 hover:border-orange-400'
+                        }`}>
+                        {qty === 1000 ? '1 kg' : `${qty} g`}
+                      </button>
+                    ))}
                   </div>
                   {/* Added items */}
                   {form.items.length > 0 && (
