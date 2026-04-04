@@ -232,14 +232,20 @@ export interface Subscription {
 }
 
 export interface SubscriptionConfig {
-  threeMonthPct: number;   // discount % for 3-month plan
-  sixMonthPct: number;     // discount % for 6-month plan
+  // Upfront payment (pay full duration in advance)
+  upfrontThreeMonthPct: number;   // discount % for 3-month plan, paid upfront
+  upfrontSixMonthPct:   number;   // discount % for 6-month plan, paid upfront
+  // Monthly payment (pay each month)
+  monthlyThreeMonthPct: number;   // discount % for 3-month plan, paid monthly
+  monthlySixMonthPct:   number;   // discount % for 6-month plan, paid monthly
   updatedAt?: string;
 }
 
 export const DEFAULT_SUBSCRIPTION_CONFIG: SubscriptionConfig = {
-  threeMonthPct: 5,
-  sixMonthPct:   10,
+  upfrontThreeMonthPct: 5,
+  upfrontSixMonthPct:   10,
+  monthlyThreeMonthPct: 3,
+  monthlySixMonthPct:   7,
 };
 
 // ─── Agent (Partner / Reseller) ────────────────────────────────────────────────────────────────

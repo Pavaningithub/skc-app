@@ -9,6 +9,7 @@ import toast from 'react-hot-toast';
 import { productsService, feedbackService, ordersService, customersService, stockService } from '../../lib/services';
 import { generateOrderNumber, formatCurrency, computeReferralDiscountFromTiers, computeCreditRedemption, normalizeWhatsapp } from '../../lib/utils';
 import { useReferralConfig } from '../../lib/useReferralConfig';
+import { useSubscriptionConfig } from '../../lib/useSubscriptionConfig';
 import { APP_CONFIG } from '../../config';
 import type { Product, Feedback, OrderItem, Order } from '../../lib/types';
 
@@ -984,21 +985,26 @@ export default function StoreFront() {
 function SubscriptionBanner({ healthProducts }: { healthProducts: Product[] }) {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [plan, setPlan] = useState<3 | 6>(6);
+  const [paymentMode, setPaymentMode] = useState<'upfront' | 'monthly'>('upfront');
+  const { config: subConfig } = useSubscriptionConfig();
 
   const toggle = (id: string) =>
     setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
 
-  const discount = plan === 6 ? 0.10 : 0.05;
+  const discountPct = paymentMode === 'upfront'
+    ? (plan === 6 ? subConfig.upfrontSixMonthPct : subConfig.upfrontThreeMonthPct)
+    : (plan === 6 ? subConfig.monthlySixMonthPct  : subConfig.monthlyThreeMonthPct);
+  const discount = discountPct / 100;
   const selectedProducts = healthProducts.filter(p => selectedIds.includes(p.id));
 
   // Build WhatsApp message
   const waMessage = selectedProducts.length === 0
-    ? `Hi! I'm interested in the Health Mix Subscription (${plan} months). Can you share more details?`
+    ? `Hi! I'm interested in the Health Mix Subscription (${plan} months, ${paymentMode} payment). Can you share more details?`
     : [
         `Hi! I'd like to subscribe to the following Health Mix products for ${plan} months:`,
         ...selectedProducts.map(p => `• ${p.name} — 250g/month`),
         ``,
-        `Plan: ${plan}-month | ${plan === 6 ? '10%' : '5%'} off`,
+        `Plan: ${plan}-month | ${paymentMode === 'upfront' ? 'Upfront' : 'Monthly'} payment | ${discountPct}% off`,
         `Please confirm pricing and delivery dates.`,
       ].join('\n');
 
@@ -1016,23 +1022,45 @@ function SubscriptionBanner({ healthProducts }: { healthProducts: Product[] }) {
           </div>
         </div>
 
-        {/* Plan selector */}
-        <div className="grid grid-cols-2 gap-2 my-4">
-          {([3, 6] as const).map(m => (
-            <button key={m} onClick={() => setPlan(m)}
-              className={`rounded-xl p-3 text-center border-2 transition-all relative ${plan === m ? 'border-yellow-300 bg-white/20' : 'border-white/20 bg-white/10'}`}>
-              {m === 6 && (
-                <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 bg-yellow-400 text-yellow-900 text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap">
-                  BEST VALUE
-                </div>
-              )}
-              <div className="text-xl font-bold">{m} Months</div>
-              <div className="text-xs mt-0.5 text-green-200">
-                Save <span className="text-yellow-300 font-bold">{m === 6 ? '10%' : '5%'}</span>
-              </div>
-              <div className="text-xs text-white/60 mt-1">{m} deliveries, price locked</div>
+        {/* Payment mode toggle */}
+        <div className="grid grid-cols-2 gap-2 my-3">
+          {(['upfront', 'monthly'] as const).map(mode => (
+            <button key={mode} onClick={() => setPaymentMode(mode)}
+              className={`rounded-xl py-2 text-sm font-semibold border-2 transition-all ${
+                paymentMode === mode ? 'border-yellow-300 bg-white/20' : 'border-white/20 bg-white/10'
+              }`}>
+              {mode === 'upfront' ? '💳 Pay Upfront' : '📅 Pay Monthly'}
             </button>
           ))}
+        </div>
+        <p className="text-xs text-green-200 mb-3">
+          {paymentMode === 'upfront'
+            ? 'Pay for the full duration at once — higher discount reward'
+            : 'Pay each month — flexible, lower discount'}
+        </p>
+
+        {/* Plan selector */}
+        <div className="grid grid-cols-2 gap-2 mb-4">
+          {([3, 6] as const).map(m => {
+            const pct = paymentMode === 'upfront'
+              ? (m === 6 ? subConfig.upfrontSixMonthPct : subConfig.upfrontThreeMonthPct)
+              : (m === 6 ? subConfig.monthlySixMonthPct  : subConfig.monthlyThreeMonthPct);
+            return (
+              <button key={m} onClick={() => setPlan(m)}
+                className={`rounded-xl p-3 text-center border-2 transition-all relative ${plan === m ? 'border-yellow-300 bg-white/20' : 'border-white/20 bg-white/10'}`}>
+                {m === 6 && (
+                  <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 bg-yellow-400 text-yellow-900 text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap">
+                    BEST VALUE
+                  </div>
+                )}
+                <div className="text-xl font-bold">{m} Months</div>
+                <div className="text-xs mt-0.5 text-green-200">
+                  Save <span className="text-yellow-300 font-bold">{pct}%</span>
+                </div>
+                <div className="text-xs text-white/60 mt-1">{m} deliveries, price locked</div>
+              </button>
+            );
+          })}
         </div>
 
         {/* Product picker */}
