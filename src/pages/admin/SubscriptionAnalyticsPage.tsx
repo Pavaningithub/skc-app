@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import {
-  TrendingUp, Users, DollarSign, Calendar, Package,
+  TrendingUp, Users, IndianRupee, Calendar, Package,
   Copy, Search, Filter, ChevronDown, ChevronUp,
 } from 'lucide-react';
 import { subscriptionsService } from '../../lib/services';
@@ -13,8 +13,16 @@ import toast from 'react-hot-toast';
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 function deriveStatus(sub: Subscription): SubscriptionStatus {
-  if (sub.status) return sub.status;
+  if (sub.status === 'cancelled') return 'cancelled';
   if (!sub.isActive) return 'cancelled';
+  const tracking = sub.monthlyTracking ?? [];
+  if (tracking.length > 0) {
+    const allDelivered = tracking.every(e => e.deliveryStatus === 'delivered');
+    const anyDelivered = tracking.some(e => e.deliveryStatus === 'delivered');
+    if (allDelivered) return 'completed';
+    if (anyDelivered) return 'in_progress';
+  }
+  if (sub.status) return sub.status;
   return 'active';
 }
 
@@ -56,14 +64,17 @@ export default function SubscriptionAnalyticsPage() {
   const stats = useMemo(() => {
     const now = new Date();
 
-    const active    = subs.filter(s => s.isActive && new Date(s.endDate) >= now);
+    const active    = subs.filter(s => { const st = deriveStatus(s); return st === 'active' || st === 'in_progress'; });
+    const completed = subs.filter(s => deriveStatus(s) === 'completed');
     const pending   = subs.filter(s => deriveStatus(s) === 'pending');
     const cancelled = subs.filter(s => deriveStatus(s) === 'cancelled');
+    void now;
 
-    // MRR from active subscriptions
-    const mrr = active.reduce((sum, s) => sum + s.discountedAmount, 0);
+    // Monthly Revenue = discountedAmount/mo across all non-cancelled subs
+    const monthlyRevenue = [...active, ...subs.filter(s => deriveStatus(s) === 'confirmed')]
+      .reduce((sum, s) => sum + s.discountedAmount, 0);
 
-    // Revenue actually collected from monthlyTracking paid entries
+    // Revenue actually collected — split upfront vs monthly logic
     let totalCollected = 0;
     let totalPending   = 0;
     let totalDelivered = 0;
@@ -72,17 +83,26 @@ export default function SubscriptionAnalyticsPage() {
 
     for (const sub of subs) {
       const tracking = sub.monthlyTracking ?? [];
-      if (tracking.length > 0) {
+      const durationMonths = sub.duration === '6months' ? 6 : 3;
+      const isUpfront = sub.paymentMode === 'upfront';
+
+      if (isUpfront) {
+        // Upfront: payment is at sub level — count full amount once
+        const fullAmount = sub.discountedAmount * durationMonths;
+        if (sub.paymentStatus === 'paid') totalCollected += fullAmount;
+        else totalPending += fullAmount;
+      } else {
+        // Monthly: count each tracking entry individually
         for (const entry of tracking) {
           if (entry.paymentStatus === 'paid') totalCollected += sub.discountedAmount;
           else totalPending += sub.discountedAmount;
-          if (entry.deliveryStatus === 'delivered') { totalDelivered++; totalMonthsDelivered++; }
-          totalMonthsDue++;
         }
-      } else {
-        // Legacy: use top-level paymentStatus
-        if (sub.paymentStatus === 'paid') totalCollected += sub.discountedAmount;
-        else totalPending += sub.discountedAmount;
+      }
+
+      // Delivery counting: same for both modes
+      for (const entry of tracking) {
+        if (entry.deliveryStatus === 'delivered') { totalDelivered++; totalMonthsDelivered++; }
+        totalMonthsDue++;
       }
     }
 
@@ -106,7 +126,11 @@ export default function SubscriptionAnalyticsPage() {
           productMap[item.productName] = { name: item.productName, count: 0, monthlyRevenue: 0, paidMonths: 0 };
         productMap[item.productName].count += 1;
         productMap[item.productName].monthlyRevenue += item.totalPrice;
-        const paidCount = (sub.monthlyTracking ?? []).filter(e => e.paymentStatus === 'paid').length;
+        // For upfront: count as paid if sub.paymentStatus === paid
+        const isUpfront = sub.paymentMode === 'upfront';
+        const paidCount = isUpfront
+          ? (sub.paymentStatus === 'paid' ? (sub.duration === '3months' ? 3 : 6) : 0)
+          : (sub.monthlyTracking ?? []).filter(e => e.paymentStatus === 'paid').length;
         productMap[item.productName].paidMonths += paidCount;
       }
     }
@@ -117,28 +141,48 @@ export default function SubscriptionAnalyticsPage() {
       ? Math.round((totalMonthsDelivered / totalMonthsDue) * 100)
       : 0;
 
-    // Payment collection rate (months)
-    const paidMonthsTotal = subs.flatMap(s => s.monthlyTracking ?? []).filter(e => e.paymentStatus === 'paid').length;
-    const allMonthsTotal  = subs.flatMap(s => s.monthlyTracking ?? []).length;
-    const paymentRate = allMonthsTotal > 0
-      ? Math.round((paidMonthsTotal / allMonthsTotal) * 100)
-      : 0;
+    // Payment collection rate
+    // For upfront: 1 sub = 1 payment unit; for monthly: each month = 1 unit
+    let paidUnits = 0, totalUnits = 0;
+    for (const sub of subs) {
+      if (sub.paymentMode === 'upfront') {
+        totalUnits++;
+        if (sub.paymentStatus === 'paid') paidUnits++;
+      } else {
+        const tracking = sub.monthlyTracking ?? [];
+        totalUnits += tracking.length;
+        paidUnits  += tracking.filter(e => e.paymentStatus === 'paid').length;
+      }
+    }
+    const paymentRate = totalUnits > 0 ? Math.round((paidUnits / totalUnits) * 100) : 0;
+    const paidMonthsTotal = paidUnits;
+    const allMonthsTotal  = totalUnits;
 
-    // Month-by-month collection (last 6 months)
+    // Month-by-month breakdown — use calendar month labels from tracking
     const monthlyBreakdown: Record<string, { collected: number; delivered: number; pending: number }> = {};
     for (const sub of subs) {
-      for (const entry of sub.monthlyTracking ?? []) {
+      const tracking = sub.monthlyTracking ?? [];
+      const isUpfront = sub.paymentMode === 'upfront';
+      for (const entry of tracking) {
         const key = entry.label;
         if (!monthlyBreakdown[key]) monthlyBreakdown[key] = { collected: 0, delivered: 0, pending: 0 };
-        if (entry.paymentStatus === 'paid') monthlyBreakdown[key].collected += sub.discountedAmount;
-        else monthlyBreakdown[key].pending += sub.discountedAmount;
+
+        if (isUpfront) {
+          // For upfront: payment reflects sub-level status, same amount for each month slot
+          if (sub.paymentStatus === 'paid') monthlyBreakdown[key].collected += sub.discountedAmount;
+          else monthlyBreakdown[key].pending += sub.discountedAmount;
+        } else {
+          if (entry.paymentStatus === 'paid') monthlyBreakdown[key].collected += sub.discountedAmount;
+          else monthlyBreakdown[key].pending += sub.discountedAmount;
+        }
+
         if (entry.deliveryStatus === 'delivered') monthlyBreakdown[key].delivered++;
       }
     }
 
     return {
-      active, pending, cancelled,
-      mrr, totalCollected, totalPending, totalSavings,
+      active, pending, cancelled, completed,
+      monthlyRevenue, totalCollected, totalPending, totalSavings,
       threeMoSubs, sixMoSubs, upfrontSubs, monthlySubs,
       topProducts,
       deliveryRate, paymentRate, paidMonthsTotal, allMonthsTotal,
@@ -186,15 +230,15 @@ export default function SubscriptionAnalyticsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-800 font-display">Subscription Analytics</h1>
-          <p className="text-sm text-gray-500">{subs.length} total · {stats.active.length} active · {stats.pending.length} pending · {stats.cancelled.length} cancelled</p>
+          <p className="text-sm text-gray-500">{subs.length} total · {stats.active.length} active · {stats.completed.length} completed · {stats.pending.length} pending · {stats.cancelled.length} cancelled</p>
         </div>
         <button
           onClick={() => copyText(
             [
               `Subscription Summary — ${new Date().toLocaleDateString('en-IN')}`,
-              `Total: ${subs.length} | Active: ${stats.active.length} | Pending: ${stats.pending.length} | Cancelled: ${stats.cancelled.length}`,
-              `MRR: ₹${stats.mrr} | Collected: ₹${stats.totalCollected} | Pending: ₹${stats.totalPending}`,
-              `Payment rate: ${stats.paymentRate}% (${stats.paidMonthsTotal}/${stats.allMonthsTotal} months paid)`,
+              `Total: ${subs.length} | Active: ${stats.active.length} | Completed: ${stats.completed.length} | Pending: ${stats.pending.length} | Cancelled: ${stats.cancelled.length}`,
+              `Monthly Revenue: ₹${stats.monthlyRevenue} | Collected: ₹${stats.totalCollected} | Pending: ₹${stats.totalPending}`,
+              `Payment rate: ${stats.paymentRate}% (${stats.paidMonthsTotal}/${stats.allMonthsTotal} units paid)`,
               `Delivery rate: ${stats.deliveryRate}% (${stats.totalDelivered}/${stats.totalMonthsDue} months delivered)`,
               `Savings to customers: ₹${stats.totalSavings}`,
             ].join('\n'),
@@ -214,11 +258,11 @@ export default function SubscriptionAnalyticsPage() {
           bg="bg-green-50" />
         <KpiCard
           icon={<TrendingUp className="w-5 h-5 text-blue-600" />}
-          label="MRR" value={formatCurrency(stats.mrr)}
-          sub="active subs/mo"
+          label="Monthly Revenue" value={formatCurrency(stats.monthlyRevenue)}
+          sub="across active subs"
           bg="bg-blue-50" />
         <KpiCard
-          icon={<DollarSign className="w-5 h-5 text-orange-600" />}
+          icon={<IndianRupee className="w-5 h-5 text-orange-600" />}
           label="Collected" value={formatCurrency(stats.totalCollected)}
           sub={`${stats.paymentRate}% payment rate`}
           bg="bg-orange-50" />
@@ -401,12 +445,12 @@ export default function SubscriptionAnalyticsPage() {
           </div>
           <div className="flex gap-1.5 flex-wrap items-center">
             <Filter className="w-3 h-3 text-gray-400" />
-            {(['all', 'pending', 'confirmed', 'payment_requested', 'active', 'cancelled'] as const).map(s => (
+            {(['all', 'pending', 'confirmed', 'payment_requested', 'active', 'in_progress', 'completed', 'cancelled'] as const).map(s => (
               <button key={s} onClick={() => setFilterStatus(s)}
                 className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
                   filterStatus === s ? 'bg-orange-500 text-white border-orange-500' : 'bg-white text-gray-500 border-gray-200 hover:border-orange-300'
                 }`}>
-                {s === 'all' ? 'All' : s === 'payment_requested' ? 'Pay Sent' : s.charAt(0).toUpperCase() + s.slice(1)}
+                {s === 'all' ? 'All' : s === 'payment_requested' ? 'Pay Sent' : s === 'in_progress' ? 'In Progress' : s.charAt(0).toUpperCase() + s.slice(1)}
               </button>
             ))}
             <span className="w-px h-4 bg-gray-200" />
@@ -442,7 +486,10 @@ export default function SubscriptionAnalyticsPage() {
             const durationMo = sub.duration === '6months' ? 6 : 3;
             const isUpfront  = sub.paymentMode === 'upfront';
             const tracking   = sub.monthlyTracking ?? [];
-            const paidMonths = tracking.filter(e => e.paymentStatus === 'paid').length;
+            // For upfront, "paid" is a single yes/no at sub level
+            const paidMonths = isUpfront
+              ? (sub.paymentStatus === 'paid' ? durationMo : 0)
+              : tracking.filter(e => e.paymentStatus === 'paid').length;
             const deliveredMonths = tracking.filter(e => e.deliveryStatus === 'delivered').length;
             const isExpanded = expandedSub === sub.id;
 
@@ -451,7 +498,15 @@ export default function SubscriptionAnalyticsPage() {
               confirmed:         'text-blue-600',
               payment_requested: 'text-purple-600',
               active:            'text-green-600',
+              in_progress:       'text-teal-600',
+              completed:         'text-emerald-600',
               cancelled:         'text-gray-400',
+            };
+
+            const statusLabel = (s: SubscriptionStatus) => {
+              if (s === 'payment_requested') return 'Pay Sent';
+              if (s === 'in_progress') return 'In Progress';
+              return s.charAt(0).toUpperCase() + s.slice(1);
             };
 
             return (
@@ -463,7 +518,7 @@ export default function SubscriptionAnalyticsPage() {
                       <div className="flex items-center gap-2">
                         <p className="text-sm font-medium text-gray-800 truncate">{sub.customerName}</p>
                         <span className={`text-xs font-medium ${statusCls[sub._status]}`}>
-                          {sub._status === 'payment_requested' ? 'Pay Sent' : sub._status.charAt(0).toUpperCase() + sub._status.slice(1)}
+                          {statusLabel(sub._status)}
                         </span>
                       </div>
                       <p className="text-xs text-gray-400">
@@ -508,13 +563,13 @@ export default function SubscriptionAnalyticsPage() {
                         {tracking.map(entry => (
                           <tr key={entry.month} className="border-t border-gray-50">
                             <td className="py-1 font-bold text-gray-600">#{entry.month}</td>
-                            <td className="py-1 text-gray-400">
-                              {entry.startDate
-                                ? `${formatDate(entry.startDate)} → ${formatDate(entry.endDate)}`
-                                : entry.label}
-                            </td>
+                            <td className="py-1 text-gray-600 font-medium">{entry.label}</td>
                             <td className="py-1 text-center">
-                              {entry.paymentStatus === 'paid'
+                              {sub.paymentMode === 'upfront'
+                                ? (sub.paymentStatus === 'paid'
+                                    ? <span className="text-green-600">✅ Paid (full)</span>
+                                    : <span className="text-yellow-500">⏳ Awaiting</span>)
+                                : entry.paymentStatus === 'paid'
                                 ? <span className="text-green-600">✅ Paid</span>
                                 : entry.paymentStatus === 'requested'
                                 ? <span className="text-purple-500">💳 Sent</span>

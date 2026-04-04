@@ -18,6 +18,8 @@ function statusBadge(status: SubscriptionStatus) {
     confirmed:         { label: '✅ Confirmed',          cls: 'bg-blue-100 text-blue-700 border border-blue-200' },
     payment_requested: { label: '💳 Payment Sent',       cls: 'bg-purple-100 text-purple-700 border border-purple-200' },
     active:            { label: '🟢 Active',             cls: 'bg-green-100 text-green-700 border border-green-200' },
+    in_progress:       { label: '📦 In Progress',        cls: 'bg-teal-100 text-teal-700 border border-teal-200' },
+    completed:         { label: '🏆 Completed',          cls: 'bg-emerald-100 text-emerald-700 border border-emerald-200' },
     cancelled:         { label: '❌ Cancelled',          cls: 'bg-red-100 text-red-500 border border-red-200' },
   };
   const { label, cls } = map[status] ?? map.pending;
@@ -45,8 +47,16 @@ function buildMonthlyTracking(startDateISO: string, durationMonths: number): Mon
 
 /** Derive the true lifecycle status from a subscription doc */
 function deriveStatus(sub: Subscription): SubscriptionStatus {
-  if (sub.status) return sub.status;
+  if (sub.status === 'cancelled') return 'cancelled';
   if (!sub.isActive) return 'cancelled';
+  const tracking = sub.monthlyTracking ?? [];
+  if (tracking.length > 0) {
+    const allDelivered = tracking.every(e => e.deliveryStatus === 'delivered');
+    const anyDelivered = tracking.some(e => e.deliveryStatus === 'delivered');
+    if (allDelivered) return 'completed';
+    if (anyDelivered) return 'in_progress';
+  }
+  if (sub.status) return sub.status;
   return 'active';
 }
 
@@ -317,8 +327,10 @@ export default function SubscriptionsPage() {
     const updated = (sub.monthlyTracking ?? []).map(e =>
       e.month === monthNum ? { ...e, deliveryStatus: 'delivered' as const, deliveredAt: new Date().toISOString() } : e
     );
-    await subscriptionsService.update(sub.id, { monthlyTracking: updated });
-    toast.success(`Month ${monthNum} marked as delivered`);
+    const allDelivered = updated.every(e => e.deliveryStatus === 'delivered');
+    const newStatus = allDelivered ? 'completed' : 'in_progress';
+    await subscriptionsService.update(sub.id, { monthlyTracking: updated, status: newStatus });
+    toast.success(allDelivered ? '🏆 All months delivered — subscription completed!' : `Month ${monthNum} marked as delivered`);
   }
 
   async function saveMonthStartDate(sub: Subscription, monthNum: number) {
@@ -364,7 +376,7 @@ export default function SubscriptionsPage() {
 
   const statusCounts = useMemo(() => {
     const counts: Record<SubscriptionStatus, number> = {
-      pending: 0, confirmed: 0, payment_requested: 0, active: 0, cancelled: 0,
+      pending: 0, confirmed: 0, payment_requested: 0, active: 0, in_progress: 0, completed: 0, cancelled: 0,
     };
     subs.forEach(s => { counts[deriveStatus(s)]++; });
     return counts;
@@ -444,12 +456,12 @@ export default function SubscriptionsPage() {
         </div>
         <div className="flex gap-1.5 flex-wrap items-center">
           <Filter className="w-3 h-3 text-gray-400" />
-          {(['all', 'pending', 'confirmed', 'payment_requested', 'active', 'cancelled'] as const).map(s => (
+          {(['all', 'pending', 'confirmed', 'payment_requested', 'active', 'in_progress', 'completed', 'cancelled'] as const).map(s => (
             <button key={s} onClick={() => setFilterStatus(s)}
               className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
                 filterStatus === s ? 'bg-orange-500 text-white border-orange-500' : 'bg-white text-gray-500 border-gray-200 hover:border-orange-300'
               }`}>
-              {s === 'all' ? 'All' : s === 'payment_requested' ? 'Pay Sent' : s.charAt(0).toUpperCase() + s.slice(1)}
+              {s === 'all' ? 'All' : s === 'payment_requested' ? 'Pay Sent' : s === 'in_progress' ? 'In Progress' : s.charAt(0).toUpperCase() + s.slice(1)}
             </button>
           ))}
           <span className="w-px h-4 bg-gray-200 mx-0.5" />
