@@ -24,17 +24,19 @@ function statusBadge(status: SubscriptionStatus) {
   return <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${cls}`}>{label}</span>;
 }
 
-/** Build per-month windows: month N starts at startDate + (N-1)*30 days */
+/** Build per-month entries using calendar months (April, May, June…) starting from the subscription start date */
 function buildMonthlyTracking(startDateISO: string, durationMonths: number): MonthlyEntry[] {
   const start = new Date(startDateISO);
+  const baseYear  = start.getFullYear();
+  const baseMonth = start.getMonth(); // 0-indexed
   return Array.from({ length: durationMonths }, (_, i) => {
-    const monthStart = new Date(start.getTime() + i * 30 * 24 * 60 * 60 * 1000);
-    const monthEnd   = new Date(start.getTime() + (i + 1) * 30 * 24 * 60 * 60 * 1000 - 1);
+    const monthDate = new Date(baseYear, baseMonth + i, 1);
+    const label = monthDate.toLocaleString('en-IN', { month: 'long', year: 'numeric' });
     return {
       month: i + 1,
-      label: monthStart.toLocaleString('en-IN', { month: 'long', year: 'numeric' }),
-      startDate: monthStart.toISOString(),
-      endDate:   monthEnd.toISOString(),
+      label,
+      startDate: monthDate.toISOString(),
+      endDate:   new Date(baseYear, baseMonth + i + 1, 0, 23, 59, 59).toISOString(), // last day of that month
       paymentStatus: 'pending' as const,
       deliveryStatus: 'pending' as const,
     };
@@ -166,8 +168,6 @@ export default function SubscriptionsPage() {
         place: '', joinedWhatsappGroup: false, createdAt: new Date().toISOString(),
       });
 
-      const tracking = buildMonthlyTracking(startDate.toISOString(), durationMonths);
-
       const subId = await subscriptionsService.add({
         customerId: customerId || '',
         customerName: form.customerName,
@@ -181,8 +181,8 @@ export default function SubscriptionsPage() {
         endDate: endDate.toISOString(),
         isActive: true,
         paymentStatus: form.paymentStatus,
-        status: 'confirmed',
-        monthlyTracking: tracking,
+        status: 'pending',
+        monthlyTracking: [],
         createdAt: new Date().toISOString(),
       });
 
@@ -276,8 +276,12 @@ export default function SubscriptionsPage() {
   async function confirmSub(sub: Subscription) {
     const durationMonths = sub.duration === '6months' ? 6 : 3;
     const tracking = buildMonthlyTracking(sub.startDate, durationMonths);
-    await subscriptionsService.update(sub.id, { status: 'confirmed', isActive: true, monthlyTracking: tracking });
-    toast.success('Confirmed! Monthly tracking generated.');
+    await subscriptionsService.update(sub.id, {
+      status: 'confirmed',
+      isActive: true,
+      monthlyTracking: tracking,
+    });
+    toast.success('Confirmed! Monthly tracking rows generated.');
   }
 
   function requestPaymentWA(sub: Subscription, entry: MonthlyEntry) {
@@ -578,12 +582,15 @@ export default function SubscriptionsPage() {
                     <div>
                       <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
                         Monthly Tracking
-                        {tracking.length === 0 && (
+                        {tracking.length === 0 && status !== 'pending' && (
                           <span className="ml-2 normal-case font-normal text-orange-500">
                             — <button onClick={() => confirmSub(sub)} className="underline hover:text-orange-600">
                                 Generate months
                               </button>
                           </span>
+                        )}
+                        {tracking.length === 0 && status === 'pending' && (
+                          <span className="ml-2 normal-case font-normal text-gray-400">— rows generated on confirm</span>
                         )}
                       </p>
 
@@ -592,9 +599,9 @@ export default function SubscriptionsPage() {
                           <table className="w-full text-xs">
                             <thead className="bg-gray-50">
                               <tr>
-                                <th className="text-left px-3 py-2 text-gray-500 font-medium">Mo</th>
-                                <th className="text-left px-2 py-2 text-gray-500 font-medium">Period (tap to edit)</th>
-                                <th className="text-center px-2 py-2 text-gray-500 font-medium">Payment</th>
+                                <th className="text-left px-3 py-2 text-gray-500 font-medium w-8">Mo</th>
+                                <th className="text-left px-2 py-2 text-gray-500 font-medium">Month</th>
+                                {!isUpfront && <th className="text-center px-2 py-2 text-gray-500 font-medium">Payment</th>}
                                 <th className="text-center px-2 py-2 text-gray-500 font-medium">Delivery</th>
                                 <th className="text-right px-2 py-2 text-gray-500 font-medium">Actions</th>
                               </tr>
@@ -603,10 +610,14 @@ export default function SubscriptionsPage() {
                               {tracking.map((entry, idx) => {
                                 const isEditingThis =
                                   editMonthIdx?.subId === sub.id && editMonthIdx.month === entry.month;
+                                // For upfront: allow delivery regardless of payment (payment tracked at top level)
+                                const canDeliver = isUpfront
+                                  ? sub.paymentStatus === 'paid' && entry.deliveryStatus !== 'delivered'
+                                  : entry.paymentStatus === 'paid' && entry.deliveryStatus !== 'delivered';
                                 return (
                                   <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}>
-                                    <td className="px-3 py-2 font-bold text-gray-700">#{entry.month}</td>
-                                    <td className="px-2 py-2 text-gray-500">
+                                    <td className="px-3 py-2.5 font-bold text-gray-700">#{entry.month}</td>
+                                    <td className="px-2 py-2.5 text-gray-600 font-medium">
                                       {isEditingThis ? (
                                         <div className="flex items-center gap-1">
                                           <input type="date" value={editMonthDate}
@@ -629,45 +640,47 @@ export default function SubscriptionsPage() {
                                               entry.startDate ? entry.startDate.split('T')[0] : ''
                                             );
                                           }}
-                                          className="text-left hover:text-orange-500 transition-colors"
-                                          title="Click to edit start date">
-                                          {entry.startDate
-                                            ? `${formatDate(entry.startDate)} → ${formatDate(entry.endDate)}`
-                                            : entry.label}
+                                          className="text-left hover:text-orange-500 transition-colors font-medium"
+                                          title="Tap to adjust month">
+                                          {entry.label}
                                         </button>
                                       )}
                                     </td>
-                                    <td className="px-2 py-2 text-center">
-                                      {entry.paymentStatus === 'paid'
-                                        ? <span className="text-green-600 font-semibold">✅ Paid</span>
-                                        : entry.paymentStatus === 'requested'
-                                        ? <span className="text-purple-600">💳 Sent</span>
-                                        : <span className="text-yellow-600">⏳ Pending</span>}
-                                    </td>
-                                    <td className="px-2 py-2 text-center">
+                                    {!isUpfront && (
+                                      <td className="px-2 py-2.5 text-center">
+                                        {entry.paymentStatus === 'paid'
+                                          ? <span className="text-green-600 font-semibold">✅ Paid</span>
+                                          : entry.paymentStatus === 'requested'
+                                          ? <span className="text-purple-600">💳 Sent</span>
+                                          : <span className="text-yellow-600">⏳ Pending</span>}
+                                      </td>
+                                    )}
+                                    <td className="px-2 py-2.5 text-center">
                                       {entry.deliveryStatus === 'delivered'
                                         ? <span className="text-green-600 font-semibold">📦 Done</span>
                                         : <span className="text-gray-400">—</span>}
                                     </td>
-                                    <td className="px-2 py-2">
+                                    <td className="px-2 py-2.5">
                                       <div className="flex justify-end gap-1 flex-wrap">
-                                        {/* Monthly pay: send WA per month */}
+                                        {/* Monthly pay: send WA request per month */}
                                         {!isUpfront && entry.paymentStatus !== 'paid' && (
                                           <button onClick={() => requestPaymentWA(sub, entry)}
                                             className="bg-purple-500 text-white px-2 py-1 rounded-lg flex items-center gap-0.5 hover:bg-purple-600">
                                             <Send className="w-2.5 h-2.5" /> WA
                                           </button>
                                         )}
-                                        {entry.paymentStatus !== 'paid' && (
+                                        {/* Monthly pay: mark paid */}
+                                        {!isUpfront && entry.paymentStatus !== 'paid' && (
                                           <button onClick={() => markMonthPaid(sub, entry.month)}
                                             className="bg-green-500 text-white px-2 py-1 rounded-lg hover:bg-green-600">
                                             ✓ Paid
                                           </button>
                                         )}
-                                        {entry.paymentStatus === 'paid' && entry.deliveryStatus !== 'delivered' && (
+                                        {/* Delivery button — for upfront: show once full payment received */}
+                                        {canDeliver && (
                                           <button onClick={() => markMonthDelivered(sub, entry.month)}
                                             className="bg-blue-500 text-white px-2 py-1 rounded-lg hover:bg-blue-600">
-                                            📦 Done
+                                            📦 Delivered
                                           </button>
                                         )}
                                       </div>
