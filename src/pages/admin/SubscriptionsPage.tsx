@@ -53,7 +53,10 @@ function deriveStatus(sub: Subscription): SubscriptionStatus {
   if (tracking.length > 0) {
     const allDelivered = tracking.every(e => e.deliveryStatus === 'delivered');
     const anyDelivered = tracking.some(e => e.deliveryStatus === 'delivered');
-    if (allDelivered) return 'completed';
+    const allPaid      = tracking.every(e => e.paymentStatus === 'paid');
+    const isMonthly    = sub.paymentMode !== 'upfront';
+    const isCompleted  = isMonthly ? (allPaid && allDelivered) : allDelivered;
+    if (isCompleted) return 'completed';
     if (anyDelivered) return 'in_progress';
   }
   if (sub.status) return sub.status;
@@ -315,12 +318,16 @@ export default function SubscriptionsPage() {
     const updated = (sub.monthlyTracking ?? []).map(e =>
       e.month === monthNum ? { ...e, paymentStatus: 'paid' as const, paidAt: new Date().toISOString() } : e
     );
-    const allPaid = updated.every(e => e.paymentStatus === 'paid');
+    const allPaid      = updated.every(e => e.paymentStatus === 'paid');
+    const allDelivered = updated.every(e => e.deliveryStatus === 'delivered');
+    const isMonthly    = sub.paymentMode !== 'upfront';
+    const isCompleted  = isMonthly ? (allPaid && allDelivered) : allDelivered;
     await subscriptionsService.update(sub.id, {
-      monthlyTracking: updated, status: 'active',
+      monthlyTracking: updated,
+      status: isCompleted ? 'completed' : 'active',
       ...(allPaid ? { paymentStatus: 'paid' } : {}),
     });
-    toast.success(`Month ${monthNum} marked as paid`);
+    toast.success(isCompleted ? '🏆 All months paid & delivered — subscription completed!' : `Month ${monthNum} marked as paid`);
   }
 
   async function markMonthDelivered(sub: Subscription, monthNum: number) {
@@ -328,9 +335,18 @@ export default function SubscriptionsPage() {
       e.month === monthNum ? { ...e, deliveryStatus: 'delivered' as const, deliveredAt: new Date().toISOString() } : e
     );
     const allDelivered = updated.every(e => e.deliveryStatus === 'delivered');
-    const newStatus = allDelivered ? 'completed' : 'in_progress';
+    const allPaid      = updated.every(e => e.paymentStatus === 'paid');
+    const isMonthly    = sub.paymentMode !== 'upfront';
+    const isCompleted  = isMonthly ? (allPaid && allDelivered) : allDelivered;
+    const newStatus    = isCompleted ? 'completed' : allDelivered ? 'in_progress' : 'in_progress';
     await subscriptionsService.update(sub.id, { monthlyTracking: updated, status: newStatus });
-    toast.success(allDelivered ? '🏆 All months delivered — subscription completed!' : `Month ${monthNum} marked as delivered`);
+    if (isCompleted) {
+      toast.success('🏆 All months paid & delivered — subscription completed!');
+    } else if (allDelivered && isMonthly) {
+      toast.success(`Month ${monthNum} delivered — waiting for all payments to complete`);
+    } else {
+      toast.success(allDelivered ? '🏆 All months delivered — subscription completed!' : `Month ${monthNum} marked as delivered`);
+    }
   }
 
   async function saveMonthStartDate(sub: Subscription, monthNum: number) {
