@@ -37,11 +37,12 @@ body {
 }
 .animate-marquee:hover { animation-play-state: paused; }
 
-@keyframes marquee-up {
-  0%   { transform: translateY(0); }
-  100% { transform: translateY(-50%); }
+/* testimonial horizontal marquee — left to right display (scrolls right-to-left) */
+@keyframes marquee-reviews {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
 }
-.animate-marquee-up {
-  animation: marquee-up 60s linear infinite;
+.animate-marquee-reviews {
+  animation: marquee-reviews 55s linear infinite;
 }
-/* pause handled via JS animationPlayState for both desktop + mobile */
+/* pause handled via JS animationPlayState */
