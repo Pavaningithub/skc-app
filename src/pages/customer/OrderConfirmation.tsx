@@ -156,7 +156,8 @@ export default function OrderConfirmation() {
               {/* Discount info pills — dynamic from Firestore referral config */}
                 <div className="flex gap-2 mb-3 flex-wrap">
                 {[...referralConfig.tiers].reverse().map((tier, i) => {
-                  const sampleAmt = tier.minOrder + 1;
+                  // Use the top of the tier range to show the *maximum* discount for that bracket
+                  const sampleAmt = tier.maxOrder != null ? tier.maxOrder - 1 : tier.minOrder + 1000;
                   const disc = computeReferralDiscountFromTiers(sampleAmt, referralConfig.tiers, referralConfig.splitReferrerPct);
                   const rangeLabel = tier.maxOrder
                     ? `Orders ₹${tier.minOrder}–₹${tier.maxOrder - 1}`
@@ -164,8 +165,8 @@ export default function OrderConfirmation() {
                   return (
                     <div key={i} className="flex-1 min-w-[120px] bg-white/10 rounded-xl px-3 py-2 text-center">
                       <p className="text-orange-200 text-xs">{rangeLabel}</p>
-                      <p className="text-white font-bold text-sm">friend gets up to ₹{disc.customerDiscount} off</p>
-                      <p className="text-orange-300 text-xs">+ you earn up to ₹{disc.referrerCredit}</p>
+                      <p className="text-white font-bold text-sm">friend gets up to {disc.customerDiscount > 0 ? `₹${disc.customerDiscount} off` : '—'}</p>
+                      <p className="text-orange-300 text-xs">+ you earn up to {disc.referrerCredit > 0 ? `₹${disc.referrerCredit}` : '—'}</p>
                     </div>
                   );
                 })}
