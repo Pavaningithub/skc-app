@@ -36,6 +36,8 @@ export default function StoreFront() {
   // Sample: max 2 products, only powders + Dry Fruit Laddu
   const [sampleSelected, setSampleSelected] = useState<Product[]>([]);
   const [sampleStep, setSampleStep]     = useState<'pick' | 'contact'>('pick');
+  const [samplePhoneError, setSamplePhoneError] = useState('');   // inline duplicate error
+  const [sampleCheckingPhone, setSampleCheckingPhone] = useState(false);
   const [orderForm, setOrderForm] = useState({ name: '', whatsapp: '', place: '', notes: '', referralCode: urlRefCode });
   // Referral: customer's own code shown after phone lookup, and validated referrer
   const [myReferralCode, setMyReferralCode] = useState<string | null>(null);
@@ -164,8 +166,27 @@ export default function StoreFront() {
   function openSampleForm() {
     setSampleSelected([]);
     setSampleStep('pick');
+    setSamplePhoneError('');
     setOrderForm({ name: '', whatsapp: '', place: '', notes: '', referralCode: '' });
     setShowSampleForm(true);
+  }
+
+  async function handleSamplePhoneChange(raw: string) {
+    setOrderForm(f => ({ ...f, whatsapp: raw }));
+    const digits = raw.replace(/\D/g, '').replace(/^(91|0)/, '').slice(0, 10);
+    if (digits.length === 10) {
+      setSampleCheckingPhone(true);
+      try {
+        const already = await ordersService.hasSampleByWhatsapp(digits);
+        setSamplePhoneError(already
+          ? 'This number has already requested a sample. Each number is eligible for one sample only.'
+          : '');
+      } finally {
+        setSampleCheckingPhone(false);
+      }
+    } else {
+      setSamplePhoneError('');
+    }
   }
 
   async function handlePlaceOrder() {
@@ -264,13 +285,9 @@ export default function StoreFront() {
     if (sampleSelected.length === 0) return toast.error('Please select at least one product');
     setSubmitting(true);
     try {
-      // Block duplicate sample requests by phone number
+      // Guard: belt-and-suspenders check in case inline validation was bypassed
       const alreadyRequested = await ordersService.hasSampleByWhatsapp(wa);
-      if (alreadyRequested) {
-        toast.error("You've already requested a sample. Each number is eligible for one sample only. 🙏", { duration: 5000 });
-        setSubmitting(false);
-        return;
-      }
+      if (alreadyRequested) { setSubmitting(false); return; }
 
       let customerId: string | undefined;
       const existing = await customersService.getByWhatsapp(wa);
@@ -951,6 +968,9 @@ export default function StoreFront() {
           setStep={setSampleStep}
           form={orderForm}
           setForm={setOrderForm}
+          onPhoneChange={handleSamplePhoneChange}
+          phoneError={samplePhoneError}
+          checkingPhone={sampleCheckingPhone}
           submitting={submitting}
           onClose={() => setShowSampleForm(false)}
           onSubmit={handleSampleRequest}
@@ -1339,12 +1359,15 @@ function ProductDetailSheet({ product, qty, setQty, qtyStep, minQty, qtyLabel, p
 }
 
 // ─── Sample Modal (2-step: pick products → contact info) ─────────────────────
-function SampleModal({ products, selected, onToggle, step, setStep, form, setForm, submitting, onClose, onSubmit }: {
+function SampleModal({ products, selected, onToggle, step, setStep, form, setForm, onPhoneChange, phoneError, checkingPhone, submitting, onClose, onSubmit }: {
   products: Product[]; selected: Product[];
   onToggle: (p: Product) => void;
   step: 'pick' | 'contact'; setStep: (s: 'pick' | 'contact') => void;
   form: { name: string; whatsapp: string; place: string; notes: string; referralCode: string };
   setForm: React.Dispatch<React.SetStateAction<{ name: string; whatsapp: string; place: string; notes: string; referralCode: string }>>;
+  onPhoneChange: (raw: string) => void;
+  phoneError: string;
+  checkingPhone: boolean;
   submitting: boolean; onClose: () => void; onSubmit: () => void;
 }) {
   return (
@@ -1437,9 +1460,22 @@ function SampleModal({ products, selected, onToggle, step, setStep, form, setFor
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">WhatsApp Number <span className="text-red-400">*</span></label>
-                <input type="tel" value={form.whatsapp} onChange={e => setForm(f => ({ ...f, whatsapp: e.target.value }))}
-                  placeholder="10-digit number"
-                  className="w-full border rounded-xl px-4 py-3 text-sm outline-none" style={{ borderColor: '#e0d0c0' }} />
+                <div className="relative">
+                  <input type="tel" value={form.whatsapp} onChange={e => onPhoneChange(e.target.value)}
+                    placeholder="10-digit number"
+                    className={`w-full border rounded-xl px-4 py-3 text-sm outline-none pr-10 ${phoneError ? 'border-red-400 bg-red-50' : ''}`}
+                    style={phoneError ? {} : { borderColor: '#e0d0c0' }} />
+                  {checkingPhone && (
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                      <div className="w-4 h-4 border-2 border-orange-400 border-t-transparent rounded-full animate-spin" />
+                    </div>
+                  )}
+                </div>
+                {phoneError && (
+                  <p className="mt-1.5 text-xs text-red-600 flex items-start gap-1">
+                    <span className="mt-0.5">⚠️</span> {phoneError}
+                  </p>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Your Area / Place</label>
@@ -1453,10 +1489,10 @@ function SampleModal({ products, selected, onToggle, step, setStep, form, setFor
               </div>
             </div>
             <div className="p-4 border-t flex-shrink-0 space-y-2" style={{ borderColor: '#f0d9c8' }}>
-              <button onClick={onSubmit} disabled={submitting}
+              <button onClick={onSubmit} disabled={submitting || !!phoneError || checkingPhone}
                 className="w-full text-white font-bold py-3.5 rounded-2xl text-sm disabled:opacity-50"
                 style={{ background: '#c8821a' }}>
-                {submitting ? 'Sending…' : '🎁 Request Free Sample'}
+                {submitting ? 'Sending…' : checkingPhone ? 'Checking…' : '🎁 Request Free Sample'}
               </button>
               <button onClick={() => setStep('pick')} className="w-full text-gray-500 text-sm py-1">
                 ← Change products
