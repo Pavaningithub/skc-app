@@ -121,21 +121,32 @@ export default function StoreFront() {
 
   async function load() {
     setLoading(true);
+    setFactsReady(false);
+
+    // Step 1: fetch facts + duration quickly so carousel starts ASAP
+    let duration = 2500;
     try {
-      // Load products + facts + cycle config in parallel
-      const [p, facts, cycleDuration] = await Promise.all([
-        productsService.getActive(),
+      const [facts, cycleDuration] = await Promise.all([
         loadingFactsService.getActive().catch(() => [] as LoadingFact[]),
-        loadingFactsService.getCycleDuration().catch(() => 1800),
+        loadingFactsService.getCycleDuration().catch(() => 2500),
       ]);
-      setProducts(p);
+      duration = cycleDuration;
       setFactCycleDuration(cycleDuration);
       if (facts.length > 0) {
         const shuffled = [...facts].sort(() => Math.random() - 0.5);
         setLoadingFacts(shuffled);
       }
-      setFactsReady(true); // both facts + duration now known — safe to start cycling
-    } finally { setLoading(false); }
+      setFactsReady(true);
+    } catch { /* carousel won't show — that's fine */ }
+
+    // Step 2: load products + enforce minimum screen time (2 full cycles or 3s, whichever longer)
+    const minVisible = Math.max(duration * 2, 3000);
+    const [p] = await Promise.all([
+      productsService.getActive().catch(() => [] as Product[]),
+      new Promise(res => setTimeout(res, minVisible)),
+    ]);
+    setProducts(p as Product[]);
+    setLoading(false);
 
     // Load stats in the background after products are shown
     try {
