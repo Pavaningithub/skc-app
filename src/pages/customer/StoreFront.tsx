@@ -51,7 +51,6 @@ export default function StoreFront() {
   const { config: referralConfig } = useReferralConfig();
   const { flags: featureFlags } = useFeatureFlags();
   const [scrolledPastHero, setScrolledPastHero] = useState(false);
-  const [headerHeight, setHeaderHeight] = useState(0);
   const [marqueesPaused, setMarqueesPaused] = useState(false);
   const [dismissedLaunches, setDismissedLaunches] = useState<string[]>(() => {
     try { return JSON.parse(localStorage.getItem('skc_dismissed_launches') ?? '[]'); } catch { return []; }
@@ -60,17 +59,7 @@ export default function StoreFront() {
 
   useEffect(() => { load(); }, []);
 
-  // Measure header height once mounted (and on resize)
-  useEffect(() => {
-    const measure = () => {
-      if (headerRef.current) setHeaderHeight(headerRef.current.offsetHeight);
-    };
-    measure();
-    window.addEventListener('resize', measure);
-    return () => window.removeEventListener('resize', measure);
-  }, []);
-
-  // Show sticky CTA bar once user scrolls past the hero (~180px)
+  // Show floating CTA pill once user scrolls past the hero (~180px)
   useEffect(() => {
     const onScroll = () => setScrolledPastHero(window.scrollY > 180);
     window.addEventListener('scroll', onScroll, { passive: true });
@@ -464,41 +453,40 @@ export default function StoreFront() {
         </div>
       </header>
 
-      {/* ── Sticky "Shop Now + Free Sample" bar — slides in below header on scroll ── */}
-      {headerHeight > 0 && (
+      {/* ── Floating action pill — visible when scrolled past hero, hidden when cart is open ── */}
+      {scrolledPastHero && !showCart && !showOrderForm && !showSampleForm && (
         <div
-          className="fixed left-0 right-0 z-[39] transition-transform duration-300 ease-in-out"
+          className="fixed left-1/2 z-[38] flex items-center gap-2 px-3 py-2 rounded-2xl shadow-2xl transition-all duration-300"
           style={{
-            top: 0,
-            transform: scrolledPastHero ? `translateY(${headerHeight}px)` : 'translateY(-100%)',
-            background: 'linear-gradient(90deg, #3d1c02 0%, #7a4010 100%)',
-            borderBottom: '2px solid #c8821a',
+            bottom: cartCount > 0 ? '88px' : '24px',
+            transform: 'translateX(-50%)',
+            background: 'linear-gradient(90deg, #3d1c02 0%, #5a2a08 100%)',
+            border: '1.5px solid #c8821a',
+            boxShadow: '0 8px 32px rgba(61,28,2,0.55), 0 0 0 1px rgba(200,130,26,0.2)',
           }}
         >
-          <div className="max-w-4xl mx-auto px-4 py-2 flex items-center justify-center gap-2 flex-wrap">
+          <button
+            onClick={() => document.getElementById('products')?.scrollIntoView({ behavior: 'smooth' })}
+            className="font-bold px-4 py-1.5 rounded-xl text-sm whitespace-nowrap"
+            style={{ background: '#c8821a', color: '#fff', border: '1.5px solid #e8c87a' }}>
+            🛍️ Shop
+          </button>
+          {featureFlags.subscriptionBanner && (
             <button
-              onClick={() => document.getElementById('products')?.scrollIntoView({ behavior: 'smooth' })}
-              className="font-bold px-5 py-2 rounded-xl text-sm shadow-md"
-              style={{ background: '#c8821a', color: '#fff', border: '1.5px solid #e8c87a' }}>
-              🛍️ Shop Now
+              onClick={() => document.getElementById('subscribe')?.scrollIntoView({ behavior: 'smooth' })}
+              className="font-semibold px-4 py-1.5 rounded-xl text-sm border-2 text-white whitespace-nowrap"
+              style={{ borderColor: 'rgba(255,255,255,0.4)', background: 'rgba(255,255,255,0.08)' }}>
+              📦 Subscribe
             </button>
-            {featureFlags.subscriptionBanner && (
-              <button
-                onClick={() => document.getElementById('subscribe')?.scrollIntoView({ behavior: 'smooth' })}
-                className="font-semibold px-5 py-2 rounded-xl text-sm border-2 text-white"
-                style={{ borderColor: 'rgba(255,255,255,0.45)', background: 'rgba(255,255,255,0.1)' }}>
-                📦 Subscribe
-              </button>
-            )}
-            {featureFlags.sampleRequest && (
-              <button
-                onClick={openSampleForm}
-                className="font-semibold px-5 py-2 rounded-xl text-sm border-2 text-white"
-                style={{ borderColor: 'rgba(255,255,255,0.45)', background: 'rgba(255,255,255,0.1)' }}>
-                🎁 Free Sample
-              </button>
-            )}
-          </div>
+          )}
+          {featureFlags.sampleRequest && (
+            <button
+              onClick={openSampleForm}
+              className="font-semibold px-4 py-1.5 rounded-xl text-sm border-2 text-white whitespace-nowrap"
+              style={{ borderColor: 'rgba(255,255,255,0.4)', background: 'rgba(255,255,255,0.08)' }}>
+              🎁 Sample
+            </button>
+          )}
         </div>
       )}
       <div className="relative overflow-hidden" style={{ background: 'linear-gradient(160deg, #3d1c02 0%, #7a4010 40%, #c8821a 75%, #e8a000 100%)' }}>
