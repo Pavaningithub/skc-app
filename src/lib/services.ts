@@ -10,7 +10,7 @@ import { generateReferralCode } from "./utils";
 import type {
   Product, StockItem, RawMaterial, RawMaterialPurchase,
   Batch, Customer, Order, Expense, Subscription, Feedback, AdminAction, AdminActionType, AdminUser, Agent,
-  ReferralConfig, SubscriptionConfig, FeatureFlags,
+  ReferralConfig, SubscriptionConfig, FeatureFlags, LoadingFact,
 } from "./types";
 import { DEFAULT_REFERRAL_CONFIG, DEFAULT_SUBSCRIPTION_CONFIG, DEFAULT_FEATURE_FLAGS } from "./types";
 
@@ -32,6 +32,7 @@ export const COLLECTIONS = {
   ADMIN_ACTIVITY:        "adminActivity",
   ADMIN_USERS:           "adminUsers",
   AGENTS:                "agents",
+  LOADING_FACTS:         "loadingFacts",
 } as const;
 
 function now() { return new Date().toISOString(); }
@@ -695,5 +696,46 @@ export const featureFlagsService = {
         ? { ...DEFAULT_FEATURE_FLAGS, ...(snap.data() as Partial<FeatureFlags>) }
         : { ...DEFAULT_FEATURE_FLAGS });
     });
+  },
+};
+
+// ─── Loading Facts ────────────────────────────────────────────────────────────
+export const loadingFactsService = {
+  async getAll(): Promise<LoadingFact[]> {
+    const snap = await getDocs(collection(db, COLLECTIONS.LOADING_FACTS));
+    return snap.docs
+      .map(d => ({ id: d.id, ...d.data() } as LoadingFact))
+      .sort((a, b) => a.sortOrder - b.sortOrder);
+  },
+  async getActive(): Promise<LoadingFact[]> {
+    const snap = await getDocs(
+      query(collection(db, COLLECTIONS.LOADING_FACTS), where('isActive', '==', true))
+    );
+    return snap.docs
+      .map(d => ({ id: d.id, ...d.data() } as LoadingFact))
+      .sort((a, b) => a.sortOrder - b.sortOrder);
+  },
+  async add(fact: Omit<LoadingFact, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
+    const ref = await addDoc(collection(db, COLLECTIONS.LOADING_FACTS), {
+      ...fact, createdAt: now(), updatedAt: now(),
+    });
+    return ref.id;
+  },
+  async update(id: string, data: Partial<LoadingFact>): Promise<void> {
+    await updateDoc(doc(db, COLLECTIONS.LOADING_FACTS, id), { ...data, updatedAt: now() });
+  },
+  async delete(id: string): Promise<void> {
+    await deleteDoc(doc(db, COLLECTIONS.LOADING_FACTS, id));
+  },
+  subscribe(cb: (items: LoadingFact[]) => void): Unsubscribe {
+    return onSnapshot(
+      query(collection(db, COLLECTIONS.LOADING_FACTS), where('isActive', '==', true)),
+      snap => {
+        const items = snap.docs
+          .map(d => ({ id: d.id, ...d.data() } as LoadingFact))
+          .sort((a, b) => a.sortOrder - b.sortOrder);
+        cb(items);
+      }
+    );
   },
 };

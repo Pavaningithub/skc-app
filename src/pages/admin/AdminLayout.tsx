@@ -4,7 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import {
   LayoutDashboard, ShoppingBag, Package, BarChart3, Users,
   RefreshCw, MessageSquare, Settings, Menu,
-  Leaf, LogOut, Bell, Megaphone, Handshake, Boxes, Gift, TrendingUp, ToggleLeft,
+  Leaf, LogOut, Bell, Megaphone, Handshake, Boxes, Gift, TrendingUp, ToggleLeft, Lightbulb,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { ordersService } from '../../lib/services';
@@ -26,6 +26,7 @@ const navItems = [
   { to: '/admin/agents', icon: Handshake, label: 'Agents' },
   { to: '/admin/referral-settings', icon: Gift,       label: 'Referral' },
   { to: '/admin/features',          icon: ToggleLeft,  label: 'Features' },
+  { to: '/admin/loading-facts',     icon: Lightbulb,   label: 'Load Facts' },
   { to: '/admin/feedback', icon: MessageSquare, label: 'Feedback' },
   { to: '/admin/announcements', icon: Megaphone, label: 'Announce' },
   { to: '/admin/settings', icon: Settings, label: 'Settings' },

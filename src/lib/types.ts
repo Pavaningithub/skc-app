@@ -322,6 +322,18 @@ export interface Feedback {
   createdAt: string;
 }
 
+// ─── Loading Facts (shown on storefront load screen) ───────────────────────────
+export interface LoadingFact {
+  id: string;
+  emoji: string;                  // e.g. "🌶️"
+  text: string;                   // the fact sentence
+  category: 'Food' | 'Health' | 'Homemade' | 'SKC';
+  isActive: boolean;
+  sortOrder: number;              // lower = shown earlier
+  createdAt: string;
+  updatedAt: string;
+}
+
 // ─── Admin Activity Log ──────────────────────────────────────────────────────
 export type AdminActionType =
   | 'order_created'

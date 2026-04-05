@@ -6,13 +6,13 @@ import {
   Search
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { productsService, feedbackService, ordersService, customersService, stockService, subscriptionsService } from '../../lib/services';
+import { productsService, feedbackService, ordersService, customersService, stockService, subscriptionsService, loadingFactsService } from '../../lib/services';
 import { generateOrderNumber, generateSubscriptionOrderNumber, formatCurrency, computeReferralDiscountFromTiers, computeCreditRedemption, normalizeWhatsapp } from '../../lib/utils';
 import { useReferralConfig } from '../../lib/useReferralConfig';
 import { useSubscriptionConfig } from '../../lib/useSubscriptionConfig';
 import { useFeatureFlags } from '../../lib/useFeatureFlags';
 import { APP_CONFIG } from '../../config';
-import type { Product, Feedback, OrderItem, Order } from '../../lib/types';
+import type { Product, Feedback, OrderItem, Order, LoadingFact } from '../../lib/types';
 
 interface CartItem extends OrderItem {}
 
@@ -51,6 +51,9 @@ export default function StoreFront() {
   const { config: referralConfig } = useReferralConfig();
   const { flags: featureFlags } = useFeatureFlags();
   const [scrolledPastHero, setScrolledPastHero] = useState(false);
+  const [loadingFacts, setLoadingFacts] = useState<LoadingFact[]>([]);
+  const [factIndex, setFactIndex]       = useState(0);
+  const [factVisible, setFactVisible]   = useState(true);  // for fade in/out
 
   const [marqueesPaused, setMarqueesPaused] = useState(false);
   const [dismissedLaunches, setDismissedLaunches] = useState<string[]>(() => {
@@ -69,6 +72,19 @@ export default function StoreFront() {
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
+
+  // Cycle loading facts every 2.5s with fade transition
+  useEffect(() => {
+    if (!loading || loadingFacts.length < 2) return;
+    const interval = setInterval(() => {
+      setFactVisible(false);
+      setTimeout(() => {
+        setFactIndex(i => (i + 1) % loadingFacts.length);
+        setFactVisible(true);
+      }, 400); // 400ms fade out, then swap
+    }, 2500);
+    return () => clearInterval(interval);
+  }, [loading, loadingFacts]);
 
   // When the order form opens and there's a URL ref code, auto-validate it
   useEffect(() => {
@@ -104,12 +120,20 @@ export default function StoreFront() {
   async function load() {
     setLoading(true);
     try {
-      // Load products first — unblock the UI immediately
-      const p = await productsService.getActive();
+      // Load products + facts in parallel
+      const [p, facts] = await Promise.all([
+        productsService.getActive(),
+        loadingFactsService.getActive().catch(() => [] as LoadingFact[]),
+      ]);
       setProducts(p);
+      if (facts.length > 0) {
+        // Shuffle so each visit feels fresh
+        const shuffled = [...facts].sort(() => Math.random() - 0.5);
+        setLoadingFacts(shuffled);
+      }
     } finally { setLoading(false); }
 
-    // Load stats in the background after products are shown — uses aggregate counts (no full fetch)
+    // Load stats in the background after products are shown
     try {
       const stats = await ordersService.getSiteStats();
       setSiteStats({ orders: stats.orders, customers: stats.customers, holige: 444 });
@@ -381,15 +405,85 @@ export default function StoreFront() {
     finally { setSubmitting(false); }
   }
 
-  if (loading) return (
-    <div className="min-h-screen flex items-center justify-center" style={{ background: 'linear-gradient(160deg, #3d1c02 0%, #7a4010 50%, #c8821a 100%)' }}>
-      <div className="text-center">
-        <div className="text-6xl mb-4 animate-bounce">🪈</div>
-        <p className="font-bold text-white text-lg mb-1" style={{ fontFamily: 'Georgia, serif', letterSpacing: '1px' }}>Sri Krishna Condiments</p>
-        <p className="text-sm italic" style={{ color: '#ffd700' }}>Where Taste Meets Tradition…</p>
+  // Fallback facts — shown if Firestore has none yet
+  const FALLBACK_FACTS = [
+    { emoji: '🌶️', text: 'Chilli powder is rich in Vitamin C — more than most citrus fruits!' },
+    { emoji: '🧄', text: 'Garlic has been used as a natural antibiotic for over 7,000 years.' },
+    { emoji: '🌿', text: 'Fresh homemade chutneys retain 3x more nutrients than store-bought versions.' },
+    { emoji: '🫙', text: 'Handground masalas release essential oils that boost both flavour and digestion.' },
+    { emoji: '💪', text: 'Turmeric’s curcumin is a powerful anti-inflammatory used in Ayurveda for centuries.' },
+    { emoji: '🏺', text: 'Pickling is one of humanity’s oldest preservation techniques — over 4,000 years old!' },
+    { emoji: '🤲', text: 'Small-batch, hand-made food has no preservatives — just pure ingredients and love.' },
+    { emoji: '🌾', text: 'Ragi (finger millet) is a complete protein and one of the richest plant sources of calcium.' },
+  ];
+
+  if (loading) {
+    const displayFacts = loadingFacts.length > 0 ? loadingFacts : FALLBACK_FACTS;
+    const current = displayFacts[factIndex % displayFacts.length];
+    const categoryColors: Record<string, string> = {
+      Food: '#f97316', Health: '#22c55e', Homemade: '#f59e0b', SKC: '#a855f7',
+    };
+    const catColor = 'category' in current ? categoryColors[(current as LoadingFact).category] ?? '#c8821a' : '#c8821a';
+
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center px-6"
+        style={{ background: 'linear-gradient(160deg, #2a0f01 0%, #5a2a08 55%, #3d1c02 100%)' }}>
+
+        {/* Brand */}
+        <div className="mb-10 text-center">
+          <div className="text-5xl mb-3 animate-bounce">🪈</div>
+          <p className="font-bold text-white text-xl tracking-wide" style={{ fontFamily: 'Georgia, serif' }}>Sri Krishna Condiments</p>
+          <p className="text-xs italic mt-1" style={{ color: '#c8821a' }}>Where Taste Meets Tradition</p>
+        </div>
+
+        {/* Did You Know card */}
+        <div className="w-full max-w-sm">
+          <p className="text-center text-xs font-semibold uppercase tracking-widest mb-4" style={{ color: 'rgba(255,215,0,0.6)' }}>Did You Know?</p>
+          <div
+            className="rounded-2xl p-6 text-center transition-all duration-400"
+            style={{
+              background: 'rgba(255,255,255,0.07)',
+              border: '1px solid rgba(255,255,255,0.12)',
+              opacity: factVisible ? 1 : 0,
+              transform: factVisible ? 'translateY(0)' : 'translateY(8px)',
+              transition: 'opacity 0.4s ease, transform 0.4s ease',
+            }}>
+            <div className="text-5xl mb-4">{current.emoji}</div>
+            {'category' in current && (
+              <span className="text-xs font-semibold px-2.5 py-1 rounded-full mb-3 inline-block"
+                style={{ background: `${catColor}22`, color: catColor, border: `1px solid ${catColor}55` }}>
+                {'category' in current ? (current as LoadingFact).category : ''}
+              </span>
+            )}
+            <p className="text-white text-sm leading-relaxed mt-2" style={{ fontFamily: 'Georgia, serif' }}>
+              {current.text}
+            </p>
+          </div>
+
+          {/* Progress dots */}
+          {displayFacts.length > 1 && (
+            <div className="flex justify-center gap-1.5 mt-4">
+              {displayFacts.map((_, i) => (
+                <div key={i}
+                  className="rounded-full transition-all duration-300"
+                  style={{
+                    width: i === factIndex % displayFacts.length ? '20px' : '6px',
+                    height: '6px',
+                    background: i === factIndex % displayFacts.length ? '#c8821a' : 'rgba(255,255,255,0.25)',
+                  }} />
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Loading indicator */}
+        <div className="mt-10 flex items-center gap-2">
+          <div className="w-4 h-4 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: '#c8821a', borderTopColor: 'transparent' }} />
+          <span className="text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>Loading fresh products…</span>
+        </div>
       </div>
-    </div>
-  );
+    );
+  }
 
   return (
     <div className="min-h-screen font-sans" style={{ background: '#fdf5e6' }}>
@@ -899,10 +993,10 @@ export default function StoreFront() {
           <div className="flex flex-col gap-2">
 
             {/* Direct DM — always shown */}
-            <a href={`https://wa.me/91${APP_CONFIG.WHATSAPP_NUMBER}?text=${encodeURIComponent('Hi! I found you on your website.')}`} target="_blank" rel="noreferrer"
+            <a href={`https://wa.me/${APP_CONFIG.WHATSAPP_NUMBER}?text=${encodeURIComponent('Hi! I found you on your website.')}`} target="_blank" rel="noreferrer"
               className="flex items-center gap-3 rounded-xl px-4 py-3 text-left"
               style={{ background: 'rgba(37,211,102,0.18)', border: '1.5px solid rgba(37,211,102,0.5)' }}>
-              <svg className="w-7 h-7 flex-shrink-0" viewBox="0 0 24 24" fill="#25d366"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/></svg>
+              <svg className="w-7 h-7 flex-shrink-0" viewBox="0 0 32 32" fill="#25d366"><path d="M16 3C9.373 3 4 8.373 4 15c0 2.385.668 4.61 1.822 6.51L4 29l7.701-1.797A12.93 12.93 0 0 0 16 28c6.627 0 12-5.373 12-12S22.627 3 16 3zm0 2c5.523 0 10 4.477 10 10S21.523 25 16 25c-1.97 0-3.8-.57-5.35-1.55l-.37-.23-4.57 1.07 1.1-4.46-.25-.38A9.96 9.96 0 0 1 6 15c0-5.523 4.477-10 10-10zm-3.5 5.5c-.28 0-.73.1-1.11.52-.38.42-1.45 1.41-1.45 3.44 0 2.03 1.48 3.99 1.69 4.27.2.27 2.9 4.63 7.13 6.31 3.54 1.4 4.25 1.12 5.02.99.76-.13 2.46-.89 2.81-1.76.35-.87.35-1.61.24-1.76-.1-.16-.37-.26-.78-.46-.4-.2-2.38-.96-2.75-1.07-.36-.1-.63-.16-.89.16-.27.33-1.03 1.07-1.26 1.29-.23.21-.46.24-.86.08-.4-.16-1.69-.54-3.21-1.72-1.19-.92-1.99-2.06-2.22-2.41-.23-.35-.02-.54.17-.72.18-.16.4-.42.6-.63.2-.21.27-.35.4-.59.14-.24.07-.45-.02-.63-.08-.18-.87-2.13-1.21-2.92-.32-.77-.65-.65-.89-.66l-.76-.02z"/></svg>
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-white">Chat with Us Directly</p>
                 <p className="text-xs" style={{ color: 'rgba(255,255,255,0.6)' }}>WhatsApp DM — we reply fast!</p>
@@ -927,7 +1021,7 @@ export default function StoreFront() {
               <a href={APP_CONFIG.WHATSAPP_GROUP_LINK} target="_blank" rel="noreferrer"
                 className="flex items-center gap-3 rounded-xl px-4 py-3 text-left"
                 style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}>
-                <svg className="w-6 h-6 flex-shrink-0" viewBox="0 0 24 24" fill="#25d366"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/></svg>
+                <svg className="w-6 h-6 flex-shrink-0" viewBox="0 0 32 32" fill="#25d366"><path d="M16 3C9.373 3 4 8.373 4 15c0 2.385.668 4.61 1.822 6.51L4 29l7.701-1.797A12.93 12.93 0 0 0 16 28c6.627 0 12-5.373 12-12S22.627 3 16 3zm0 2c5.523 0 10 4.477 10 10S21.523 25 16 25c-1.97 0-3.8-.57-5.35-1.55l-.37-.23-4.57 1.07 1.1-4.46-.25-.38A9.96 9.96 0 0 1 6 15c0-5.523 4.477-10 10-10zm-3.5 5.5c-.28 0-.73.1-1.11.52-.38.42-1.45 1.41-1.45 3.44 0 2.03 1.48 3.99 1.69 4.27.2.27 2.9 4.63 7.13 6.31 3.54 1.4 4.25 1.12 5.02.99.76-.13 2.46-.89 2.81-1.76.35-.87.35-1.61.24-1.76-.1-.16-.37-.26-.78-.46-.4-.2-2.38-.96-2.75-1.07-.36-.1-.63-.16-.89.16-.27.33-1.03 1.07-1.26 1.29-.23.21-.46.24-.86.08-.4-.16-1.69-.54-3.21-1.72-1.19-.92-1.99-2.06-2.22-2.41-.23-.35-.02-.54.17-.72.18-.16.4-.42.6-.63.2-.21.27-.35.4-.59.14-.24.07-.45-.02-.63-.08-.18-.87-2.13-1.21-2.92-.32-.77-.65-.65-.89-.66l-.76-.02z"/></svg>
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-white">WhatsApp Group</p>
                   <p className="text-xs" style={{ color: 'rgba(255,255,255,0.5)' }}>Offers & order updates</p>
@@ -940,7 +1034,7 @@ export default function StoreFront() {
               <a href={APP_CONFIG.WHATSAPP_CHANNEL_LINK} target="_blank" rel="noreferrer"
                 className="flex items-center gap-3 rounded-xl px-4 py-3 text-left"
                 style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}>
-                <svg className="w-6 h-6 flex-shrink-0" viewBox="0 0 24 24" fill="#25d366"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437-9.884-9.885-9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/></svg>
+                <svg className="w-6 h-6 flex-shrink-0" viewBox="0 0 32 32" fill="#25d366"><path d="M16 3C9.373 3 4 8.373 4 15c0 2.385.668 4.61 1.822 6.51L4 29l7.701-1.797A12.93 12.93 0 0 0 16 28c6.627 0 12-5.373 12-12S22.627 3 16 3zm0 2c5.523 0 10 4.477 10 10S21.523 25 16 25c-1.97 0-3.8-.57-5.35-1.55l-.37-.23-4.57 1.07 1.1-4.46-.25-.38A9.96 9.96 0 0 1 6 15c0-5.523 4.477-10 10-10zm-3.5 5.5c-.28 0-.73.1-1.11.52-.38.42-1.45 1.41-1.45 3.44 0 2.03 1.48 3.99 1.69 4.27.2.27 2.9 4.63 7.13 6.31 3.54 1.4 4.25 1.12 5.02.99.76-.13 2.46-.89 2.81-1.76.35-.87.35-1.61.24-1.76-.1-.16-.37-.26-.78-.46-.4-.2-2.38-.96-2.75-1.07-.36-.1-.63-.16-.89.16-.27.33-1.03 1.07-1.26 1.29-.23.21-.46.24-.86.08-.4-.16-1.69-.54-3.21-1.72-1.19-.92-1.99-2.06-2.22-2.41-.23-.35-.02-.54.17-.72.18-.16.4-.42.6-.63.2-.21.27-.35.4-.59.14-.24.07-.45-.02-.63-.08-.18-.87-2.13-1.21-2.92-.32-.77-.65-.65-.89-.66l-.76-.02z"/></svg>
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-white">WhatsApp Channel</p>
                   <p className="text-xs" style={{ color: 'rgba(255,255,255,0.5)' }}>Follow for news & recipes</p>
