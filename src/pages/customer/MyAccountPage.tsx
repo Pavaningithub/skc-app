@@ -228,7 +228,7 @@ export default function MyAccountPage() {
           <div className="flex gap-3 justify-center">
             <a href="/" className="text-xs text-gray-400 hover:text-orange-600 transition-colors">← Back to Store</a>
             <span className="text-gray-300">·</span>
-            <a href="/about" className="text-xs text-gray-400 hover:text-orange-600 transition-colors">About Us</a>
+
           </div>
         </div>
       ) : (

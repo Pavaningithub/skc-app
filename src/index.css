@@ -36,3 +36,13 @@ body {
   animation: marquee 90s linear infinite;
 }
 .animate-marquee:hover { animation-play-state: paused; }
+
+/* testimonial horizontal marquee — left to right display (scrolls right-to-left) */
+@keyframes marquee-reviews {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+.animate-marquee-reviews {
+  animation: marquee-reviews 55s linear infinite;
+}
+/* pause handled via JS animationPlayState */

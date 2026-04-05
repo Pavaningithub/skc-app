@@ -228,6 +228,11 @@ export default function OrdersPage() {
                 {order.items.map((item, i) => (
                   <span key={i} className="mr-2">
                     {item.productName} ×{item.quantity}{item.unit === 'piece' ? 'pc' : 'g'}
+                    {item.customizationNote && (
+                      <span className="ml-1 text-xs text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded-full border border-amber-200">
+                        {item.customizationNote}
+                      </span>
+                    )}
                     {i < order.items.length - 1 ? ',' : ''}
                   </span>
                 ))}

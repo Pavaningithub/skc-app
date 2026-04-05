@@ -5,10 +5,10 @@ import { Suspense, lazy } from 'react';
 
 // Customer pages
 import StoreFront from './pages/customer/StoreFront';
-const OrderConfirmation = lazy(() => import('./pages/customer/OrderConfirmation'));
-const FeedbackPage      = lazy(() => import('./pages/customer/FeedbackPage'));
+const OrderConfirmation        = lazy(() => import('./pages/customer/OrderConfirmation'));
+const SubscriptionConfirmation = lazy(() => import('./pages/customer/SubscriptionConfirmation'));
+const FeedbackPage             = lazy(() => import('./pages/customer/FeedbackPage'));
 const MyAccountPage     = lazy(() => import('./pages/customer/MyAccountPage'));
-const AboutPage         = lazy(() => import('./pages/customer/AboutPage'));
 
 // Admin pages
 const AdminLayout      = lazy(() => import('./pages/admin/AdminLayout'));
@@ -30,6 +30,8 @@ const AgentsPage       = lazy(() => import('./pages/admin/AgentsPage'));
 const ReferralSettingsPage = lazy(() => import('./pages/admin/ReferralSettingsPage'));
 const AnalyticsPage        = lazy(() => import('./pages/admin/AnalyticsPage'));
 const SubscriptionAnalyticsPage = lazy(() => import('./pages/admin/SubscriptionAnalyticsPage'));
+const FeaturesPage         = lazy(() => import('./pages/admin/FeaturesPage'));
+const LoadingFactsPage     = lazy(() => import('./pages/admin/LoadingFactsPage'));
 
 // Agent portal
 const AgentLogin   = lazy(() => import('./pages/agent/AgentLogin'));
@@ -63,10 +65,10 @@ export default function App() {
             {/* ── Storefront ──────────────────────────────────────── */}
             <Route path="/" element={<StoreFront />} />
             <Route path="/order-confirmation/:orderId" element={<OrderConfirmation />} />
+            <Route path="/subscription-confirmation/:subId" element={<SubscriptionConfirmation />} />
             <Route path="/feedback/:orderId" element={<FeedbackPage />} />
             <Route path="/my-referral" element={<Navigate to="/my-orders?tab=referral" replace />} />
             <Route path="/my-orders" element={<MyAccountPage />} />
-            <Route path="/about" element={<AboutPage />} />
 
             {/* ── Agent portal ─────────────────────────────────────── */}
             <Route path="/agent/login" element={<AgentLogin />} />
@@ -92,6 +94,8 @@ export default function App() {
               <Route path="announcements" element={<AnnouncementsPage />} />
               <Route path="agents" element={<AgentsPage />} />
               <Route path="referral-settings" element={<ReferralSettingsPage />} />
+              <Route path="features" element={<FeaturesPage />} />
+              <Route path="loading-facts" element={<LoadingFactsPage />} />
               <Route path="settings" element={<SettingsPage />} />
             </Route>
 

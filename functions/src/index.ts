@@ -9,6 +9,7 @@ const TELEGRAM_BOT_TOKEN = defineSecret("TELEGRAM_BOT_TOKEN");
 const TELEGRAM_CHAT_ID = defineSecret("TELEGRAM_CHAT_ID");
 
 const ADMIN_BASE_URL = "https://skctreats.in/admin/orders";
+const ADMIN_SUBS_URL = "https://skctreats.in/admin/subscriptions";
 const WA_GROUP_LINK = "https://chat.whatsapp.com/GnLnmfvY8gqJpxu6EcVkkL";
 
 interface OrderItem {
@@ -81,39 +82,40 @@ export const notifyNewOrder = onDocumentCreated(
     // Build message
     const isSample = order.type === "sample";
     const emoji = isSample ? "🎁" : "🛒";
+    const orderLabel = isSample ? "Sample Request" : "New Order";
+    const adminLink = `${ADMIN_BASE_URL}/${orderId}`;
 
-    const lines = [
-      `${emoji} <b>${isSample ? "Sample Request" : "New Order"} — ${order.orderNumber}</b>`,
+    // ── Telegram message (HTML) ───────────────────────────────────────────────
+    const telegramLines = [
+      `${emoji} <b>${orderLabel} — ${order.orderNumber}</b>`,
       "",
       `👤 <b>${order.customerName}</b>`,
       `📞 ${phone}`,
       `📍 ${order.customerPlace || "—"}`,
       "",
-      `<b>Items:</b>`,
+      "<b>Items:</b>",
       itemLines,
-      order.notes ? `\n📝 Notes: ${order.notes}` : "",
+      order.notes ? `📝 ${order.notes}` : "",
+      "",
+      `💰 ${isSample ? "FREE SAMPLE" : `₹${order.total}`}`,
     ].filter(Boolean).join("\n");
 
-    // Build WhatsApp message to share in group — same details as Telegram, no pricing
-    const waText = [
-      `${emoji} *${isSample ? "Sample Request" : "New Order"} — ${order.orderNumber}*`,
-      "",
-      `👤 *${order.customerName}*`,
-      `📞 ${phone}`,
+    // ── WA group message — short plain text so URL stays under Telegram's 2048-char button limit ──
+    const shortName = order.customerName.slice(0, 10);
+    const waLines = [
+      `${emoji} ${orderLabel} — ${order.orderNumber}`,
+      `👤 ${shortName}  📞 ${phone}`,
       `📍 ${order.customerPlace || "—"}`,
-      "",
-      `*Items:*`,
       itemLines,
-      order.notes ? `\n📝 Notes: ${order.notes}` : "",
+      `💰 ${isSample ? "FREE SAMPLE" : `₹${order.total}`}`,
+      order.notes ? `📝 ${order.notes}` : "",
     ].filter(Boolean).join("\n");
 
-    const waUrl = `https://wa.me/?text=${encodeURIComponent(waText)}`;
+    const waUrl = `https://wa.me/?text=${encodeURIComponent(waLines)}`;
 
-    // Inline keyboard buttons
+    // ── Inline keyboard buttons ───────────────────────────────────────────────
     const buttons = [
-      [
-        {text: "📋 Open in Admin", url: `${ADMIN_BASE_URL}/${orderId}`},
-      ],
+      [{text: "📋 Open in Admin", url: adminLink}],
       [
         {text: "📲 Share to WA Group", url: waUrl},
         {text: "🔗 Join WA Group", url: WA_GROUP_LINK},
@@ -124,12 +126,103 @@ export const notifyNewOrder = onDocumentCreated(
       await sendTelegram(
         TELEGRAM_BOT_TOKEN.value(),
         TELEGRAM_CHAT_ID.value(),
-        lines,
+        telegramLines,
         buttons
       );
       logger.info("Telegram notification sent", {orderId, orderNumber: order.orderNumber});
     } catch (err) {
       logger.error("Failed to send Telegram notification", {orderId, err});
+    }
+  }
+);
+
+interface SubscriptionItem {
+  productName: string;
+  quantity: number;
+  unit: string;
+  totalPrice: number;
+}
+
+interface SubscriptionDoc {
+  subscriptionNumber?: string;
+  customerName: string;
+  customerWhatsapp: string;
+  customerPlace?: string;
+  items: SubscriptionItem[];
+  duration: string;
+  paymentMode?: string;
+  discountPercent: number;
+  baseAmount: number;
+  discountedAmount: number;
+  startDate: string;
+  endDate: string;
+  notes?: string;
+}
+
+// Fires whenever a new document is created in the 'subscriptions' collection
+export const notifyNewSubscription = onDocumentCreated(
+  {
+    document: "subscriptions/{subId}",
+    secrets: [TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID],
+    region: "asia-south1",
+  },
+  async (event) => {
+    const sub = event.data?.data() as SubscriptionDoc | undefined;
+    const subId = event.params.subId;
+
+    if (!sub) {
+      logger.warn("notifyNewSubscription: no data", {subId});
+      return;
+    }
+
+    const phone = sub.customerWhatsapp
+      ? `+91 ${sub.customerWhatsapp.slice(0, 5)} ${sub.customerWhatsapp.slice(5)}`
+      : "—";
+
+    const durationMonths = sub.duration === "6months" ? 6 : 3;
+    const paymentLabel = sub.paymentMode === "monthly" ? "Monthly" : "Upfront";
+    const subNum = sub.subscriptionNumber ?? subId.slice(0, 8).toUpperCase();
+
+    const itemLines = (sub.items ?? [])
+      .map((i) => `  • ${i.productName} × ${i.quantity}g — ₹${i.totalPrice}/mo`)
+      .join("\n");
+
+    const adminLink = `${ADMIN_SUBS_URL}`;
+
+    const telegramText = [
+      `🌿 <b>New Subscription — ${subNum}</b>`,
+      "",
+      `👤 <b>${sub.customerName}</b>`,
+      `📞 ${phone}`,
+      sub.customerPlace ? `📍 ${sub.customerPlace}` : "",
+      "",
+      `📅 Plan: <b>${durationMonths}-Month | ${paymentLabel}</b>`,
+      `🏷 Discount: ${sub.discountPercent}%`,
+      "",
+      "<b>Products / Month:</b>",
+      itemLines,
+      "",
+      `💰 Monthly: ₹${sub.discountedAmount}  (was ₹${sub.baseAmount})`,
+      sub.paymentMode === "upfront"
+        ? `💳 Upfront total: ₹${sub.discountedAmount * durationMonths}`
+        : `📅 Pay ₹${sub.discountedAmount} each month`,
+      sub.notes ? `📝 ${sub.notes}` : "",
+    ].filter(Boolean).join("\n");
+
+    const buttons = [
+      [{text: "📋 Open Subscriptions", url: adminLink}],
+    ];
+
+    try {
+      await sendTelegram(
+        TELEGRAM_BOT_TOKEN.value(),
+        TELEGRAM_CHAT_ID.value(),
+        telegramText,
+        buttons
+      );
+      logger.info("Subscription Telegram notification sent", {subId, subNum});
+    } catch (err) {
+      logger.error("Failed to send subscription Telegram notification", {subId, err});
     }
   }
 );

@@ -1,4 +1,4 @@
-import type { Unit, OrderStatus, PaymentStatus, OrderType, ExpenseCategory, SubscriptionDuration } from "./constants";
+import type { Unit, OrderStatus, PaymentStatus, OrderType, ExpenseCategory, SubscriptionDuration, SubscriptionStatus } from "./constants";
 
 // ─── Admin User ──────────────────────────────────────────────────────────────
 type AdminRole = 'owner' | 'operator';
@@ -60,6 +60,9 @@ export interface Product {
   hasGarlicOption?: boolean;      // show With Garlic / Without Garlic radio
   stockId?: string;
   sortOrder: number;              // for manual ordering in storefront
+  isNewLaunch?: boolean;          // show "New!" badge and launch banner on storefront
+  newLaunchUntil?: string;        // ISO date — badge/banner hidden after this date
+  didYouKnow?: string;            // short 1–2 line fact shown on product card (expandable)
   createdAt: string;
   updatedAt: string;
 }
@@ -160,6 +163,7 @@ export interface OrderItem {
   quantity: number;               // grams / pieces
   pricePerUnit: number;
   totalPrice: number;
+  minOrderQty?: number;           // minimum qty step for cart adjustments
   customizationNote?: string;     // customer customization request
   isOnDemand?: boolean;           // was it an on-demand product?
   rawMaterialCost?: number;       // for on-demand: actual raw material cost
@@ -214,32 +218,75 @@ export interface Expense {
 }
 
 // ─── Subscription ─────────────────────────────────────────────────────────────
+export interface MonthlyEntry {
+  month: number;          // 1-based: month 1, 2, 3...
+  label: string;          // e.g. "May 2026"
+  startDate: string;      // ISO — start of this month window (admin-editable)
+  endDate: string;        // ISO — end of this month window (+30 days)
+  paymentStatus: 'pending' | 'requested' | 'paid';
+  deliveryStatus: 'pending' | 'delivered';
+  paymentRequestedAt?: string;
+  paidAt?: string;
+  deliveredAt?: string;
+}
+
 export interface Subscription {
   id: string;
+  subscriptionNumber?: string;
   customerId: string;
   customerName: string;
   customerWhatsapp: string;
+  customerPlace?: string;
   items: OrderItem[];
   duration: SubscriptionDuration;
+  paymentMode?: 'upfront' | 'monthly';
   discountPercent: number;
   baseAmount: number;
   discountedAmount: number;
   startDate: string;
   endDate: string;
   isActive: boolean;
+  status?: SubscriptionStatus;      // lifecycle status
   paymentStatus: PaymentStatus;
+  monthlyTracking?: MonthlyEntry[]; // one entry per month of the subscription
+  notes?: string;
   createdAt: string;
 }
 
 export interface SubscriptionConfig {
-  threeMonthPct: number;   // discount % for 3-month plan
-  sixMonthPct: number;     // discount % for 6-month plan
+  // Upfront payment (pay full duration in advance)
+  upfrontThreeMonthPct: number;   // discount % for 3-month plan, paid upfront
+  upfrontSixMonthPct:   number;   // discount % for 6-month plan, paid upfront
+  // Monthly payment (pay each month)
+  monthlyThreeMonthPct: number;   // discount % for 3-month plan, paid monthly
+  monthlySixMonthPct:   number;   // discount % for 6-month plan, paid monthly
   updatedAt?: string;
 }
 
 export const DEFAULT_SUBSCRIPTION_CONFIG: SubscriptionConfig = {
-  threeMonthPct: 5,
-  sixMonthPct:   10,
+  upfrontThreeMonthPct: 7,
+  upfrontSixMonthPct:   10,
+  monthlyThreeMonthPct: 3,
+  monthlySixMonthPct:   5,
+};
+
+// ─── Feature Flags ───────────────────────────────────────────────────────────
+export interface FeatureFlags {
+  // Customer storefront banners & sections
+  holigeBanner:       boolean;  // Festival: Holige / Obbattu promotional banner
+  subscriptionBanner: boolean;  // Health Mix Subscription plan section
+  sampleRequest:      boolean;  // "Free Sample" button & modal
+  referralProgram:    boolean;  // Referral code entry in order form
+  testimonials:       boolean;  // Customer testimonials marquee
+  updatedAt?: string;
+}
+
+export const DEFAULT_FEATURE_FLAGS: FeatureFlags = {
+  holigeBanner:       false,  // off by default — enable during festivals
+  subscriptionBanner: true,
+  sampleRequest:      true,
+  referralProgram:    true,
+  testimonials:       true,
 };
 
 // ─── Agent (Partner / Reseller) ────────────────────────────────────────────────────────────────
@@ -273,6 +320,18 @@ export interface Feedback {
   recommend: boolean;
   isPublic: boolean;              // true if rating >= 4
   createdAt: string;
+}
+
+// ─── Loading Facts (shown on storefront load screen) ───────────────────────────
+export interface LoadingFact {
+  id: string;
+  emoji: string;                  // e.g. "🌶️"
+  text: string;                   // the fact sentence
+  category: 'Food' | 'Health' | 'Homemade' | 'SKC';
+  isActive: boolean;
+  sortOrder: number;              // lower = shown earlier
+  createdAt: string;
+  updatedAt: string;
 }
 
 // ─── Admin Activity Log ──────────────────────────────────────────────────────
