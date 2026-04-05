@@ -749,4 +749,16 @@ export const loadingFactsService = {
       }
     );
   },
+  /** Admin-only: returns ALL facts including inactive */
+  subscribeAll(cb: (items: LoadingFact[]) => void): Unsubscribe {
+    return onSnapshot(
+      collection(db, COLLECTIONS.LOADING_FACTS),
+      snap => {
+        const items = snap.docs
+          .map(d => ({ id: d.id, ...d.data() } as LoadingFact))
+          .sort((a, b) => a.sortOrder - b.sortOrder);
+        cb(items);
+      }
+    );
+  },
 };
