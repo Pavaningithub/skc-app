@@ -21,26 +21,38 @@ export const APP_CONFIG = {
   // ── Admin Security (from env) ────────────────────────────────
   DEFAULT_ADMIN_PIN:    import.meta.env.VITE_ADMIN_PIN   as string,
 
-  // ── Subscription Discounts ───────────────────────────────────────
-  SUBSCRIPTION_3M_DISCOUNT_PCT: 5,      // 5% off for 3-month plan
-  SUBSCRIPTION_6M_DISCOUNT_PCT: 10,     // 10% off for 6-month plan
+  // ── Subscription Discounts (static fallback — live values come from Firestore via admin) ──
+  SUBSCRIPTION_UPFRONT_3M_PCT:  7,    // upfront payment, 3-month plan
+  SUBSCRIPTION_UPFRONT_6M_PCT:  10,   // upfront payment, 6-month plan
+  SUBSCRIPTION_MONTHLY_3M_PCT:  3,    // monthly payment, 3-month plan
+  SUBSCRIPTION_MONTHLY_6M_PCT:  5,    // monthly payment, 6-month plan
 
   // ── Stock Alerts ─────────────────────────────────────────────────
   DEFAULT_LOW_STOCK_GRAMS:  500,        // Alert when stock < 500g
   DEFAULT_LOW_STOCK_PIECES: 5,          // Alert when stock < 5 pieces
 
-  // ── Sample Orders ────────────────────────────────────────────────
+  // ── Sample Orders ────────────────────────────────────────────────────
   SAMPLE_SIZE_OPTIONS: ['50g', '100g'],  // Available sample sizes
   SAMPLE_MESSAGE:      'Free sample — no payment required',
+
+  // Flat charge for all sample requests (set to 0 for free, e.g. 50 to enable ₹50 charge)
+  // When non-zero: payment is required, paymentStatus becomes 'unpaid', UPI link is shown
+  SAMPLE_CHARGE: 0,
 
   // ── WhatsApp Links (from env) ──────────────────────────────────
   SHOW_WHATSAPP_GROUP_LINK:   true,
   WHATSAPP_GROUP_LINK:        import.meta.env.VITE_WA_GROUP_LINK     as string,
   WHATSAPP_CHANNEL_LINK:      import.meta.env.VITE_WA_CHANNEL_LINK   as string,
+  // WhatsApp Community (invite link — set in Vercel env, never in source)
+  WHATSAPP_COMMUNITY_URL:     import.meta.env.VITE_WA_COMMUNITY_URL  || '',
   // Internal group for order tracking (admins only)
   ORDER_TRACKING_GROUP_LINK:  import.meta.env.VITE_WA_TRACKING_LINK  as string,
   WHATSAPP_GROUP_DISPLAY:     'Join Our WhatsApp Group for Offers & Updates',
   WHATSAPP_CHANNEL_DISPLAY:   'Follow Our WhatsApp Channel',
+
+  // ── Social Media (from env — leave empty to hide) ─────────────────────────
+  INSTAGRAM_URL:              import.meta.env.VITE_INSTAGRAM_URL || '',
+  FACEBOOK_URL:               import.meta.env.VITE_FACEBOOK_URL  || '',
 
   // ── Storefront UI ────────────────────────────────────────────────
   MAX_TESTIMONIALS_ON_HOME: 8,

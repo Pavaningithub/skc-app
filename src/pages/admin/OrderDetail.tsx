@@ -94,21 +94,21 @@ export default function OrderDetail() {
       const updates: Partial<Order> = {
         customerName: editName.trim(),
         customerWhatsapp: editPhone.replace(/\D/g, '').replace(/^(91|0)/, '').slice(0, 10),
-        customerPlace: editPlace.trim(),
+        ...(editPlace.trim() ? { customerPlace: editPlace.trim() } : {}),
         notes: editNotes.trim(),
         deliveryCharge,
-        referralCodeUsed: editReferralCode.trim().toUpperCase() || undefined,
+        ...(editReferralCode.trim() ? { referralCodeUsed: editReferralCode.trim().toUpperCase() } : {}),
         referralDiscount,
         total: newTotal,
         discount: (order.discount ?? 0),  // keep item discount unchanged
       };
       await ordersService.update(order.id, updates);
-      // Sync customer name/place
+      // Sync customer name/place/phone
       if (order.customerId) {
         await customersService.update(order.customerId, {
           name: updates.customerName!,
           whatsapp: updates.customerWhatsapp!,
-          place: updates.customerPlace,
+          ...(updates.customerPlace ? { place: updates.customerPlace } : {}),
         });
       }
       toast.success('Order details updated ✅');

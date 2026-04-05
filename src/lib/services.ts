@@ -10,9 +10,9 @@ import { generateReferralCode } from "./utils";
 import type {
   Product, StockItem, RawMaterial, RawMaterialPurchase,
   Batch, Customer, Order, Expense, Subscription, Feedback, AdminAction, AdminActionType, AdminUser, Agent,
-  ReferralConfig, SubscriptionConfig,
+  ReferralConfig, SubscriptionConfig, FeatureFlags, LoadingFact,
 } from "./types";
-import { DEFAULT_REFERRAL_CONFIG, DEFAULT_SUBSCRIPTION_CONFIG } from "./types";
+import { DEFAULT_REFERRAL_CONFIG, DEFAULT_SUBSCRIPTION_CONFIG, DEFAULT_FEATURE_FLAGS } from "./types";
 
 // ─── Collection Names ─────────────────────────────────────────────────────────
 export const COLLECTIONS = {
@@ -32,6 +32,7 @@ export const COLLECTIONS = {
   ADMIN_ACTIVITY:        "adminActivity",
   ADMIN_USERS:           "adminUsers",
   AGENTS:                "agents",
+  LOADING_FACTS:         "loadingFacts",
 } as const;
 
 function now() { return new Date().toISOString(); }
@@ -303,6 +304,17 @@ export const ordersService = {
     const items = snap.docs.map(d => ({ id: d.id, ...d.data() } as Order));
     return items.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   },
+  /** Returns true if this phone number already has a non-cancelled sample order */
+  async hasSampleByWhatsapp(whatsapp: string): Promise<boolean> {
+    const snap = await getDocs(
+      query(
+        collection(db, COLLECTIONS.ORDERS),
+        where('customerWhatsapp', '==', whatsapp),
+        where('type', '==', 'sample'),
+      )
+    );
+    return snap.docs.some(d => d.data().status !== 'cancelled');
+  },
   async getById(id: string): Promise<Order | null> {
     const docSnap = await getDoc(doc(db, COLLECTIONS.ORDERS, id));
     if (!docSnap.exists()) return null;
@@ -415,12 +427,20 @@ export const subscriptionsService = {
     const items = snap.docs.map(d => ({ id: d.id, ...d.data() } as Subscription));
     return items.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   },
+  async getById(id: string): Promise<Subscription | null> {
+    const snap = await getDoc(doc(db, COLLECTIONS.SUBSCRIPTIONS, id));
+    if (!snap.exists()) return null;
+    return { id: snap.id, ...snap.data() } as Subscription;
+  },
   async add(sub: Omit<Subscription, "id">): Promise<string> {
     const ref = await addDoc(collection(db, COLLECTIONS.SUBSCRIPTIONS), { ...sub, createdAt: now() });
     return ref.id;
   },
   async update(id: string, data: Partial<Subscription>): Promise<void> {
     await updateDoc(doc(db, COLLECTIONS.SUBSCRIPTIONS, id), data);
+  },
+  async delete(id: string): Promise<void> {
+    await deleteDoc(doc(db, COLLECTIONS.SUBSCRIPTIONS, id));
   },
   subscribe(cb: (items: Subscription[]) => void): Unsubscribe {
     return onSnapshot(collection(db, COLLECTIONS.SUBSCRIPTIONS), snap => {
@@ -653,5 +673,92 @@ export const subscriptionConfigService = {
     return onSnapshot(doc(db, 'settings', 'subscription_config'), snap => {
       cb(snap.exists() ? (snap.data() as SubscriptionConfig) : { ...DEFAULT_SUBSCRIPTION_CONFIG });
     });
+  },
+};
+
+// ─── Feature Flags ───────────────────────────────────────────────────────────
+export const featureFlagsService = {
+  async get(): Promise<FeatureFlags> {
+    try {
+      const snap = await getDoc(doc(db, 'settings', 'feature_flags'));
+      if (!snap.exists()) return { ...DEFAULT_FEATURE_FLAGS };
+      return { ...DEFAULT_FEATURE_FLAGS, ...(snap.data() as Partial<FeatureFlags>) };
+    } catch {
+      return { ...DEFAULT_FEATURE_FLAGS };
+    }
+  },
+  async save(flags: FeatureFlags): Promise<void> {
+    await setDoc(doc(db, 'settings', 'feature_flags'), { ...flags, updatedAt: now() });
+  },
+  subscribe(cb: (flags: FeatureFlags) => void): Unsubscribe {
+    return onSnapshot(doc(db, 'settings', 'feature_flags'), snap => {
+      cb(snap.exists()
+        ? { ...DEFAULT_FEATURE_FLAGS, ...(snap.data() as Partial<FeatureFlags>) }
+        : { ...DEFAULT_FEATURE_FLAGS });
+    });
+  },
+};
+
+// ─── Loading Facts ────────────────────────────────────────────────────
+export const loadingFactsService = {
+  /** Get cycle duration setting (ms). Default 1800ms. */
+  async getCycleDuration(): Promise<number> {
+    try {
+      const snap = await getDoc(doc(db, 'settings', 'loading_facts_config'));
+      if (!snap.exists()) return 1800;
+      return (snap.data().cycleDurationMs as number) ?? 1800;
+    } catch { return 1800; }
+  },
+  async saveCycleDuration(ms: number): Promise<void> {
+    await setDoc(doc(db, 'settings', 'loading_facts_config'), { cycleDurationMs: ms }, { merge: true });
+  },
+  async getAll(): Promise<LoadingFact[]> {
+    const snap = await getDocs(collection(db, COLLECTIONS.LOADING_FACTS));
+    return snap.docs
+      .map(d => ({ id: d.id, ...d.data() } as LoadingFact))
+      .sort((a, b) => a.sortOrder - b.sortOrder);
+  },
+  async getActive(): Promise<LoadingFact[]> {
+    const snap = await getDocs(
+      query(collection(db, COLLECTIONS.LOADING_FACTS), where('isActive', '==', true))
+    );
+    return snap.docs
+      .map(d => ({ id: d.id, ...d.data() } as LoadingFact))
+      .sort((a, b) => a.sortOrder - b.sortOrder);
+  },
+  async add(fact: Omit<LoadingFact, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
+    const ref = await addDoc(collection(db, COLLECTIONS.LOADING_FACTS), {
+      ...fact, createdAt: now(), updatedAt: now(),
+    });
+    return ref.id;
+  },
+  async update(id: string, data: Partial<LoadingFact>): Promise<void> {
+    await updateDoc(doc(db, COLLECTIONS.LOADING_FACTS, id), { ...data, updatedAt: now() });
+  },
+  async delete(id: string): Promise<void> {
+    await deleteDoc(doc(db, COLLECTIONS.LOADING_FACTS, id));
+  },
+  subscribe(cb: (items: LoadingFact[]) => void): Unsubscribe {
+    return onSnapshot(
+      query(collection(db, COLLECTIONS.LOADING_FACTS), where('isActive', '==', true)),
+      snap => {
+        const items = snap.docs
+          .map(d => ({ id: d.id, ...d.data() } as LoadingFact))
+          .sort((a, b) => a.sortOrder - b.sortOrder);
+        cb(items);
+      }
+    );
+  },
+  /** Admin-only: returns ALL facts including inactive */
+  subscribeAll(cb: (items: LoadingFact[]) => void): Unsubscribe {
+    return onSnapshot(
+      collection(db, COLLECTIONS.LOADING_FACTS),
+      snap => {
+        const items = snap.docs
+          .map(d => ({ id: d.id, ...d.data() } as LoadingFact))
+          .sort((a, b) => a.sortOrder - b.sortOrder);
+        cb(items);
+      }
+    );
   },
 };

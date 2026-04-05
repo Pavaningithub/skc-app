@@ -10,7 +10,9 @@
     "preview": "vite preview",
     "release:patch": "node scripts/release.mjs patch",
     "release:minor": "node scripts/release.mjs minor",
-    "release:major": "node scripts/release.mjs major"
+    "release:major": "node scripts/release.mjs major",
+    "test:e2e": "playwright test",
+    "test:customer": "playwright test e2e/customer.spec.ts"
   },
   "dependencies": {
     "@headlessui/react": "^2.2.9",

@@ -4,7 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import {
   LayoutDashboard, ShoppingBag, Package, BarChart3, Users,
   RefreshCw, MessageSquare, Settings, Menu,
-  Leaf, LogOut, Bell, Megaphone, Handshake, Boxes, Gift, TrendingUp,
+  Leaf, LogOut, Bell, Megaphone, Handshake, Boxes, Gift, TrendingUp, ToggleLeft, Lightbulb,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { ordersService } from '../../lib/services';
@@ -24,7 +24,9 @@ const navItems = [
   { to: '/admin/subscriptions', icon: RefreshCw, label: 'Subscriptions' },
   { to: '/admin/subscription-analytics', icon: TrendingUp, label: 'Sub Analytics' },
   { to: '/admin/agents', icon: Handshake, label: 'Agents' },
-  { to: '/admin/referral-settings', icon: Gift, label: 'Referral' },
+  { to: '/admin/referral-settings', icon: Gift,       label: 'Referral' },
+  { to: '/admin/features',          icon: ToggleLeft,  label: 'Features' },
+  { to: '/admin/loading-facts',     icon: Lightbulb,   label: 'Load Facts' },
   { to: '/admin/feedback', icon: MessageSquare, label: 'Feedback' },
   { to: '/admin/announcements', icon: Megaphone, label: 'Announce' },
   { to: '/admin/settings', icon: Settings, label: 'Settings' },
@@ -45,9 +47,9 @@ export default function AdminLayout() {
       toast(
         (t) => (
           <div className="flex flex-col gap-2">
-            <div className="flex items-center gap-2">
-              <Bell className="w-4 h-4 text-orange-500 flex-shrink-0" />
-              <div className="min-w-0">
+            <div className="flex items-start gap-2">
+              <Bell className="w-4 h-4 text-orange-500 flex-shrink-0 mt-0.5" />
+              <div className="min-w-0 flex-1">
                 <p className="font-semibold text-sm text-gray-800">
                   New {order.type === 'sample' ? 'Sample ' : ''}Order #{order.orderNumber}
                 </p>
@@ -55,6 +57,13 @@ export default function AdminLayout() {
                   {order.customerName} · {order.customerPlace || '—'} · {order.type === 'sample' ? 'Free sample' : `₹${order.total}`}
                 </p>
               </div>
+              <button
+                onClick={() => toast.dismiss(t.id)}
+                className="text-gray-400 hover:text-gray-600 text-lg leading-none flex-shrink-0 -mt-0.5"
+                aria-label="Dismiss"
+              >
+                ×
+              </button>
             </div>
             <div className="flex gap-2">
               <a
@@ -77,7 +86,7 @@ export default function AdminLayout() {
           </div>
         ),
         {
-          duration: Infinity,
+          duration: 30000,
           style: { maxWidth: '320px', padding: '12px' },
         }
       );

@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Search, ChevronDown, ChevronUp, Tag, ArrowUpDown, Copy, Share2 } from 'lucide-react';
+import { Search, ChevronDown, ChevronUp, Tag, ArrowUpDown, Copy, Share2, Pencil, Check, X } from 'lucide-react';
 import { customersService, ordersService } from '../../lib/services';
 import { useRealtimeCollection } from '../../lib/useRealtimeCollection';
 import { formatCurrency, formatDate, referralShareMessage, buildWABusinessUrl } from '../../lib/utils';
@@ -29,6 +29,7 @@ export default function CustomersPage() {
   const [customerOrders, setCustomerOrders] = useState<Record<string, Order[]>>({});
   const [discountEdit, setDiscountEdit] = useState<Record<string, string>>({}); // customerId -> draft string
   const [savingDiscount, setSavingDiscount] = useState<string | null>(null);
+  const [referralCodeEdit, setReferralCodeEdit] = useState<Record<string, string | null>>({}); // null = not editing, string = draft
   const [markingPaid, setMarkingPaid] = useState<string | null>(null);   // customerId being processed
   const [custFilter, setCustFilter] = useState<CustFilter>('all');
   const [sortKey, setSortKey] = useState<CustSort>('name_asc');
@@ -331,19 +332,54 @@ export default function CustomersPage() {
                         {c.referralCode ? (
                           <div className="bg-white rounded-xl border border-orange-100 p-3 space-y-2">
                             <p className="text-xs font-semibold text-gray-700">🎟️ Referral Code</p>
-                            <div className="flex items-center justify-between gap-2">
-                              <span className="font-mono font-bold text-base tracking-widest text-orange-700 bg-orange-50 px-3 py-1.5 rounded-lg flex-1">
-                                {c.referralCode}
-                              </span>
-                              <button
-                                onClick={() => {
-                                  navigator.clipboard.writeText(c.referralCode!);
-                                  toast.success('Code copied!');
-                                }}
-                                className="flex items-center gap-1 text-xs border border-gray-200 text-gray-600 px-2.5 py-1.5 rounded-lg hover:bg-gray-50">
-                                <Copy className="w-3 h-3" /> Copy
-                              </button>
-                            </div>
+                            {referralCodeEdit[c.id] !== undefined && referralCodeEdit[c.id] !== null ? (
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="text"
+                                  value={referralCodeEdit[c.id] as string}
+                                  onChange={e => setReferralCodeEdit(prev => ({ ...prev, [c.id]: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '') }))}
+                                  maxLength={12}
+                                  placeholder="e.g. RAVI123"
+                                  className="flex-1 font-mono font-bold text-base tracking-widest border border-orange-300 rounded-lg px-3 py-1.5 outline-none focus:border-orange-500"
+                                />
+                                <button
+                                  onClick={async () => {
+                                    const code = (referralCodeEdit[c.id] as string).trim();
+                                    if (!code) return toast.error('Code cannot be empty');
+                                    if (code.length < 4) return toast.error('Code must be at least 4 characters');
+                                    await customersService.update(c.id, { referralCode: code });
+                                    toast.success('Referral code updated!');
+                                    setReferralCodeEdit(prev => ({ ...prev, [c.id]: null }));
+                                  }}
+                                  className="text-green-600 hover:text-green-700 p-1.5 rounded-lg border border-green-200 hover:bg-green-50">
+                                  <Check className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={() => setReferralCodeEdit(prev => ({ ...prev, [c.id]: null }))}
+                                  className="text-gray-400 hover:text-gray-600 p-1.5 rounded-lg border border-gray-200 hover:bg-gray-50">
+                                  <X className="w-4 h-4" />
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="font-mono font-bold text-base tracking-widest text-orange-700 bg-orange-50 px-3 py-1.5 rounded-lg flex-1">
+                                  {c.referralCode}
+                                </span>
+                                <button
+                                  onClick={() => setReferralCodeEdit(prev => ({ ...prev, [c.id]: c.referralCode ?? '' }))}
+                                  className="flex items-center gap-1 text-xs border border-blue-200 text-blue-600 px-2.5 py-1.5 rounded-lg hover:bg-blue-50">
+                                  <Pencil className="w-3 h-3" /> Edit
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(c.referralCode!);
+                                    toast.success('Code copied!');
+                                  }}
+                                  className="flex items-center gap-1 text-xs border border-gray-200 text-gray-600 px-2.5 py-1.5 rounded-lg hover:bg-gray-50">
+                                  <Copy className="w-3 h-3" /> Copy
+                                </button>
+                              </div>
+                            )}
                             {c.referralCredit > 0 && (
                               <p className="text-xs text-orange-600">💰 Credit balance: <strong>₹{c.referralCredit}</strong></p>
                             )}
