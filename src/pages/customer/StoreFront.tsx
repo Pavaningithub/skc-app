@@ -54,6 +54,7 @@ export default function StoreFront() {
   const [loadingFacts, setLoadingFacts] = useState<LoadingFact[]>([]);
   const [factIndex, setFactIndex]       = useState(0);
   const [factVisible, setFactVisible]   = useState(true);  // for fade in/out
+  const [factCycleDuration, setFactCycleDuration] = useState(1800); // ms — from Firestore
 
   const [marqueesPaused, setMarqueesPaused] = useState(false);
   const [dismissedLaunches, setDismissedLaunches] = useState<string[]>(() => {
@@ -73,7 +74,7 @@ export default function StoreFront() {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  // Cycle loading facts every 2.5s with fade transition
+  // Cycle loading facts with admin-configured duration
   useEffect(() => {
     if (!loading || loadingFacts.length < 2) return;
     const interval = setInterval(() => {
@@ -81,10 +82,10 @@ export default function StoreFront() {
       setTimeout(() => {
         setFactIndex(i => (i + 1) % loadingFacts.length);
         setFactVisible(true);
-      }, 400); // 400ms fade out, then swap
-    }, 2500);
+      }, 350); // 350ms fade out, then swap
+    }, factCycleDuration);
     return () => clearInterval(interval);
-  }, [loading, loadingFacts]);
+  }, [loading, loadingFacts, factCycleDuration]);
 
   // When the order form opens and there's a URL ref code, auto-validate it
   useEffect(() => {
@@ -120,12 +121,14 @@ export default function StoreFront() {
   async function load() {
     setLoading(true);
     try {
-      // Load products + facts in parallel
-      const [p, facts] = await Promise.all([
+      // Load products + facts + cycle config in parallel
+      const [p, facts, cycleDuration] = await Promise.all([
         productsService.getActive(),
         loadingFactsService.getActive().catch(() => [] as LoadingFact[]),
+        loadingFactsService.getCycleDuration().catch(() => 1800),
       ]);
       setProducts(p);
+      setFactCycleDuration(cycleDuration);
       if (facts.length > 0) {
         // Shuffle so each visit feels fresh
         const shuffled = [...facts].sort(() => Math.random() - 0.5);
@@ -1008,7 +1011,7 @@ export default function StoreFront() {
             <a href="https://chat.whatsapp.com/***REMOVED***" target="_blank" rel="noreferrer"
               className="flex items-center gap-3 rounded-xl px-4 py-3 text-left"
               style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)' }}>
-              <span className="text-2xl flex-shrink-0">👥</span>
+              <svg className="w-6 h-6 flex-shrink-0" viewBox="0 0 32 32" fill="#25d366"><path d="M16 3C9.373 3 4 8.373 4 15c0 2.385.668 4.61 1.822 6.51L4 29l7.701-1.797A12.93 12.93 0 0 0 16 28c6.627 0 12-5.373 12-12S22.627 3 16 3zm0 2c5.523 0 10 4.477 10 10S21.523 25 16 25c-1.97 0-3.8-.57-5.35-1.55l-.37-.23-4.57 1.07 1.1-4.46-.25-.38A9.96 9.96 0 0 1 6 15c0-5.523 4.477-10 10-10zm-3.5 5.5c-.28 0-.73.1-1.11.52-.38.42-1.45 1.41-1.45 3.44 0 2.03 1.48 3.99 1.69 4.27.2.27 2.9 4.63 7.13 6.31 3.54 1.4 4.25 1.12 5.02.99.76-.13 2.46-.89 2.81-1.76.35-.87.35-1.61.24-1.76-.1-.16-.37-.26-.78-.46-.4-.2-2.38-.96-2.75-1.07-.36-.1-.63-.16-.89.16-.27.33-1.03 1.07-1.26 1.29-.23.21-.46.24-.86.08-.4-.16-1.69-.54-3.21-1.72-1.19-.92-1.99-2.06-2.22-2.41-.23-.35-.02-.54.17-.72.18-.16.4-.42.6-.63.2-.21.27-.35.4-.59.14-.24.07-.45-.02-.63-.08-.18-.87-2.13-1.21-2.92-.32-.77-.65-.65-.89-.66l-.76-.02z"/></svg>
               <div className="min-w-0">
                 <p className="text-sm font-medium text-white">WhatsApp Community</p>
                 <p className="text-xs" style={{ color: 'rgba(255,255,255,0.5)' }}>Updates, offers & announcements</p>
