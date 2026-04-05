@@ -44,11 +44,15 @@ export const APP_CONFIG = {
   WHATSAPP_GROUP_LINK:        import.meta.env.VITE_WA_GROUP_LINK     as string,
   WHATSAPP_CHANNEL_LINK:      import.meta.env.VITE_WA_CHANNEL_LINK   as string,
   // WhatsApp Community (invite link — set in Vercel env, never in source)
-  WHATSAPP_COMMUNITY_URL:     import.meta.env.VITE_WA_COMMUNITY_URL  as string | undefined,
+  WHATSAPP_COMMUNITY_URL:     import.meta.env.VITE_WA_COMMUNITY_URL  || '',
   // Internal group for order tracking (admins only)
   ORDER_TRACKING_GROUP_LINK:  import.meta.env.VITE_WA_TRACKING_LINK  as string,
   WHATSAPP_GROUP_DISPLAY:     'Join Our WhatsApp Group for Offers & Updates',
   WHATSAPP_CHANNEL_DISPLAY:   'Follow Our WhatsApp Channel',
+
+  // ── Social Media (from env — leave empty to hide) ─────────────────────────
+  INSTAGRAM_URL:              import.meta.env.VITE_INSTAGRAM_URL || '',
+  FACEBOOK_URL:               import.meta.env.VITE_FACEBOOK_URL  || '',
 
   // ── Storefront UI ────────────────────────────────────────────────
   MAX_TESTIMONIALS_ON_HOME: 8,
