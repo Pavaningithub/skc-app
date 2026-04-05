@@ -43,6 +43,8 @@ export const APP_CONFIG = {
   SHOW_WHATSAPP_GROUP_LINK:   true,
   WHATSAPP_GROUP_LINK:        import.meta.env.VITE_WA_GROUP_LINK     as string,
   WHATSAPP_CHANNEL_LINK:      import.meta.env.VITE_WA_CHANNEL_LINK   as string,
+  // WhatsApp Community (invite link — set in Vercel env, never in source)
+  WHATSAPP_COMMUNITY_URL:     import.meta.env.VITE_WA_COMMUNITY_URL  as string | undefined,
   // Internal group for order tracking (admins only)
   ORDER_TRACKING_GROUP_LINK:  import.meta.env.VITE_WA_TRACKING_LINK  as string,
   WHATSAPP_GROUP_DISPLAY:     'Join Our WhatsApp Group for Offers & Updates',
