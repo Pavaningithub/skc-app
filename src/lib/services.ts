@@ -699,8 +699,19 @@ export const featureFlagsService = {
   },
 };
 
-// ─── Loading Facts ────────────────────────────────────────────────────────────
+// ─── Loading Facts ────────────────────────────────────────────────────
 export const loadingFactsService = {
+  /** Get cycle duration setting (ms). Default 1800ms. */
+  async getCycleDuration(): Promise<number> {
+    try {
+      const snap = await getDoc(doc(db, 'settings', 'loading_facts_config'));
+      if (!snap.exists()) return 1800;
+      return (snap.data().cycleDurationMs as number) ?? 1800;
+    } catch { return 1800; }
+  },
+  async saveCycleDuration(ms: number): Promise<void> {
+    await setDoc(doc(db, 'settings', 'loading_facts_config'), { cycleDurationMs: ms }, { merge: true });
+  },
   async getAll(): Promise<LoadingFact[]> {
     const snap = await getDocs(collection(db, COLLECTIONS.LOADING_FACTS));
     return snap.docs

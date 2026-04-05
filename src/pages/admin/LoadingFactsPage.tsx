@@ -1,9 +1,17 @@
-import { useState } from 'react';
-import { Plus, Pencil, Trash2, ToggleLeft, ToggleRight, GripVertical, Lightbulb } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Plus, Pencil, Trash2, ToggleLeft, ToggleRight, GripVertical, Lightbulb, Timer } from 'lucide-react';
 import { loadingFactsService } from '../../lib/services';
 import { useRealtimeCollection } from '../../lib/useRealtimeCollection';
 import type { LoadingFact } from '../../lib/types';
 import toast from 'react-hot-toast';
+
+const SPEED_OPTIONS = [
+  { label: 'Very Fast', ms: 800 },
+  { label: 'Fast',      ms: 1200 },
+  { label: 'Medium',    ms: 1800 },
+  { label: 'Slow',      ms: 2800 },
+  { label: 'Very Slow', ms: 4000 },
+];
 
 const CATEGORIES: LoadingFact['category'][] = ['Food', 'Health', 'Homemade', 'SKC'];
 
@@ -34,6 +42,22 @@ export default function LoadingFactsPage() {
   const [form, setForm] = useState(emptyForm());
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [cycleDuration, setCycleDuration] = useState(1800);
+  const [savingSpeed, setSavingSpeed] = useState(false);
+
+  useEffect(() => {
+    loadingFactsService.getCycleDuration().then(setCycleDuration);
+  }, []);
+
+  async function saveSpeed(ms: number) {
+    setSavingSpeed(true);
+    try {
+      await loadingFactsService.saveCycleDuration(ms);
+      setCycleDuration(ms);
+      toast.success('Speed saved');
+    } catch { toast.error('Failed to save speed'); }
+    finally { setSavingSpeed(false); }
+  }
 
   function openAdd() {
     setEditId(null);
@@ -110,10 +134,28 @@ export default function LoadingFactsPage() {
         </button>
       </div>
 
-      {/* Preview hint */}
-      <div className="mb-4 p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-800 flex items-start gap-2">
-        <span className="text-base">💡</span>
-        <span>Active facts rotate every <strong>2.5 seconds</strong> on the loading screen with a smooth fade. Add at least 5–10 for variety. The storefront shows them in <strong>sort order</strong> (lowest first), then shuffles.</span>
+      {/* Speed Control */}
+      <div className="mb-4 p-4 rounded-xl bg-white border border-gray-200">
+        <div className="flex items-center gap-2 mb-3">
+          <Timer className="w-4 h-4 text-orange-500" />
+          <span className="text-sm font-semibold text-gray-700">Cycle Speed</span>
+          <span className="ml-auto text-xs text-gray-400">{cycleDuration}ms per fact</span>
+        </div>
+        <div className="flex gap-2 flex-wrap">
+          {SPEED_OPTIONS.map(opt => (
+            <button key={opt.ms}
+              onClick={() => saveSpeed(opt.ms)}
+              disabled={savingSpeed}
+              className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
+                cycleDuration === opt.ms
+                  ? 'bg-orange-500 border-orange-500 text-white'
+                  : 'border-gray-200 text-gray-600 hover:border-orange-300 hover:text-orange-600'
+              }`}>
+              {opt.label}
+            </button>
+          ))}
+        </div>
+        <p className="text-xs text-gray-400 mt-2">Changes apply immediately for new visitors.</p>
       </div>
 
       {/* List */}
