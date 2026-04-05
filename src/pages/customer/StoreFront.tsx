@@ -54,7 +54,8 @@ export default function StoreFront() {
   const [loadingFacts, setLoadingFacts] = useState<LoadingFact[]>([]);
   const [factIndex, setFactIndex]       = useState(0);
   const [factVisible, setFactVisible]   = useState(true);  // for fade in/out
-  const [factCycleDuration, setFactCycleDuration] = useState(1800); // ms — from Firestore
+  const [factCycleDuration, setFactCycleDuration] = useState<number | null>(null); // null = not yet loaded
+  const [factsReady, setFactsReady]     = useState(false); // true once both facts + duration loaded
 
   const [marqueesPaused, setMarqueesPaused] = useState(false);
   const [dismissedLaunches, setDismissedLaunches] = useState<string[]>(() => {
@@ -74,18 +75,18 @@ export default function StoreFront() {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  // Cycle loading facts with admin-configured duration
+  // Cycle loading facts — only after both facts AND duration are loaded from Firestore
   useEffect(() => {
-    if (!loading || loadingFacts.length < 2) return;
+    if (!loading || !factsReady || !factCycleDuration || loadingFacts.length < 2) return;
     const interval = setInterval(() => {
       setFactVisible(false);
       setTimeout(() => {
         setFactIndex(i => (i + 1) % loadingFacts.length);
         setFactVisible(true);
-      }, 350); // 350ms fade out, then swap
+      }, 350);
     }, factCycleDuration);
     return () => clearInterval(interval);
-  }, [loading, loadingFacts, factCycleDuration]);
+  }, [loading, factsReady, loadingFacts, factCycleDuration]);
 
   // When the order form opens and there's a URL ref code, auto-validate it
   useEffect(() => {
@@ -130,10 +131,10 @@ export default function StoreFront() {
       setProducts(p);
       setFactCycleDuration(cycleDuration);
       if (facts.length > 0) {
-        // Shuffle so each visit feels fresh
         const shuffled = [...facts].sort(() => Math.random() - 0.5);
         setLoadingFacts(shuffled);
       }
+      setFactsReady(true); // both facts + duration now known — safe to start cycling
     } finally { setLoading(false); }
 
     // Load stats in the background after products are shown
@@ -408,25 +409,14 @@ export default function StoreFront() {
     finally { setSubmitting(false); }
   }
 
-  // Fallback facts — shown if Firestore has none yet
-  const FALLBACK_FACTS = [
-    { emoji: '🌶️', text: 'Chilli powder is rich in Vitamin C — more than most citrus fruits!' },
-    { emoji: '🧄', text: 'Garlic has been used as a natural antibiotic for over 7,000 years.' },
-    { emoji: '🌿', text: 'Fresh homemade chutneys retain 3x more nutrients than store-bought versions.' },
-    { emoji: '🫙', text: 'Handground masalas release essential oils that boost both flavour and digestion.' },
-    { emoji: '💪', text: 'Turmeric’s curcumin is a powerful anti-inflammatory used in Ayurveda for centuries.' },
-    { emoji: '🏺', text: 'Pickling is one of humanity’s oldest preservation techniques — over 4,000 years old!' },
-    { emoji: '🤲', text: 'Small-batch, hand-made food has no preservatives — just pure ingredients and love.' },
-    { emoji: '🌾', text: 'Ragi (finger millet) is a complete protein and one of the richest plant sources of calcium.' },
-  ];
-
   if (loading) {
-    const displayFacts = loadingFacts.length > 0 ? loadingFacts : FALLBACK_FACTS;
-    const current = displayFacts[factIndex % displayFacts.length];
+    // Show facts only when both are loaded from Firestore — avoids fallback cycling at wrong speed
+    const showCarousel = factsReady && loadingFacts.length > 0;
+    const current = showCarousel ? loadingFacts[factIndex % loadingFacts.length] : null;
     const categoryColors: Record<string, string> = {
       Food: '#f97316', Health: '#22c55e', Homemade: '#f59e0b', SKC: '#a855f7',
     };
-    const catColor = 'category' in current ? categoryColors[(current as LoadingFact).category] ?? '#c8821a' : '#c8821a';
+    const catColor = current && 'category' in current ? categoryColors[(current as LoadingFact).category] ?? '#c8821a' : '#c8821a';
 
     return (
       <div className="min-h-screen flex flex-col items-center justify-center px-6"
@@ -439,49 +429,49 @@ export default function StoreFront() {
           <p className="text-xs italic mt-1" style={{ color: '#c8821a' }}>Where Taste Meets Tradition</p>
         </div>
 
-        {/* Did You Know card */}
-        <div className="w-full max-w-sm">
-          <p className="text-center text-xs font-semibold uppercase tracking-widest mb-4" style={{ color: 'rgba(255,215,0,0.6)' }}>Did You Know?</p>
-          <div
-            className="rounded-2xl p-6 text-center transition-all duration-400"
-            style={{
-              background: 'rgba(255,255,255,0.07)',
-              border: '1px solid rgba(255,255,255,0.12)',
-              opacity: factVisible ? 1 : 0,
-              transform: factVisible ? 'translateY(0)' : 'translateY(8px)',
-              transition: 'opacity 0.4s ease, transform 0.4s ease',
-            }}>
-            <div className="text-5xl mb-4">{current.emoji}</div>
-            {'category' in current && (
+        {/* Did You Know card — only when facts are loaded */}
+        {showCarousel && current && (
+          <div className="w-full max-w-sm">
+            <p className="text-center text-xs font-semibold uppercase tracking-widest mb-4" style={{ color: 'rgba(255,215,0,0.6)' }}>Did You Know?</p>
+            <div
+              className="rounded-2xl p-6 text-center"
+              style={{
+                background: 'rgba(255,255,255,0.07)',
+                border: '1px solid rgba(255,255,255,0.12)',
+                opacity: factVisible ? 1 : 0,
+                transform: factVisible ? 'translateY(0)' : 'translateY(8px)',
+                transition: 'opacity 0.35s ease, transform 0.35s ease',
+              }}>
+              <div className="text-5xl mb-4">{current.emoji}</div>
               <span className="text-xs font-semibold px-2.5 py-1 rounded-full mb-3 inline-block"
                 style={{ background: `${catColor}22`, color: catColor, border: `1px solid ${catColor}55` }}>
-                {'category' in current ? (current as LoadingFact).category : ''}
+                {(current as LoadingFact).category}
               </span>
-            )}
-            <p className="text-white text-sm leading-relaxed mt-2" style={{ fontFamily: 'Georgia, serif' }}>
-              {current.text}
-            </p>
-          </div>
-
-          {/* Progress dots */}
-          {displayFacts.length > 1 && (
-            <div className="flex justify-center gap-1.5 mt-4">
-              {displayFacts.map((_, i) => (
-                <div key={i}
-                  className="rounded-full transition-all duration-300"
-                  style={{
-                    width: i === factIndex % displayFacts.length ? '20px' : '6px',
-                    height: '6px',
-                    background: i === factIndex % displayFacts.length ? '#c8821a' : 'rgba(255,255,255,0.25)',
-                  }} />
-              ))}
+              <p className="text-white text-sm leading-relaxed mt-2" style={{ fontFamily: 'Georgia, serif' }}>
+                {current.text}
+              </p>
             </div>
-          )}
-        </div>
+            {/* Progress dots */}
+            {loadingFacts.length > 1 && (
+              <div className="flex justify-center gap-1.5 mt-4">
+                {loadingFacts.map((_, i) => (
+                  <div key={i}
+                    className="rounded-full transition-all duration-300"
+                    style={{
+                      width: i === factIndex % loadingFacts.length ? '20px' : '6px',
+                      height: '6px',
+                      background: i === factIndex % loadingFacts.length ? '#c8821a' : 'rgba(255,255,255,0.25)',
+                    }} />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Loading indicator */}
         <div className="mt-10 flex items-center gap-2">
-          <div className="w-4 h-4 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: '#c8821a', borderTopColor: 'transparent' }} />
+          <div className="w-4 h-4 border-2 border-t-transparent rounded-full animate-spin"
+            style={{ borderColor: '#c8821a', borderTopColor: 'transparent' }} />
           <span className="text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>Loading fresh products…</span>
         </div>
       </div>
