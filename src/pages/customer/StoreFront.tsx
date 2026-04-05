@@ -51,6 +51,7 @@ export default function StoreFront() {
   const { config: referralConfig } = useReferralConfig();
   const { flags: featureFlags } = useFeatureFlags();
   const [scrolledPastHero, setScrolledPastHero] = useState(false);
+
   const [marqueesPaused, setMarqueesPaused] = useState(false);
   const [dismissedLaunches, setDismissedLaunches] = useState<string[]>(() => {
     try { return JSON.parse(localStorage.getItem('skc_dismissed_launches') ?? '[]'); } catch { return []; }
@@ -61,7 +62,10 @@ export default function StoreFront() {
 
   // Show floating CTA pill only after hero CTA buttons have scrolled out of view (~400px)
   useEffect(() => {
-    const onScroll = () => setScrolledPastHero(window.scrollY > 400);
+    const onScroll = () => {
+      setScrolledPastHero(window.scrollY > 400);
+
+    };
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
@@ -392,90 +396,66 @@ export default function StoreFront() {
 
       {/* Header — slides up out of view when scrolled past hero */}
       <header ref={headerRef}
-        className="sticky top-0 z-40 shadow-md transition-transform duration-300"
+        className="sticky top-0 z-40 transition-transform duration-300"
         style={{
-          background: 'linear-gradient(90deg, #3d1c02 0%, #7a4010 50%, #3d1c02 100%)',
-          borderBottom: '2px solid #c8821a',
+          background: 'linear-gradient(90deg, #2a0f01 0%, #5a2a08 50%, #2a0f01 100%)',
+          borderBottom: '1.5px solid rgba(200,130,26,0.6)',
+          boxShadow: '0 2px 20px rgba(0,0,0,0.4)',
           transform: scrolledPastHero ? 'translateY(-110%)' : 'translateY(0)',
         }}>
-        <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 text-2xl"
-              style={{ background: 'rgba(200,130,26,0.25)', border: '2px solid #c8821a' }}>
+        <div className="max-w-4xl mx-auto px-4 h-14 flex items-center justify-between gap-3">
+
+          {/* Brand */}
+          <a href="/" className="flex items-center gap-2.5 flex-shrink-0 group">
+            <div className="w-9 h-9 rounded-full flex items-center justify-center text-lg flex-shrink-0 transition-transform group-hover:scale-110"
+              style={{ background: 'rgba(200,130,26,0.2)', border: '1.5px solid rgba(200,130,26,0.7)' }}>
               🪈
             </div>
-            <div className="min-w-0">
-              <p className="font-bold text-sm leading-tight text-white" style={{ fontFamily: 'Georgia, serif', letterSpacing: '0.5px' }}>SKC</p>
-              <p className="text-xs leading-tight italic" style={{ color: '#ffd700' }}>Where Taste Meets Tradition</p>
+            <div>
+              <p className="font-bold text-white text-sm leading-none tracking-wide" style={{ fontFamily: 'Georgia, serif' }}>SKC</p>
+              <p className="text-xs leading-none mt-0.5 hidden sm:block" style={{ color: '#c8821a', fontStyle: 'italic' }}>Where Taste Meets Tradition</p>
             </div>
-          </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <a href={APP_CONFIG.WHATSAPP_GROUP_LINK} target="_blank" rel="noreferrer"
-              className="hidden sm:flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-full"
-              style={{ color: '#ffd700', border: '1px solid rgba(200,130,26,0.5)' }}
-              title="Join our WhatsApp Group">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/></svg>
-              Group
-            </a>
-            <a href={APP_CONFIG.WHATSAPP_CHANNEL_LINK} target="_blank" rel="noreferrer"
-              className="hidden sm:flex items-center text-xs font-medium px-2.5 py-1.5 rounded-full"
-              style={{ color: '#ffd700', border: '1px solid rgba(200,130,26,0.5)' }}
-              title="Follow our WhatsApp Channel">
-              Channel
-            </a>
-            {APP_CONFIG.WHATSAPP_COMMUNITY_URL && (
-              <a href={APP_CONFIG.WHATSAPP_COMMUNITY_URL} target="_blank" rel="noreferrer"
-                className="hidden sm:flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-full"
-                style={{ color: '#3d1c02', background: '#c8821a' }}
-                title="Join our WhatsApp Community">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/></svg>
-                Community
-              </a>
-            )}
+          </a>
+
+          {/* Right actions */}
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+
+            {/* Connect — scrolls to footer Connect section */}
+            <button
+              onClick={() => document.getElementById('connect')?.scrollIntoView({ behavior: 'smooth' })}
+              className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full transition-all hover:opacity-80"
+              style={{ background: 'rgba(200,130,26,0.15)', color: '#ffd700', border: '1.5px solid rgba(200,130,26,0.5)' }}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/></svg>
+              <span className="hidden sm:inline">Connect</span>
+            </button>
+
+            {/* My Orders — icon on mobile, text on desktop */}
             <a href="/my-orders"
-              className="hidden sm:flex items-center text-xs font-medium px-3 py-1.5 rounded-full"
-              style={{ color: '#ffd700', border: '1px solid rgba(200,130,26,0.5)' }}>
-              My Account
+              className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full transition-opacity hover:opacity-80"
+              style={{ color: '#ffd700', border: '1.5px solid rgba(200,130,26,0.4)' }}
+              title="My Orders">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/>
+                <rect x="9" y="3" width="6" height="4" rx="1"/>
+                <path d="M9 12h6M9 16h4"/>
+              </svg>
+              <span className="hidden sm:inline">My Orders</span>
             </a>
+
+            {/* Cart */}
             <button onClick={() => setShowCart(true)}
-              className="relative w-11 h-11 rounded-full flex items-center justify-center"
-              style={{ background: 'rgba(200,130,26,0.25)', border: '1.5px solid #c8821a' }}>
-              <ShoppingCart className="w-5 h-5 text-white" />
+              className="relative w-9 h-9 rounded-full flex items-center justify-center transition-all hover:scale-105"
+              style={{ background: cartCount > 0 ? '#c8821a' : 'rgba(200,130,26,0.2)', border: '1.5px solid rgba(200,130,26,0.7)' }}>
+              <ShoppingCart className="w-4 h-4 text-white" />
               {cartCount > 0 && (
-                <span className="absolute -top-1 -right-1 w-5 h-5 text-xs rounded-full flex items-center justify-center font-bold"
-                  style={{ background: '#c8821a', color: '#3d1c02' }}>
+                <span className="absolute -top-1 -right-1 w-4 h-4 text-xs rounded-full flex items-center justify-center font-bold"
+                  style={{ background: '#ffd700', color: '#3d1c02', fontSize: '10px' }}>
                   {cartCount}
                 </span>
               )}
             </button>
+
           </div>
-        </div>
-        {/* Mobile nav row */}
-        <div className="sm:hidden flex gap-2 px-4 pb-2 flex-wrap">
-          <a href={APP_CONFIG.WHATSAPP_GROUP_LINK} target="_blank" rel="noreferrer"
-            className="text-xs font-medium px-3 py-1 rounded-full flex items-center gap-1"
-            style={{ color: '#ffd700', border: '1px solid rgba(200,130,26,0.5)' }}>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/></svg>
-            WA Group
-          </a>
-          <a href={APP_CONFIG.WHATSAPP_CHANNEL_LINK} target="_blank" rel="noreferrer"
-            className="text-xs font-medium px-3 py-1 rounded-full"
-            style={{ color: '#ffd700', border: '1px solid rgba(200,130,26,0.5)' }}>
-            Channel
-          </a>
-          {APP_CONFIG.WHATSAPP_COMMUNITY_URL && (
-            <a href={APP_CONFIG.WHATSAPP_COMMUNITY_URL} target="_blank" rel="noreferrer"
-              className="text-xs font-semibold px-3 py-1 rounded-full flex items-center gap-1"
-              style={{ color: '#3d1c02', background: '#c8821a' }}>
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/></svg>
-              Community
-            </a>
-          )}
-          <a href="/my-orders"
-            className="text-xs font-medium px-3 py-1 rounded-full"
-            style={{ color: '#ffd700', border: '1px solid rgba(200,130,26,0.5)' }}>
-            My Account
-          </a>
         </div>
       </header>
 
@@ -915,22 +895,32 @@ export default function StoreFront() {
           <p className="text-xs mb-6" style={{ color: '#ffd700' }}>🙏 Hare Krishna — Pure · Fresh · Made with Devotion 🌿</p>
 
           {/* Connect with Us */}
-          <p className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: 'rgba(255,215,0,0.6)' }}>Connect with Us</p>
+          <p id="connect" className="text-xs font-semibold uppercase tracking-widest mb-3 scroll-mt-4" style={{ color: 'rgba(255,215,0,0.6)' }}>Connect with Us</p>
           <div className="flex flex-col gap-2">
 
-            {/* WhatsApp Community — highlighted */}
-            {APP_CONFIG.WHATSAPP_COMMUNITY_URL && (
-              <a href={APP_CONFIG.WHATSAPP_COMMUNITY_URL} target="_blank" rel="noreferrer"
-                className="flex items-center gap-3 rounded-xl px-4 py-3 text-left"
-                style={{ background: 'rgba(37,211,102,0.15)', border: '1px solid rgba(37,211,102,0.4)' }}>
-                <span className="text-2xl flex-shrink-0">💬</span>
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-white">Join our WhatsApp Community</p>
-                  <p className="text-xs" style={{ color: 'rgba(255,255,255,0.55)' }}>Updates, offers & direct support</p>
-                </div>
-                <span className="ml-auto text-xs font-bold px-2 py-0.5 rounded-full flex-shrink-0" style={{ background: '#25d366', color: '#fff' }}>Join</span>
-              </a>
-            )}
+            {/* Direct DM — always shown */}
+            <a href={`https://wa.me/91${APP_CONFIG.WHATSAPP_NUMBER}?text=${encodeURIComponent('Hi! I found you on your website.')}`} target="_blank" rel="noreferrer"
+              className="flex items-center gap-3 rounded-xl px-4 py-3 text-left"
+              style={{ background: 'rgba(37,211,102,0.18)', border: '1.5px solid rgba(37,211,102,0.5)' }}>
+              <svg className="w-7 h-7 flex-shrink-0" viewBox="0 0 24 24" fill="#25d366"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/></svg>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-white">Chat with Us Directly</p>
+                <p className="text-xs" style={{ color: 'rgba(255,255,255,0.6)' }}>WhatsApp DM — we reply fast!</p>
+              </div>
+              <span className="ml-auto text-xs font-bold px-2 py-0.5 rounded-full flex-shrink-0" style={{ background: '#25d366', color: '#fff' }}>DM</span>
+            </a>
+
+            {/* WhatsApp Community — always shown */}
+            <a href="https://chat.whatsapp.com/***REMOVED***" target="_blank" rel="noreferrer"
+              className="flex items-center gap-3 rounded-xl px-4 py-3 text-left"
+              style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)' }}>
+              <span className="text-2xl flex-shrink-0">👥</span>
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-white">WhatsApp Community</p>
+                <p className="text-xs" style={{ color: 'rgba(255,255,255,0.5)' }}>Updates, offers & announcements</p>
+              </div>
+              <span className="ml-auto text-xs font-bold px-2 py-0.5 rounded-full flex-shrink-0" style={{ background: 'rgba(37,211,102,0.2)', color: '#25d366', border: '1px solid rgba(37,211,102,0.4)' }}>Join</span>
+            </a>
 
             {/* WA Group */}
             {APP_CONFIG.WHATSAPP_GROUP_LINK && (
@@ -950,7 +940,7 @@ export default function StoreFront() {
               <a href={APP_CONFIG.WHATSAPP_CHANNEL_LINK} target="_blank" rel="noreferrer"
                 className="flex items-center gap-3 rounded-xl px-4 py-3 text-left"
                 style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}>
-                <svg className="w-6 h-6 flex-shrink-0" viewBox="0 0 24 24" fill="#25d366"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/></svg>
+                <svg className="w-6 h-6 flex-shrink-0" viewBox="0 0 24 24" fill="#25d366"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/></svg>
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-white">WhatsApp Channel</p>
                   <p className="text-xs" style={{ color: 'rgba(255,255,255,0.5)' }}>Follow for news & recipes</p>
