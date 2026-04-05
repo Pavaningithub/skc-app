@@ -216,7 +216,13 @@ export default function OrderDetail() {
   async function cancelOrder() {
     if (!order) return;
     await ordersService.updateStatus(order.id, 'cancelled');
-    toast.success('Order cancelled');
+    // Restore any referral credit that was redeemed on this order
+    if (order.customerId && (order.creditUsed ?? 0) > 0) {
+      await customersService.addReferralCredit(order.customerId, order.creditUsed!);
+      toast.success(`Order cancelled — ₹${order.creditUsed} credit restored to customer`);
+    } else {
+      toast.success('Order cancelled');
+    }
     activityService.log('order_cancelled', `Order #${order.orderNumber} cancelled (${order.customerName})`, order.id, order.orderNumber);
     setConfirm(null);
     setLastStatusChanged('cancelled');
@@ -225,6 +231,10 @@ export default function OrderDetail() {
 
   async function deleteOrder() {
     if (!order) return;
+    // Restore any referral credit that was redeemed on this order before deleting
+    if (order.customerId && (order.creditUsed ?? 0) > 0) {
+      await customersService.addReferralCredit(order.customerId, order.creditUsed!);
+    }
     await ordersService.delete(order.id);
     toast.success('Order deleted');
     activityService.log('order_deleted', `Order #${order.orderNumber} deleted (${order.customerName})`, order.id, order.orderNumber);
