@@ -456,35 +456,71 @@ export default function StoreFront() {
         </div>
       </header>
 
-      {/* ── Floating CTA pill — bottom-right, appears only after hero CTAs scroll away ── */}
+      {/* ── Floating CTA — top-center on mobile, bottom-right on desktop ── */}
       {scrolledPastHero && !showCart && !showOrderForm && !showSampleForm && (
-        <div
-          className="fixed right-4 z-[38] flex flex-col gap-2 transition-all duration-300"
-          style={{ bottom: cartCount > 0 ? '88px' : '24px' }}
-        >
-          <button
-            onClick={() => document.getElementById('products')?.scrollIntoView({ behavior: 'smooth' })}
-            className="font-bold px-4 py-2 rounded-2xl text-sm shadow-xl whitespace-nowrap flex items-center gap-1.5"
-            style={{ background: '#c8821a', color: '#fff', border: '1.5px solid #e8c87a', boxShadow: '0 4px 20px rgba(200,130,26,0.5)' }}>
-            🛍️ Shop
-          </button>
-          {featureFlags.subscriptionBanner && (
+        <>
+          {/* Mobile: slim bar pinned to top */}
+          <div
+            className="sm:hidden fixed top-0 left-0 right-0 z-[38] flex items-center justify-center gap-2 px-3 py-2"
+            style={{
+              background: 'linear-gradient(90deg, #3d1c02 0%, #5a2a08 100%)',
+              borderBottom: '1.5px solid #c8821a',
+              boxShadow: '0 4px 16px rgba(61,28,2,0.5)',
+            }}
+          >
             <button
-              onClick={() => document.getElementById('subscribe')?.scrollIntoView({ behavior: 'smooth' })}
-              className="font-semibold px-4 py-2 rounded-2xl text-sm shadow-xl whitespace-nowrap"
-              style={{ background: '#3d1c02', color: '#ffd700', border: '1.5px solid #c8821a', boxShadow: '0 4px 20px rgba(61,28,2,0.4)' }}>
-              📦 Subscribe
+              onClick={() => document.getElementById('products')?.scrollIntoView({ behavior: 'smooth' })}
+              className="font-bold px-4 py-1.5 rounded-xl text-sm whitespace-nowrap"
+              style={{ background: '#c8821a', color: '#fff', border: '1.5px solid #e8c87a' }}>
+              🛍️ Shop
             </button>
-          )}
-          {featureFlags.sampleRequest && (
+            {featureFlags.subscriptionBanner && (
+              <button
+                onClick={() => document.getElementById('subscribe')?.scrollIntoView({ behavior: 'smooth' })}
+                className="font-semibold px-4 py-1.5 rounded-xl text-sm whitespace-nowrap border-2 text-white"
+                style={{ borderColor: 'rgba(255,255,255,0.4)', background: 'rgba(255,255,255,0.08)' }}>
+                📦 Subscribe
+              </button>
+            )}
+            {featureFlags.sampleRequest && (
+              <button
+                onClick={openSampleForm}
+                className="font-semibold px-4 py-1.5 rounded-xl text-sm whitespace-nowrap border-2 text-white"
+                style={{ borderColor: 'rgba(255,255,255,0.4)', background: 'rgba(255,255,255,0.08)' }}>
+                🎁 Sample
+              </button>
+            )}
+          </div>
+
+          {/* Desktop: stacked column bottom-right */}
+          <div
+            className="hidden sm:flex fixed right-4 z-[38] flex-col gap-2 transition-all duration-300"
+            style={{ bottom: cartCount > 0 ? '88px' : '24px' }}
+          >
             <button
-              onClick={openSampleForm}
-              className="font-semibold px-4 py-2 rounded-2xl text-sm shadow-xl whitespace-nowrap"
-              style={{ background: '#3d1c02', color: '#ffd700', border: '1.5px solid #c8821a', boxShadow: '0 4px 20px rgba(61,28,2,0.4)' }}>
-              🎁 Sample
+              onClick={() => document.getElementById('products')?.scrollIntoView({ behavior: 'smooth' })}
+              className="font-bold px-4 py-2 rounded-2xl text-sm shadow-xl whitespace-nowrap"
+              style={{ background: '#c8821a', color: '#fff', border: '1.5px solid #e8c87a', boxShadow: '0 4px 20px rgba(200,130,26,0.5)' }}>
+              🛍️ Shop
             </button>
-          )}
-        </div>
+            {featureFlags.subscriptionBanner && (
+              <button
+                onClick={() => document.getElementById('subscribe')?.scrollIntoView({ behavior: 'smooth' })}
+                className="font-semibold px-4 py-2 rounded-2xl text-sm shadow-xl whitespace-nowrap"
+                style={{ background: '#3d1c02', color: '#ffd700', border: '1.5px solid #c8821a', boxShadow: '0 4px 20px rgba(61,28,2,0.4)' }}>
+                📦 Subscribe
+              </button>
+            )}
+            {featureFlags.sampleRequest && (
+              <button
+                onClick={openSampleForm}
+                className="font-semibold px-4 py-2 rounded-2xl text-sm shadow-xl whitespace-nowrap"
+                style={{ background: '#3d1c02', color: '#ffd700', border: '1.5px solid #c8821a', boxShadow: '0 4px 20px rgba(61,28,2,0.4)' }}>
+                🎁 Sample
+              </button>
+            )}
+          </div>
+        </>
       )}
       <div className="relative overflow-hidden" style={{ background: 'linear-gradient(160deg, #3d1c02 0%, #7a4010 40%, #c8821a 75%, #e8a000 100%)' }}>
         {/* Decorative pattern */}
