@@ -144,6 +144,11 @@ export default function StoreFront() {
     });
 
   function addToCart(product: Product, qty: number, note?: string) {
+    // Compute the true step/minimum the same way ProductCard does
+    const qtyStep = product.unit === 'piece' ? 1 : product.unit === 'kg' ? 0.25 : product.minOrderQty || 250;
+    const rawMin  = product.minOrderQty && product.minOrderQty > 0 ? product.minOrderQty : qtyStep;
+    const minQty  = product.unit === 'kg' && rawMin >= 100 ? rawMin / 1000 : rawMin;
+
     setCart(prev => {
       const idx = prev.findIndex(i => i.productId === product.id && i.customizationNote === (note ?? ''));
       if (idx >= 0) {
@@ -156,6 +161,7 @@ export default function StoreFront() {
         productId: product.id, productName: product.name,
         unit: product.unit, quantity: qty,
         pricePerUnit: product.pricePerUnit, totalPrice: qty * product.pricePerUnit,
+        minOrderQty: minQty,
         customizationNote: note ?? '',
         isOnDemand: product.isOnDemand ?? false,
       }];
@@ -164,11 +170,16 @@ export default function StoreFront() {
   }
 
   function updateCartItem(idx: number, qty: number) {
-    if (qty <= 0) setCart(p => p.filter((_, i) => i !== idx));
-    else setCart(p => p.map((item, i) => i === idx
-      ? { ...item, quantity: qty, totalPrice: qty * item.pricePerUnit }
-      : item
-    ));
+    setCart(p => {
+      const item = p[idx];
+      const step = item?.minOrderQty ?? (item?.unit === 'piece' ? 1 : 250);
+      const min  = step; // minimum = one step
+      if (qty < min) return p.filter((_, i) => i !== idx); // remove if below minimum
+      return p.map((it, i) => i === idx
+        ? { ...it, quantity: qty, totalPrice: qty * it.pricePerUnit }
+        : it
+      );
+    });
   }
 
   const cartTotal = cart.reduce((s, i) => s + i.totalPrice, 0);
@@ -311,11 +322,12 @@ export default function StoreFront() {
         await customersService.update(customerId, { referredBy: referralCodeUsed });
       }
 
+      // Navigate first to avoid storefront flash, then clear state
+      navigate(`/order-confirmation/${orderId}`);
       setCart([]); setShowOrderForm(false);
       setMyReferralCode(null); setIsReturningCustomer(false); setReferralDiscount(0); setReferralError(''); setStandingDiscount(0);
       setOrderForm({ name: '', whatsapp: '', place: '', notes: '', referralCode: '' });
       toast.success('Order placed! 🎉');
-      navigate(`/order-confirmation/${orderId}`);
     } catch (err) { console.error('Order error:', err); toast.error('Something went wrong: ' + (err instanceof Error ? err.message : String(err))); }
     finally { setSubmitting(false); }
   }
@@ -363,9 +375,9 @@ export default function StoreFront() {
         createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
       };
       const orderId = await ordersService.add(order);
+      navigate(`/order-confirmation/${orderId}`);
       setShowSampleForm(false);
       toast.success("Sample request received! We'll contact you soon. 🎁");
-      navigate(`/order-confirmation/${orderId}`);
     } catch (err) { console.error('Sample error:', err); toast.error('Something went wrong: ' + (err instanceof Error ? err.message : String(err))); }
     finally { setSubmitting(false); }
   }
@@ -393,7 +405,7 @@ export default function StoreFront() {
             </div>
             <div className="min-w-0">
               <p className="font-bold text-sm leading-tight text-white" style={{ fontFamily: 'Georgia, serif', letterSpacing: '0.5px' }}>
-                Sri Krishna Condiments
+                SKC
               </p>
               <p className="text-xs leading-tight italic" style={{ color: '#ffd700' }}>Where Taste Meets Tradition</p>
             </div>
@@ -912,14 +924,14 @@ export default function StoreFront() {
                   <div className="flex flex-col items-end gap-2">
                     <p className="text-sm font-bold" style={{ color: '#c8821a' }}>₹{item.totalPrice.toFixed(0)}</p>
                     <div className="flex items-center gap-1.5">
-                      <button onClick={() => updateCartItem(i, item.quantity - (item.unit === 'piece' ? 1 : 50))}
+                      <button onClick={() => updateCartItem(i, item.quantity - (item.minOrderQty ?? (item.unit === 'piece' ? 1 : 250)))}
                         className="w-7 h-7 rounded-lg border flex items-center justify-center bg-white" style={{ borderColor: '#e0e0e0' }}>
                         <Minus className="w-3 h-3 text-gray-600" />
                       </button>
                       <span className="text-sm font-medium w-12 text-center">
                         {item.quantity}{item.unit === 'piece' ? '' : 'g'}
                       </span>
-                      <button onClick={() => updateCartItem(i, item.quantity + (item.unit === 'piece' ? 1 : 50))}
+                      <button onClick={() => updateCartItem(i, item.quantity + (item.minOrderQty ?? (item.unit === 'piece' ? 1 : 250)))}
                         className="w-7 h-7 rounded-lg border flex items-center justify-center bg-white" style={{ borderColor: '#e0e0e0' }}>
                         <Plus className="w-3 h-3 text-gray-600" />
                       </button>
