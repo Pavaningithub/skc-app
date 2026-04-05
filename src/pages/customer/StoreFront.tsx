@@ -51,11 +51,8 @@ export default function StoreFront() {
   const { config: referralConfig } = useReferralConfig();
   const { flags: featureFlags } = useFeatureFlags();
   const [scrolledPastHero, setScrolledPastHero] = useState(false);
-  const [loadingFacts, setLoadingFacts] = useState<LoadingFact[]>([]);
-  const [factIndex, setFactIndex]       = useState(0);
-  const [factVisible, setFactVisible]   = useState(true);  // for fade in/out
-  const [factCycleDuration, setFactCycleDuration] = useState<number | null>(null); // null = not yet loaded
-  const [factsReady, setFactsReady]     = useState(false); // true once both facts + duration loaded
+  const [loadingFact, setLoadingFact]   = useState<LoadingFact | null>(null); // single random fact for loading screen
+  const [factsReady, setFactsReady]     = useState(false); // true once fact + duration loaded from Firestore
 
   const [marqueesPaused, setMarqueesPaused] = useState(false);
   const [dismissedLaunches, setDismissedLaunches] = useState<string[]>(() => {
@@ -74,19 +71,6 @@ export default function StoreFront() {
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
-
-  // Cycle loading facts — only after both facts AND duration are loaded from Firestore
-  useEffect(() => {
-    if (!loading || !factsReady || !factCycleDuration || loadingFacts.length < 2) return;
-    const interval = setInterval(() => {
-      setFactVisible(false);
-      setTimeout(() => {
-        setFactIndex(i => (i + 1) % loadingFacts.length);
-        setFactVisible(true);
-      }, 350);
-    }, factCycleDuration);
-    return () => clearInterval(interval);
-  }, [loading, factsReady, loadingFacts, factCycleDuration]);
 
   // When the order form opens and there's a URL ref code, auto-validate it
   useEffect(() => {
@@ -123,27 +107,25 @@ export default function StoreFront() {
     setLoading(true);
     setFactsReady(false);
 
-    // Step 1: fetch facts + duration quickly so carousel starts ASAP
-    let duration = 2500;
+    // Step 1: fetch one random fact + duration quickly so it shows immediately
+    let duration = 3000;
     try {
       const [facts, cycleDuration] = await Promise.all([
         loadingFactsService.getActive().catch(() => [] as LoadingFact[]),
-        loadingFactsService.getCycleDuration().catch(() => 2500),
+        loadingFactsService.getCycleDuration().catch(() => 3000),
       ]);
-      duration = cycleDuration;
-      setFactCycleDuration(cycleDuration);
+      duration = Math.max(cycleDuration, 3000);
       if (facts.length > 0) {
-        const shuffled = [...facts].sort(() => Math.random() - 0.5);
-        setLoadingFacts(shuffled);
+        // Pick one random fact — shown for the full duration
+        setLoadingFact(facts[Math.floor(Math.random() * facts.length)]);
       }
       setFactsReady(true);
-    } catch { /* carousel won't show — that's fine */ }
+    } catch { /* fact won't show — that's fine */ }
 
-    // Step 2: load products + enforce minimum screen time (2 full cycles or 3s, whichever longer)
-    const minVisible = Math.max(duration * 2, 3000);
+    // Step 2: load products + hold screen for exactly the admin-configured duration
     const [p] = await Promise.all([
       productsService.getActive().catch(() => [] as Product[]),
-      new Promise(res => setTimeout(res, minVisible)),
+      new Promise(res => setTimeout(res, duration)),
     ]);
     setProducts(p as Product[]);
     setLoading(false);
@@ -421,13 +403,10 @@ export default function StoreFront() {
   }
 
   if (loading) {
-    // Show facts only when both are loaded from Firestore — avoids fallback cycling at wrong speed
-    const showCarousel = factsReady && loadingFacts.length > 0;
-    const current = showCarousel ? loadingFacts[factIndex % loadingFacts.length] : null;
     const categoryColors: Record<string, string> = {
       Food: '#f97316', Health: '#22c55e', Homemade: '#f59e0b', SKC: '#a855f7',
     };
-    const catColor = current && 'category' in current ? categoryColors[(current as LoadingFact).category] ?? '#c8821a' : '#c8821a';
+    const catColor = loadingFact ? categoryColors[loadingFact.category] ?? '#c8821a' : '#c8821a';
 
     return (
       <div className="min-h-screen flex flex-col items-center justify-center px-6"
@@ -440,8 +419,8 @@ export default function StoreFront() {
           <p className="text-xs italic mt-1" style={{ color: '#c8821a' }}>Where Taste Meets Tradition</p>
         </div>
 
-        {/* Did You Know card — only when facts are loaded */}
-        {showCarousel && current && (
+        {/* Did You Know card — single random fact, shown once Firestore resolves */}
+        {factsReady && loadingFact && (
           <div className="w-full max-w-sm">
             <p className="text-center text-xs font-semibold uppercase tracking-widest mb-4" style={{ color: 'rgba(255,215,0,0.6)' }}>Did You Know?</p>
             <div
@@ -449,33 +428,16 @@ export default function StoreFront() {
               style={{
                 background: 'rgba(255,255,255,0.07)',
                 border: '1px solid rgba(255,255,255,0.12)',
-                opacity: factVisible ? 1 : 0,
-                transform: factVisible ? 'translateY(0)' : 'translateY(8px)',
-                transition: 'opacity 0.35s ease, transform 0.35s ease',
               }}>
-              <div className="text-5xl mb-4">{current.emoji}</div>
+              <div className="text-5xl mb-4">{loadingFact.emoji}</div>
               <span className="text-xs font-semibold px-2.5 py-1 rounded-full mb-3 inline-block"
                 style={{ background: `${catColor}22`, color: catColor, border: `1px solid ${catColor}55` }}>
-                {(current as LoadingFact).category}
+                {loadingFact.category}
               </span>
               <p className="text-white text-sm leading-relaxed mt-2" style={{ fontFamily: 'Georgia, serif' }}>
-                {current.text}
+                {loadingFact.text}
               </p>
             </div>
-            {/* Progress dots */}
-            {loadingFacts.length > 1 && (
-              <div className="flex justify-center gap-1.5 mt-4">
-                {loadingFacts.map((_, i) => (
-                  <div key={i}
-                    className="rounded-full transition-all duration-300"
-                    style={{
-                      width: i === factIndex % loadingFacts.length ? '20px' : '6px',
-                      height: '6px',
-                      background: i === factIndex % loadingFacts.length ? '#c8821a' : 'rgba(255,255,255,0.25)',
-                    }} />
-                ))}
-              </div>
-            )}
           </div>
         )}
 
