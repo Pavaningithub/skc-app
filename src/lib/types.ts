@@ -163,6 +163,7 @@ export interface OrderItem {
   quantity: number;               // grams / pieces
   pricePerUnit: number;
   totalPrice: number;
+  minOrderQty?: number;           // minimum qty step for cart adjustments
   customizationNote?: string;     // customer customization request
   isOnDemand?: boolean;           // was it an on-demand product?
   rawMaterialCost?: number;       // for on-demand: actual raw material cost
