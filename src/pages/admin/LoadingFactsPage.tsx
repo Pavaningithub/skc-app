@@ -34,7 +34,7 @@ const emptyForm = (): Omit<LoadingFact, 'id' | 'createdAt' | 'updatedAt'> => ({
 
 export default function LoadingFactsPage() {
   const [facts, loading] = useRealtimeCollection<LoadingFact>(
-    cb => loadingFactsService.subscribe(cb),
+    cb => loadingFactsService.subscribeAll(cb),
   );
 
   const [showForm, setShowForm] = useState(false);
