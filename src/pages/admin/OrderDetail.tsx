@@ -213,6 +213,14 @@ export default function OrderDetail() {
     load();
   }
 
+  async function markUnpaid() {
+    if (!order) return;
+    await ordersService.updatePayment(order.id, 'pending');
+    toast.success('Marked as unpaid');
+    activityService.log('payment_marked', `Payment reverted to pending for #${order.orderNumber} (${order.customerName})`, order.id, order.orderNumber);
+    load();
+  }
+
   async function cancelOrder() {
     if (!order) return;
     await ordersService.updateStatus(order.id, 'cancelled');
@@ -342,11 +350,18 @@ export default function OrderDetail() {
           </div>
         </div>
 
-        {order.paymentStatus === 'pending' && order.total > 0 && (
-          <button onClick={markPaid}
-            className="w-full bg-green-500 hover:bg-green-600 text-white py-2 rounded-xl text-sm font-semibold transition-colors">
-            ✅ Mark as Paid
-          </button>
+        {order.paymentStatus !== 'na' && (
+          order.paymentStatus === 'pending' && order.total > 0 ? (
+            <button onClick={markPaid}
+              className="w-full bg-green-500 hover:bg-green-600 text-white py-2 rounded-xl text-sm font-semibold transition-colors">
+              ✅ Mark as Paid
+            </button>
+          ) : order.paymentStatus === 'paid' ? (
+            <button onClick={markUnpaid}
+              className="w-full bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 py-2 rounded-xl text-sm font-semibold transition-colors">
+              ↩ Revert to Unpaid
+            </button>
+          ) : null
         )}
       </div>
 

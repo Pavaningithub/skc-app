@@ -255,6 +255,15 @@ export default function OrdersPage() {
                     Mark Paid
                   </button>
                 )}
+                {order.paymentStatus === 'paid' && (
+                  <button
+                    onClick={async () => {
+                      await ordersService.updatePayment(order.id, 'pending');
+                    }}
+                    className="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors">
+                    ↩ Unpaid
+                  </button>
+                )}
                 <a href={buildWABusinessUrl(order.customerWhatsapp)} target="_blank" rel="noreferrer"
                   className="border border-green-300 text-green-600 hover:bg-green-50 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors">
                   📱 WhatsApp
