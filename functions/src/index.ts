@@ -17,6 +17,7 @@ interface OrderItem {
   quantity: number;
   unit: string;
   total: number;
+  customizationNote?: string;
 }
 
 interface Order {
@@ -69,9 +70,12 @@ export const notifyNewOrder = onDocumentCreated(
       return;
     }
 
-    // Format items list — no pricing
+    // Format items list — with garlic/customization note if present
     const itemLines = (order.items ?? [])
-      .map((i) => `  • ${i.productName} × ${i.quantity} ${i.unit}`)
+      .map((i) => {
+        const note = i.customizationNote ? ` (${i.customizationNote})` : "";
+        return `  • ${i.productName} × ${i.quantity} ${i.unit}${note}`;
+      })
       .join("\n");
 
     // Format phone for display
@@ -95,9 +99,8 @@ export const notifyNewOrder = onDocumentCreated(
       "",
       "<b>Items:</b>",
       itemLines,
-      order.notes ? `📝 ${order.notes}` : "",
-      "",
-      `💰 ${isSample ? "FREE SAMPLE" : `₹${order.total}`}`,
+      order.notes ? `\n📝 <b>Note:</b> ${order.notes}` : "",
+      isSample ? "\n🎁 FREE SAMPLE" : "",
     ].filter(Boolean).join("\n");
 
     // ── WA group message — short plain text so URL stays under Telegram's 2048-char button limit ──
@@ -107,8 +110,8 @@ export const notifyNewOrder = onDocumentCreated(
       `👤 ${shortName}  📞 ${phone}`,
       `📍 ${order.customerPlace || "—"}`,
       itemLines,
-      `💰 ${isSample ? "FREE SAMPLE" : `₹${order.total}`}`,
       order.notes ? `📝 ${order.notes}` : "",
+      isSample ? "🎁 FREE SAMPLE" : "",
     ].filter(Boolean).join("\n");
 
     const waUrl = `https://wa.me/?text=${encodeURIComponent(waLines)}`;
