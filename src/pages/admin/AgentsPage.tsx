@@ -29,6 +29,12 @@ export default function AgentsPage() {
   const [editingMarkup, setEditingMarkup] = useState<string | null>(null);
   const [markupPctDraft, setMarkupPctDraft] = useState('');
 
+  // Edit thresholds
+  const [editingThresholds, setEditingThresholds] = useState<string | null>(null);
+  const [yellowDraft, setYellowDraft] = useState('');
+  const [redDraft, setRedDraft] = useState('');
+  const [blockDraft, setBlockDraft] = useState('');
+
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     if (!form.name.trim()) return toast.error('Name required');
@@ -44,6 +50,9 @@ export default function AgentsPage() {
         mustChangePin: true,
         markupPercent: 0,
         enforceMarkup: false,
+        warnYellowPct: 7,
+        warnRedPct: 10,
+        blockPct: 15,
         isActive: true,
         notes: form.notes.trim(),
       });
@@ -92,6 +101,19 @@ export default function AgentsPage() {
     const next = !agent.enforceMarkup;
     await agentsService.update(agent.id, { enforceMarkup: next });
     toast.success(next ? 'Markup cap enforced — agent cannot exceed this %' : 'Markup cap is now a suggestion only');
+  }
+
+  async function saveThresholds(agent: Agent) {
+    const y = Number(yellowDraft);
+    const r = Number(redDraft);
+    const b = Number(blockDraft);
+    if (isNaN(y) || y < 0 || y > 100) return toast.error('Yellow warn % must be 0–100');
+    if (isNaN(r) || r < 0 || r > 100) return toast.error('Red warn % must be 0–100');
+    if (isNaN(b) || b < 0 || b > 100) return toast.error('Block % must be 0–100');
+    if (!(y <= r && r <= b)) return toast.error('Must be: yellow ≤ red ≤ block');
+    await agentsService.update(agent.id, { warnYellowPct: y, warnRedPct: r, blockPct: b });
+    setEditingThresholds(null);
+    toast.success('Thresholds updated');
   }
 
   return (
@@ -271,6 +293,55 @@ export default function AgentsPage() {
                       </span>
                     </label>
                   )}
+                </div>
+
+                {/* Markup thresholds */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-gray-500 font-medium">Markup warning thresholds:</span>
+                    {editingThresholds === agent.id ? (
+                      <>
+                        <span className="text-xs text-amber-600 font-medium">🟡</span>
+                        <input type="number" min="0" max="100" step="0.5" value={yellowDraft}
+                          onChange={e => setYellowDraft(e.target.value)}
+                          className="w-14 border border-amber-300 rounded-lg px-2 py-1 text-xs outline-none text-center" placeholder="7" />
+                        <span className="text-xs text-red-500 font-medium">🔴</span>
+                        <input type="number" min="0" max="100" step="0.5" value={redDraft}
+                          onChange={e => setRedDraft(e.target.value)}
+                          className="w-14 border border-red-300 rounded-lg px-2 py-1 text-xs outline-none text-center" placeholder="10" />
+                        <span className="text-xs text-gray-700 font-medium">🚫</span>
+                        <input type="number" min="0" max="100" step="0.5" value={blockDraft}
+                          onChange={e => setBlockDraft(e.target.value)}
+                          className="w-14 border border-gray-400 rounded-lg px-2 py-1 text-xs outline-none text-center" placeholder="15" />
+                        <span className="text-xs text-gray-400">%</span>
+                        <button onClick={() => saveThresholds(agent)} className="p-1.5 bg-green-500 text-white rounded-lg">
+                          <Check className="w-3.5 h-3.5" />
+                        </button>
+                        <button onClick={() => setEditingThresholds(null)} className="p-1.5 bg-gray-100 rounded-lg">
+                          <X className="w-3.5 h-3.5 text-gray-500" />
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-xs">
+                          <span className="text-amber-600">🟡 {agent.warnYellowPct ?? 7}%</span>
+                          <span className="text-gray-400 mx-1">·</span>
+                          <span className="text-red-500">🔴 {agent.warnRedPct ?? 10}%</span>
+                          <span className="text-gray-400 mx-1">·</span>
+                          <span className="text-gray-700">🚫 {agent.blockPct ?? 15}%</span>
+                        </span>
+                        <button onClick={() => {
+                          setEditingThresholds(agent.id);
+                          setYellowDraft(String(agent.warnYellowPct ?? 7));
+                          setRedDraft(String(agent.warnRedPct ?? 10));
+                          setBlockDraft(String(agent.blockPct ?? 15));
+                        }} className="p-1 text-gray-400 hover:text-orange-500">
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                      </>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-gray-400">🟡 yellow nudge · 🔴 red alert · 🚫 order blocked</p>
                 </div>
 
                 {/* Action buttons */}

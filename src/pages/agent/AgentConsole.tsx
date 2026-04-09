@@ -67,7 +67,13 @@ export default function AgentConsole() {
 
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  const [liveAgent, setLiveAgent] = useState<{ markupPercent: number; enforceMarkup: boolean } | null>(null);
+  const [liveAgent, setLiveAgent] = useState<{
+    markupPercent: number;
+    enforceMarkup: boolean;
+    warnYellowPct: number;
+    warnRedPct: number;
+    blockPct: number;
+  } | null>(null);
 
   // ── Multi-customer ────────────────────────────────────────────────────
   const [customers, setCustomers] = useState<AgentCustomer[]>([newCustomer()]);
@@ -86,7 +92,13 @@ export default function AgentConsole() {
     if (!agentSession) { navigate('/agent/login'); return; }
     // Fetch live agent so markup% and commission% are never stale from session
     agentsService.getById(agentSession.id).then(a => {
-      if (a) setLiveAgent({ markupPercent: a.markupPercent ?? 0, enforceMarkup: a.enforceMarkup ?? false });
+      if (a) setLiveAgent({
+        markupPercent: a.markupPercent ?? 0,
+        enforceMarkup: a.enforceMarkup ?? false,
+        warnYellowPct: a.warnYellowPct ?? 7,
+        warnRedPct: a.warnRedPct ?? 10,
+        blockPct: a.blockPct ?? 15,
+      });
     });
     const unsub = productsService.subscribe(p => {
       setProducts(p.filter(x => x.isActive));
@@ -219,7 +231,13 @@ export default function AgentConsole() {
           toast.error(`${cust.name || 'Customer'}: "${item.productName}" sell price (₹${custAmt}) is below SKC cost (₹${skcAmt})`);
           return;
         }
-        // Block if enforced cap is exceeded
+        // Block if margin exceeds blockPct threshold
+        const blockThreshold = liveAgent?.blockPct ?? 15;
+        if (skcAmt > 0 && custAmt > Math.round(skcAmt * (1 + blockThreshold / 100))) {
+          toast.error(`${cust.name || 'Customer'}: "${item.productName}" markup exceeds ${blockThreshold}% — order blocked to protect SKC pricing reputation`);
+          return;
+        }
+        // Also block if enforced cap is exceeded
         if (liveAgent?.enforceMarkup && liveAgent.markupPercent > 0) {
           const maxSell = Math.round(skcAmt * (1 + liveAgent.markupPercent / 100));
           if (custAmt > maxSell) {
@@ -445,6 +463,9 @@ export default function AgentConsole() {
               onReapplyMarkup={() => reapplyMarkup(cust.id)}
               maxMarkupPct={liveAgent?.markupPercent ?? 0}
               enforceMarkup={liveAgent?.enforceMarkup ?? false}
+              warnYellowPct={liveAgent?.warnYellowPct ?? 7}
+              warnRedPct={liveAgent?.warnRedPct ?? 10}
+              blockPct={liveAgent?.blockPct ?? 15}
               canDelete={customers.length > 1}
             />
           ))}
@@ -532,7 +553,10 @@ interface CustomerCardProps {
   onUpdateItemSellingPrice: (idx: number, sp: number) => void;
   onReapplyMarkup: () => void;
   maxMarkupPct: number;       // 0 = no cap set by admin
-  enforceMarkup: boolean;     // true = hard cap, false = warn at 15%
+  enforceMarkup: boolean;     // true = hard cap, false = warn only
+  warnYellowPct: number;      // yellow nudge threshold %
+  warnRedPct: number;         // red alert threshold %
+  blockPct: number;           // order blocked above this %
   canDelete: boolean;
 }
 
@@ -540,15 +564,18 @@ function CustomerCard({
   cust, cidx, products, addState,
   onUpdateCustomer, onRemoveCustomer, onAddStateChange, onAddToCart,
   onRemoveCartItem, onUpdateCartQty, onUpdateItemSellingPrice, onReapplyMarkup,
-  maxMarkupPct, enforceMarkup,
+  maxMarkupPct, enforceMarkup, warnYellowPct, warnRedPct, blockPct,
   canDelete,
 }: CustomerCardProps) {
   const skc = cartSkcTotal(cust.cart);
   const margin = cartMarginTotal(cust.cart);
   const custTotal = cartCustomerTotal(cust.cart);
-  // Warn threshold: if enforced, use admin cap; otherwise warn at 15%
-  const warnThreshold = enforceMarkup && maxMarkupPct > 0 ? maxMarkupPct : 15;
-  const highMargin = skc > 0 && margin / skc * 100 > warnThreshold;
+  const overallPct = skc > 0 ? margin / skc * 100 : 0;
+  const overallYellow = overallPct > warnYellowPct && overallPct <= warnRedPct;
+  const overallRed    = overallPct > warnRedPct && overallPct <= blockPct;
+  const overallBlock  = overallPct > blockPct;
+  // For enforced cap also flag overall
+  const enforceViolation = enforceMarkup && maxMarkupPct > 0 && overallPct > maxMarkupPct;
 
   const [productSearch, setProductSearch] = useState('');
   const [garlicOnly, setGarlicOnly] = useState(false);
@@ -751,10 +778,10 @@ function CustomerCard({
                 const custAmt = Math.round(item.sellingPrice * item.quantity);
                 const marginAmt = custAmt - skcAmt;
                 const marginPct = skcAmt > 0 ? Math.round(marginAmt / skcAmt * 100) : 0;
-                // Per-item threshold: enforced cap or 15% warning
-                const itemWarnPct = enforceMarkup && maxMarkupPct > 0 ? maxMarkupPct : 15;
-                const itemHighMargin = marginPct > itemWarnPct;
-                // Max allowed sell amount when enforced
+                const itemYellow = marginPct > warnYellowPct && marginPct <= warnRedPct;
+                const itemRed    = marginPct > warnRedPct && marginPct <= blockPct;
+                const itemBlock  = marginPct > blockPct;
+                // Enforced cap
                 const maxSellAmt = enforceMarkup && maxMarkupPct > 0
                   ? Math.round(skcAmt * (1 + maxMarkupPct / 100))
                   : Infinity;
@@ -810,7 +837,11 @@ function CustomerCard({
                         }}
                         className="w-20 border rounded-lg px-2 py-1 text-sm font-semibold outline-none text-center focus:border-orange-400"
                         style={{
-                          borderColor: custAmt < skcAmt ? '#ef4444' : itemHighMargin ? (enforceMarkup ? '#ef4444' : '#fbbf24') : '#e5e7eb',
+                          borderColor: custAmt < skcAmt ? '#ef4444'
+                            : itemBlock ? '#ef4444'
+                            : itemRed ? '#ef4444'
+                            : itemYellow ? '#f59e0b'
+                            : '#e5e7eb',
                           color: custAmt < skcAmt ? '#ef4444' : '#c8821a',
                         }}
                       />
@@ -820,7 +851,7 @@ function CustomerCard({
                         {custAmt < skcAmt
                           ? <span className="text-xs font-semibold text-red-500">−₹{skcAmt - custAmt}</span>
                           : marginAmt > 0
-                            ? <span className={`text-xs font-semibold ${itemHighMargin ? 'text-amber-600' : 'text-green-600'}`}>
+                            ? <span className={`text-xs font-semibold ${itemBlock ? 'text-red-600' : itemRed ? 'text-red-500' : itemYellow ? 'text-amber-600' : 'text-green-600'}`}>
                                 +₹{marginAmt}<br />
                                 <span className="font-normal text-[10px]">({marginPct}%)</span>
                               </span>
@@ -829,12 +860,16 @@ function CustomerCard({
                       </div>
                     </div>
 
-                    {/* Per-item high-margin nudge */}
-                    {itemHighMargin && (
-                      <p className={`text-[10px] flex items-center gap-1 ${enforceMarkup ? 'text-red-600' : 'text-amber-600'}`}>
-                        {enforceMarkup
-                          ? `🔒 Exceeds ${maxMarkupPct}% cap — will be clamped when you leave this field.`
-                          : `⚠️ ${marginPct}% margin on this item — consider reducing for customer retention.`
+                    {/* Per-item margin indicator */}
+                    {(itemYellow || itemRed || itemBlock) && (
+                      <p className={`text-[10px] flex items-center gap-1 ${
+                        itemBlock ? 'text-red-700 font-semibold' : itemRed ? 'text-red-500' : 'text-amber-600'
+                      }`}>
+                        {itemBlock
+                          ? `🚫 ${marginPct}% — exceeds ${blockPct}% block limit. Reduce price to place order.`
+                          : itemRed
+                          ? `🔴 ${marginPct}% margin — high, customer may push back.`
+                          : `⚠️ ${marginPct}% margin — nudging above ${warnYellowPct}%.`
                         }
                       </p>
                     )}
@@ -860,14 +895,28 @@ function CustomerCard({
                 </div>
               </div>
 
-              {/* Overall high-margin warning */}
-              {highMargin && (
-                <div className="flex items-start gap-2 px-3 py-2.5 border-t" style={{ background: enforceMarkup ? '#fef2f2' : '#fffbeb', borderColor: enforceMarkup ? '#fca5a5' : '#fcd34d' }}>
-                  <span className="text-base leading-none flex-shrink-0">{enforceMarkup ? '🔒' : '⚠️'}</span>
-                  <p className={`text-xs ${enforceMarkup ? 'text-red-700' : 'text-amber-700'}`}>
-                    {enforceMarkup
-                      ? <><strong className="text-red-800">Overall {Math.round(margin / skc * 100)}% markup exceeds the {maxMarkupPct}% cap.</strong> Prices will be clamped when you leave each field.</>
-                      : <><strong className="text-amber-800">Overall {Math.round(margin / skc * 100)}% markup</strong> — above 15% may deter customers. Consider lowering prices to retain them long-term.</>
+              {/* Overall margin warning banners */}
+              {(overallBlock || overallRed || overallYellow || enforceViolation) && (
+                <div className={`flex items-start gap-2 px-3 py-2.5 border-t ${
+                  overallBlock || enforceViolation
+                    ? 'bg-red-50 border-red-200'
+                    : overallRed
+                    ? 'bg-red-50 border-red-100'
+                    : 'bg-amber-50 border-amber-200'
+                }`}>
+                  <span className="text-base leading-none flex-shrink-0">
+                    {overallBlock || enforceViolation ? '🚫' : overallRed ? '🔴' : '⚠️'}
+                  </span>
+                  <p className={`text-xs ${
+                    overallBlock || enforceViolation ? 'text-red-700' : overallRed ? 'text-red-600' : 'text-amber-700'
+                  }`}>
+                    {overallBlock
+                      ? <><strong>Overall {Math.round(overallPct)}% markup exceeds the {blockPct}% block limit.</strong> Lower sell prices before placing the order.</>
+                      : enforceViolation
+                      ? <><strong>Overall markup exceeds the enforced {maxMarkupPct}% cap.</strong> Prices will be clamped on submit.</>
+                      : overallRed
+                      ? <><strong>{Math.round(overallPct)}% overall markup</strong> — customers may find this expensive. Consider reducing.​</>
+                      : <><strong>{Math.round(overallPct)}% overall markup</strong> — slightly above {warnYellowPct}%. Keep an eye on pricing.</>
                     }
                   </p>
                 </div>
