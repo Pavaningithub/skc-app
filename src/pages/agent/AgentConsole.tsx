@@ -231,15 +231,18 @@ export default function AgentConsole() {
           toast.error(`${cust.name || 'Customer'}: "${item.productName}" sell price (₹${custAmt}) is below SKC cost (₹${skcAmt})`);
           return;
         }
+        // Use rounded SKC amount for all comparisons to avoid float precision issues
+        const skcRounded = Math.round(skcAmt);
+        const marginPctActual = skcRounded > 0 ? (custAmt - skcRounded) / skcRounded * 100 : 0;
         // Block if margin exceeds blockPct threshold
         const blockThreshold = liveAgent?.blockPct ?? 15;
-        if (skcAmt > 0 && custAmt > Math.round(skcAmt * (1 + blockThreshold / 100))) {
-          toast.error(`${cust.name || 'Customer'}: "${item.productName}" markup exceeds ${blockThreshold}% — order blocked to protect SKC pricing reputation`);
+        if (marginPctActual > blockThreshold) {
+          toast.error(`${cust.name || 'Customer'}: "${item.productName}" markup ${Math.round(marginPctActual)}% exceeds ${blockThreshold}% limit — reduce sell price to place order`);
           return;
         }
         // Also block if enforced cap is exceeded
         if (liveAgent?.enforceMarkup && liveAgent.markupPercent > 0) {
-          const maxSell = Math.round(skcAmt * (1 + liveAgent.markupPercent / 100));
+          const maxSell = Math.round(skcRounded * (1 + liveAgent.markupPercent / 100));
           if (custAmt > maxSell) {
             toast.error(`${cust.name || 'Customer'}: "${item.productName}" exceeds the ${liveAgent.markupPercent}% markup cap (max ₹${maxSell})`);
             return;
@@ -570,7 +573,8 @@ function CustomerCard({
   const skc = cartSkcTotal(cust.cart);
   const margin = cartMarginTotal(cust.cart);
   const custTotal = cartCustomerTotal(cust.cart);
-  const overallPct = skc > 0 ? margin / skc * 100 : 0;
+  const skcRounded = Math.round(skc);
+  const overallPct = skcRounded > 0 ? (Math.round(custTotal) - skcRounded) / skcRounded * 100 : 0;
   const overallYellow = overallPct > warnYellowPct && overallPct <= warnRedPct;
   const overallRed    = overallPct > warnRedPct && overallPct <= blockPct;
   const overallBlock  = overallPct > blockPct;
@@ -777,7 +781,8 @@ function CustomerCard({
                 const skcAmt = item.totalPrice;
                 const custAmt = Math.round(item.sellingPrice * item.quantity);
                 const marginAmt = custAmt - skcAmt;
-                const marginPct = skcAmt > 0 ? Math.round(marginAmt / skcAmt * 100) : 0;
+                const skcRounded = Math.round(skcAmt);
+                const marginPct = skcRounded > 0 ? Math.round((custAmt - skcRounded) / skcRounded * 100) : 0;
                 const itemYellow = marginPct > warnYellowPct && marginPct <= warnRedPct;
                 const itemRed    = marginPct > warnRedPct && marginPct <= blockPct;
                 const itemBlock  = marginPct > blockPct;
