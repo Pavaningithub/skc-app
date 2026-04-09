@@ -269,7 +269,7 @@ export default function AgentConsole() {
         const order: Omit<Order, 'id'> = {
           orderNumber: generateOrderNumber(), type: 'regular',
           customerName: cust.name.trim(),
-          customerWhatsapp: agent.phone,
+          customerWhatsapp: agent.phone ?? '',
           customerPlace: cust.place.trim(),
           items: orderItems,
           subtotal: skc, discount: 0, total: skc,
@@ -278,7 +278,7 @@ export default function AgentConsole() {
           hasOnDemandItems: cust.cart.some(i => i.isOnDemand),
           referralDiscount: 0, creditUsed: 0, deliveryCharge: 0,
           agentId: agent.id, agentName: agent.name,
-          agentMargin: agentMargin > 0 ? agentMargin : undefined,
+          ...(agentMargin > 0 ? { agentMargin } : {}),
           createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
         };
         await ordersService.add(order);
@@ -294,8 +294,9 @@ export default function AgentConsole() {
       toast.success(`${placed} order${placed > 1 ? 's' : ''} placed! 🎉`);
       setCustomers([newCustomer()]);
     } catch (err) {
-      console.error(err);
-      toast.error(`Failed after ${placed} order(s) — check your connection`);
+      console.error('placeAllOrders error:', err);
+      const msg = err instanceof Error ? err.message : String(err);
+      toast.error(`Failed after ${placed} order(s): ${msg.slice(0, 80)}`);
     } finally {
       setSaving(false);
       setSavingProgress('');
