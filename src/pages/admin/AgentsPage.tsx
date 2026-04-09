@@ -43,6 +43,7 @@ export default function AgentsPage() {
         pin: form.pin.trim(),
         mustChangePin: true,
         markupPercent: 0,
+        enforceMarkup: false,
         isActive: true,
         notes: form.notes.trim(),
       });
@@ -83,8 +84,14 @@ export default function AgentsPage() {
   }
 
   async function clearAdminMarkup(agent: Agent) {
-    await agentsService.update(agent.id, { markupPercent: 0 });
+    await agentsService.update(agent.id, { markupPercent: 0, enforceMarkup: false });
     toast.success('Markup cleared — agent will price manually');
+  }
+
+  async function toggleEnforceMarkup(agent: Agent) {
+    const next = !agent.enforceMarkup;
+    await agentsService.update(agent.id, { enforceMarkup: next });
+    toast.success(next ? 'Markup cap enforced — agent cannot exceed this %' : 'Markup cap is now a suggestion only');
   }
 
   return (
@@ -207,45 +214,62 @@ export default function AgentsPage() {
                 </div>
 
                 {/* Markup % edit */}
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-xs text-gray-500 font-medium">Markup % (enforced):</span>
-                  {editingMarkup === agent.id ? (
-                    <>
-                      <input type="number" min="0" max="100" step="0.5"
-                        value={markupPctDraft}
-                        onChange={e => setMarkupPctDraft(e.target.value)}
-                        placeholder="e.g. 10"
-                        className="w-20 border border-orange-300 rounded-lg px-2 py-1 text-sm outline-none text-center"
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs text-gray-500 font-medium">Max markup %:</span>
+                    {editingMarkup === agent.id ? (
+                      <>
+                        <input type="number" min="0" max="100" step="0.5"
+                          value={markupPctDraft}
+                          onChange={e => setMarkupPctDraft(e.target.value)}
+                          placeholder="e.g. 10"
+                          className="w-20 border border-orange-300 rounded-lg px-2 py-1 text-sm outline-none text-center"
+                        />
+                        <span className="text-xs text-gray-500">%</span>
+                        <button onClick={() => saveAdminMarkup(agent)} className="p-1.5 bg-green-500 text-white rounded-lg">
+                          <Check className="w-3.5 h-3.5" />
+                        </button>
+                        <button onClick={() => setEditingMarkup(null)} className="p-1.5 bg-gray-100 rounded-lg">
+                          <X className="w-3.5 h-3.5 text-gray-500" />
+                        </button>
+                      </>
+                    ) : agent.markupPercent > 0 ? (
+                      <>
+                        <span className="text-sm font-bold text-orange-700">{agent.markupPercent}%</span>
+                        <button onClick={() => { setEditingMarkup(agent.id); setMarkupPctDraft(String(agent.markupPercent)); }}
+                          className="p-1 text-gray-400 hover:text-orange-500">
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                        <button onClick={() => clearAdminMarkup(agent)}
+                          className="text-xs text-red-500 hover:text-red-700 px-2 py-1 rounded-lg border border-red-200 hover:bg-red-50">
+                          Clear
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-xs text-gray-400">Not set (agent prices freely)</span>
+                        <button onClick={() => { setEditingMarkup(agent.id); setMarkupPctDraft(''); }}
+                          className="p-1 text-gray-400 hover:text-orange-500">
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                      </>
+                    )}
+                  </div>
+                  {/* Enforce toggle — only visible when markup % is set */}
+                  {agent.markupPercent > 0 && (
+                    <label className="flex items-center gap-2 cursor-pointer w-fit">
+                      <input
+                        type="checkbox"
+                        checked={!!agent.enforceMarkup}
+                        onChange={() => toggleEnforceMarkup(agent)}
+                        className="accent-orange-500 w-4 h-4"
                       />
-                      <span className="text-xs text-gray-500">%</span>
-                      <button onClick={() => saveAdminMarkup(agent)} className="p-1.5 bg-green-500 text-white rounded-lg">
-                        <Check className="w-3.5 h-3.5" />
-                      </button>
-                      <button onClick={() => setEditingMarkup(null)} className="p-1.5 bg-gray-100 rounded-lg">
-                        <X className="w-3.5 h-3.5 text-gray-500" />
-                      </button>
-                    </>
-                  ) : agent.markupPercent > 0 ? (
-                    <>
-                      <span className="text-sm font-bold text-orange-700">{agent.markupPercent}%</span>
-                      <span className="text-xs text-gray-400">(applied automatically)</span>
-                      <button onClick={() => { setEditingMarkup(agent.id); setMarkupPctDraft(String(agent.markupPercent)); }}
-                        className="p-1 text-gray-400 hover:text-orange-500">
-                        <Edit2 className="w-3.5 h-3.5" />
-                      </button>
-                      <button onClick={() => clearAdminMarkup(agent)}
-                        className="text-xs text-red-500 hover:text-red-700 px-2 py-1 rounded-lg border border-red-200 hover:bg-red-50">
-                        Clear
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <span className="text-xs text-gray-400">Not set — agent prices manually</span>
-                      <button onClick={() => { setEditingMarkup(agent.id); setMarkupPctDraft(''); }}
-                        className="p-1 text-gray-400 hover:text-orange-500">
-                        <Edit2 className="w-3.5 h-3.5" />
-                      </button>
-                    </>
+                      <span className="text-xs">
+                        {agent.enforceMarkup
+                          ? <span className="text-red-600 font-semibold">🔒 Enforced — agent cannot exceed {agent.markupPercent}%</span>
+                          : <span className="text-gray-500">Suggested only — agent can go higher (warned at 15%)</span>}
+                      </span>
+                    </label>
                   )}
                 </div>
 

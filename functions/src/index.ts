@@ -103,14 +103,20 @@ export const notifyNewOrder = onDocumentCreated(
       isSample ? "\n🎁 FREE SAMPLE" : "",
     ].filter(Boolean).join("\n");
 
-    // ── WA group message — short plain text so URL stays under Telegram's 2048-char button limit ──
-    const shortName = order.customerName.slice(0, 10);
+    // ── WA group message ─────────────────────────────────────────────────────
+    // WG = With Garlic (omit if without/default), "📝 check notes" if any notes
+    const waItemLines = (order.items ?? [])
+      .map((i) => {
+        const note = i.customizationNote?.toLowerCase().includes("with garlic") ? " WG" : "";
+        return `  • ${i.productName} × ${i.quantity} ${i.unit}${note}`;
+      })
+      .join("\n");
     const waLines = [
       `${emoji} ${orderLabel} — ${order.orderNumber}`,
-      `👤 ${shortName}  📞 ${phone}`,
+      `👤 ${order.customerName}  📞 ${phone}`,
       `📍 ${order.customerPlace || "—"}`,
-      itemLines,
-      order.notes ? `📝 ${order.notes}` : "",
+      waItemLines,
+      order.notes ? "📝 check notes" : "",
       isSample ? "🎁 FREE SAMPLE" : "",
     ].filter(Boolean).join("\n");
 

@@ -67,7 +67,7 @@ export default function AgentConsole() {
 
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  const [liveAgent, setLiveAgent] = useState<{ markupPercent: number } | null>(null);
+  const [liveAgent, setLiveAgent] = useState<{ markupPercent: number; enforceMarkup: boolean } | null>(null);
 
   // ── Multi-customer ────────────────────────────────────────────────────
   const [customers, setCustomers] = useState<AgentCustomer[]>([newCustomer()]);
@@ -86,7 +86,7 @@ export default function AgentConsole() {
     if (!agentSession) { navigate('/agent/login'); return; }
     // Fetch live agent so markup% and commission% are never stale from session
     agentsService.getById(agentSession.id).then(a => {
-      if (a) setLiveAgent({ markupPercent: a.markupPercent ?? 0 });
+      if (a) setLiveAgent({ markupPercent: a.markupPercent ?? 0, enforceMarkup: a.enforceMarkup ?? false });
     });
     const unsub = productsService.subscribe(p => {
       setProducts(p.filter(x => x.isActive));
@@ -95,11 +95,9 @@ export default function AgentConsole() {
     return () => unsub();
   }, []);
 
-  // ─── Per-item markup calc: uses live Firestore data, falls back to session ──────────────────────
-  const markupPct = liveAgent?.markupPercent ?? agentSession?.markupPercent ?? 0;
-  function markupForProduct(product: Product): number {
-    if (!markupPct) return 0;
-    return product.pricePerUnit * markupPct / 100;  // per-unit markup
+  // ─── Per-item markup: agents start at 0 (same price as customers) and can increase manually ──
+  function markupForProduct(_product: Product): number {
+    return 0;
   }
 
   // ─── Customer CRUD ────────────────────────────────────────────────────────
@@ -220,6 +218,14 @@ export default function AgentConsole() {
         if (custAmt < skcAmt) {
           toast.error(`${cust.name || 'Customer'}: "${item.productName}" sell price (₹${custAmt}) is below SKC cost (₹${skcAmt})`);
           return;
+        }
+        // Block if enforced cap is exceeded
+        if (liveAgent?.enforceMarkup && liveAgent.markupPercent > 0) {
+          const maxSell = Math.round(skcAmt * (1 + liveAgent.markupPercent / 100));
+          if (custAmt > maxSell) {
+            toast.error(`${cust.name || 'Customer'}: "${item.productName}" exceeds the ${liveAgent.markupPercent}% markup cap (max ₹${maxSell})`);
+            return;
+          }
         }
       }
     }
@@ -416,15 +422,7 @@ export default function AgentConsole() {
       {!showOrders && (
         <div className="max-w-2xl mx-auto p-4 space-y-4 pb-12">
 
-          {/* Markup notice */}
-          {markupPct > 0 && (
-            <div className="rounded-xl px-4 py-2.5 flex items-center gap-2 text-sm" style={{ background: '#fff8f0', border: '1px solid #f0d9c8' }}>
-              <span>🏷️</span>
-              <span style={{ color: '#7a4010' }}>
-                <strong>{markupPct}% markup</strong> applied automatically to all products.
-              </span>
-            </div>
-          )}
+
 
           {/* Product reference list */}
           <ProductReferenceList products={products} />
@@ -445,6 +443,8 @@ export default function AgentConsole() {
               onUpdateCartQty={(idx, qty) => updateCartQty(cust.id, idx, qty)}
               onUpdateItemSellingPrice={(idx, sp) => updateCartItemSellingPrice(cust.id, idx, sp)}
               onReapplyMarkup={() => reapplyMarkup(cust.id)}
+              maxMarkupPct={liveAgent?.markupPercent ?? 0}
+              enforceMarkup={liveAgent?.enforceMarkup ?? false}
               canDelete={customers.length > 1}
             />
           ))}
@@ -531,6 +531,8 @@ interface CustomerCardProps {
   onUpdateCartQty: (idx: number, qty: number) => void;
   onUpdateItemSellingPrice: (idx: number, sp: number) => void;
   onReapplyMarkup: () => void;
+  maxMarkupPct: number;       // 0 = no cap set by admin
+  enforceMarkup: boolean;     // true = hard cap, false = warn at 15%
   canDelete: boolean;
 }
 
@@ -538,12 +540,15 @@ function CustomerCard({
   cust, cidx, products, addState,
   onUpdateCustomer, onRemoveCustomer, onAddStateChange, onAddToCart,
   onRemoveCartItem, onUpdateCartQty, onUpdateItemSellingPrice, onReapplyMarkup,
+  maxMarkupPct, enforceMarkup,
   canDelete,
 }: CustomerCardProps) {
   const skc = cartSkcTotal(cust.cart);
   const margin = cartMarginTotal(cust.cart);
   const custTotal = cartCustomerTotal(cust.cart);
-  const highMargin = skc > 0 && margin / skc > 0.15;
+  // Warn threshold: if enforced, use admin cap; otherwise warn at 15%
+  const warnThreshold = enforceMarkup && maxMarkupPct > 0 ? maxMarkupPct : 15;
+  const highMargin = skc > 0 && margin / skc * 100 > warnThreshold;
 
   const [productSearch, setProductSearch] = useState('');
   const [garlicOnly, setGarlicOnly] = useState(false);
@@ -746,7 +751,13 @@ function CustomerCard({
                 const custAmt = Math.round(item.sellingPrice * item.quantity);
                 const marginAmt = custAmt - skcAmt;
                 const marginPct = skcAmt > 0 ? Math.round(marginAmt / skcAmt * 100) : 0;
-                const itemHighMargin = marginPct > 15;
+                // Per-item threshold: enforced cap or 15% warning
+                const itemWarnPct = enforceMarkup && maxMarkupPct > 0 ? maxMarkupPct : 15;
+                const itemHighMargin = marginPct > itemWarnPct;
+                // Max allowed sell amount when enforced
+                const maxSellAmt = enforceMarkup && maxMarkupPct > 0
+                  ? Math.round(skcAmt * (1 + maxMarkupPct / 100))
+                  : Infinity;
                 return (
                   <div key={i} className={`px-3 py-2.5 space-y-2 ${i > 0 ? 'border-t border-gray-50' : ''}`}>
                     {/* Row 1: name + delete */}
@@ -785,20 +796,21 @@ function CustomerCard({
                         value={custAmt}
                         onChange={e => {
                           const raw = Number(e.target.value);
-                          // Allow typing freely; clamp only to non-negative
                           onUpdateItemSellingPrice(i, Math.max(0, raw) / item.quantity);
                         }}
                         onBlur={e => {
-                          // On blur: enforce sell >= SKC
                           const raw = Number(e.target.value);
                           if (raw < skcAmt) {
                             onUpdateItemSellingPrice(i, skcAmt / item.quantity);
                             toast.error(`Sell price can't be less than SKC cost (₹${skcAmt})`);
+                          } else if (enforceMarkup && maxMarkupPct > 0 && raw > maxSellAmt) {
+                            onUpdateItemSellingPrice(i, maxSellAmt / item.quantity);
+                            toast.error(`Max ${maxMarkupPct}% markup enforced — capped at ₹${maxSellAmt}`);
                           }
                         }}
                         className="w-20 border rounded-lg px-2 py-1 text-sm font-semibold outline-none text-center focus:border-orange-400"
                         style={{
-                          borderColor: custAmt < skcAmt ? '#ef4444' : itemHighMargin ? '#fbbf24' : '#e5e7eb',
+                          borderColor: custAmt < skcAmt ? '#ef4444' : itemHighMargin ? (enforceMarkup ? '#ef4444' : '#fbbf24') : '#e5e7eb',
                           color: custAmt < skcAmt ? '#ef4444' : '#c8821a',
                         }}
                       />
@@ -819,8 +831,11 @@ function CustomerCard({
 
                     {/* Per-item high-margin nudge */}
                     {itemHighMargin && (
-                      <p className="text-[10px] text-amber-600 flex items-center gap-1">
-                        ⚠️ {marginPct}% margin on this item — consider reducing for customer retention.
+                      <p className={`text-[10px] flex items-center gap-1 ${enforceMarkup ? 'text-red-600' : 'text-amber-600'}`}>
+                        {enforceMarkup
+                          ? `🔒 Exceeds ${maxMarkupPct}% cap — will be clamped when you leave this field.`
+                          : `⚠️ ${marginPct}% margin on this item — consider reducing for customer retention.`
+                        }
                       </p>
                     )}
                   </div>
@@ -847,10 +862,13 @@ function CustomerCard({
 
               {/* Overall high-margin warning */}
               {highMargin && (
-                <div className="flex items-start gap-2 px-3 py-2.5 border-t" style={{ background: '#fffbeb', borderColor: '#fcd34d' }}>
-                  <span className="text-base leading-none flex-shrink-0">⚠️</span>
-                  <p className="text-xs text-amber-700">
-                    <strong className="text-amber-800">Overall {Math.round(margin / skc * 100)}% markup</strong> — above 15% may deter customers. Consider lowering prices to retain them long-term.
+                <div className="flex items-start gap-2 px-3 py-2.5 border-t" style={{ background: enforceMarkup ? '#fef2f2' : '#fffbeb', borderColor: enforceMarkup ? '#fca5a5' : '#fcd34d' }}>
+                  <span className="text-base leading-none flex-shrink-0">{enforceMarkup ? '🔒' : '⚠️'}</span>
+                  <p className={`text-xs ${enforceMarkup ? 'text-red-700' : 'text-amber-700'}`}>
+                    {enforceMarkup
+                      ? <><strong className="text-red-800">Overall {Math.round(margin / skc * 100)}% markup exceeds the {maxMarkupPct}% cap.</strong> Prices will be clamped when you leave each field.</>
+                      : <><strong className="text-amber-800">Overall {Math.round(margin / skc * 100)}% markup</strong> — above 15% may deter customers. Consider lowering prices to retain them long-term.</>
+                    }
                   </p>
                 </div>
               )}

@@ -297,7 +297,8 @@ export interface Agent {
   agentCode: string;              // e.g. "AGT-RAVI" — unique
   pin: string;                    // 4-6 digit PIN
   mustChangePin: boolean;         // force change on first login
-  markupPercent: number;          // admin-enforced guardrail: auto-applied % on top of SKC price (0 = agent prices freely)
+  markupPercent: number;          // max markup % admin sets for this agent (0 = no cap set)
+  enforceMarkup: boolean;         // true = agent cannot exceed markupPercent; false = warning-only at 15%
   totalOrders: number;
   totalRevenue: number;           // sum of SKC prices on their orders
   isActive: boolean;
