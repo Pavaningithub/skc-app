@@ -298,7 +298,10 @@ export interface Agent {
   pin: string;                    // 4-6 digit PIN
   mustChangePin: boolean;         // force change on first login
   markupPercent: number;          // max markup % admin sets for this agent (0 = no cap set)
-  enforceMarkup: boolean;         // true = agent cannot exceed markupPercent; false = warning-only at 15%
+  enforceMarkup: boolean;         // true = agent cannot exceed markupPercent; false = warning-only
+  warnYellowPct: number;          // margin % at which yellow warning shows (default 7)
+  warnRedPct: number;             // margin % at which red warning shows (default 10)
+  blockPct: number;               // margin % above which order is blocked (default 15)
   totalOrders: number;
   totalRevenue: number;           // sum of SKC prices on their orders
   isActive: boolean;
