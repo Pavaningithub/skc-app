@@ -63,6 +63,8 @@ export interface Product {
   isNewLaunch?: boolean;          // show "New!" badge and launch banner on storefront
   newLaunchUntil?: string;        // ISO date — badge/banner hidden after this date
   didYouKnow?: string;            // short 1–2 line fact shown on product card (expandable)
+  videoUrl?: string;              // product usage video link (Instagram/YouTube)
+  kitRole?: 'mandatory' | 'optional'; // if set, product appears in postpartum kit
   createdAt: string;
   updatedAt: string;
 }
@@ -309,6 +311,55 @@ export interface Agent {
   createdAt: string;
   updatedAt: string;
 }
+
+// ─── Gift Card ───────────────────────────────────────────────────────────────
+export interface GiftCard {
+  id: string;
+  code: string;                   // 16-char uppercase alphanumeric, e.g. SKC1A3F29K7BXP4Q
+  status: 'inactive' | 'active' | 'redeemed';
+  type: 'physical' | 'virtual';
+  buyerName: string;
+  buyerWhatsapp: string;
+  recipientName?: string;
+  kitItems: KitCartItem[];
+  kitTotal: number;
+  orderId?: string;
+  redeemedOrderId?: string;
+  redeemedBy?: string;
+  createdAt: string;
+  activatedAt?: string;
+  redeemedAt?: string;
+}
+
+export interface KitCartItem {
+  productId: string;
+  productName: string;
+  unit: string;
+  quantity: number;
+  pricePerUnit: number;
+  totalPrice: number;
+  kitRole: 'mandatory' | 'optional';
+}
+
+// ─── Postpartum Kit Config (settings/postpartum_kit) ─────────────────────────
+export interface PostpartumKitConfig {
+  isActive: boolean;
+  title: string;
+  tagline: string;
+  description: string;
+  disclaimer: string;
+  instagramUrl?: string;
+  updatedAt?: string;
+}
+
+export const DEFAULT_KIT_CONFIG: PostpartumKitConfig = {
+  isActive: false,
+  title: 'Postpartum Care Kit',
+  tagline: 'Traditional grandma love — for new mothers & babies 👶',
+  description: 'A carefully curated kit of traditional home remedies and nourishing foods to support recovery after childbirth. Rooted in generations of wisdom.',
+  disclaimer: 'This kit is not a substitute for medical advice. Always consult your doctor. These are traditional home remedies passed down through generations.',
+  instagramUrl: '',
+};
 
 // ─── Feedback ────────────────────────────────────────────────────────────────
 export interface Feedback {

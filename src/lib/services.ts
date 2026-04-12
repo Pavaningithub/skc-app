@@ -11,6 +11,7 @@ import type {
   Product, StockItem, RawMaterial, RawMaterialPurchase,
   Batch, Customer, Order, Expense, Subscription, Feedback, AdminAction, AdminActionType, AdminUser, Agent,
   ReferralConfig, SubscriptionConfig, FeatureFlags, LoadingFact,
+  GiftCard, PostpartumKitConfig,
 } from "./types";
 import { DEFAULT_REFERRAL_CONFIG, DEFAULT_SUBSCRIPTION_CONFIG, DEFAULT_FEATURE_FLAGS } from "./types";
 
@@ -31,8 +32,9 @@ export const COLLECTIONS = {
   SUBSCRIPTION_CONFIG:   "settings",   // doc id = 'subscription_config' inside 'settings'
   ADMIN_ACTIVITY:        "adminActivity",
   ADMIN_USERS:           "adminUsers",
-  AGENTS:                "agents",
-  LOADING_FACTS:         "loadingFacts",
+  AGENTS:                'agents',
+  LOADING_FACTS:         'loadingFacts',
+  GIFT_CARDS:            'giftCards',
 } as const;
 
 function now() { return new Date().toISOString(); }
@@ -760,5 +762,82 @@ export const loadingFactsService = {
         cb(items);
       }
     );
+  },
+};
+
+// ─── Gift Cards ───────────────────────────────────────────────────────────────
+/** Generate a 16-char alphanumeric code like SKC1-A3F2-9K7B-XP4Q (dashes for display only, stored without) */
+export function generateGiftCardCode(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no 0/O/1/I to avoid confusion
+  let code = 'SKC';
+  for (let i = 0; i < 13; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  return code; // 16 chars total
+}
+
+export const giftCardService = {
+  async add(card: Omit<GiftCard, 'id'>): Promise<string> {
+    const ref = await addDoc(collection(db, COLLECTIONS.GIFT_CARDS), { ...card, createdAt: now() });
+    return ref.id;
+  },
+
+  async getById(id: string): Promise<GiftCard | null> {
+    const snap = await getDoc(doc(db, COLLECTIONS.GIFT_CARDS, id));
+    if (!snap.exists()) return null;
+    return { id: snap.id, ...snap.data() } as GiftCard;
+  },
+
+  async getByCode(code: string): Promise<GiftCard | null> {
+    const snap = await getDocs(query(
+      collection(db, COLLECTIONS.GIFT_CARDS),
+      where('code', '==', code.toUpperCase().trim()),
+    ));
+    if (snap.empty) return null;
+    return { id: snap.docs[0].id, ...snap.docs[0].data() } as GiftCard;
+  },
+
+  /** Admin: activate a card after payment confirmed */
+  async activate(id: string): Promise<void> {
+    await updateDoc(doc(db, COLLECTIONS.GIFT_CARDS, id), { status: 'active', activatedAt: now() });
+  },
+
+  /** Mark a card as redeemed when kit order is placed */
+  async redeem(id: string, redeemedBy: string, redeemedOrderId: string): Promise<void> {
+    await updateDoc(doc(db, COLLECTIONS.GIFT_CARDS, id), {
+      status: 'redeemed', redeemedBy, redeemedOrderId, redeemedAt: now(),
+    });
+  },
+
+  /** Admin: get all cards, ordered newest first */
+  subscribeAll(cb: (cards: GiftCard[]) => void): () => void {
+    return onSnapshot(
+      query(collection(db, COLLECTIONS.GIFT_CARDS)),
+      snap => {
+        const cards = snap.docs
+          .map(d => ({ id: d.id, ...d.data() } as GiftCard))
+          .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+        cb(cards);
+      }
+    );
+  },
+};
+
+// ─── Postpartum Kit Config ─────────────────────────────────────────────────────
+const KIT_CONFIG_DOC = 'postpartum_kit';
+
+export const kitConfigService = {
+  async get(): Promise<PostpartumKitConfig | null> {
+    const snap = await getDoc(doc(db, COLLECTIONS.SETTINGS, KIT_CONFIG_DOC));
+    if (!snap.exists()) return null;
+    return snap.data() as PostpartumKitConfig;
+  },
+
+  async save(config: Partial<PostpartumKitConfig>): Promise<void> {
+    await setDoc(doc(db, COLLECTIONS.SETTINGS, KIT_CONFIG_DOC), { ...config, updatedAt: now() }, { merge: true });
+  },
+
+  subscribe(cb: (cfg: PostpartumKitConfig) => void): () => void {
+    return onSnapshot(doc(db, COLLECTIONS.SETTINGS, KIT_CONFIG_DOC), snap => {
+      if (snap.exists()) cb(snap.data() as PostpartumKitConfig);
+    });
   },
 };

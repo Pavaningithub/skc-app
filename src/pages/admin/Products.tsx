@@ -28,6 +28,7 @@ const emptyForm: Omit<Product, 'id' | 'createdAt' | 'updatedAt'> = {
   minOrderQty: 0, category: 'Other', isActive: true,
   isOnDemand: false, isPopular: false, allowCustomization: false, customizationHint: '', sortOrder: 0,
   hasGarlicOption: false, isNewLaunch: false, newLaunchUntil: '', didYouKnow: '',
+  videoUrl: '', kitRole: undefined,
 };
 
 export default function Products() {
@@ -56,6 +57,8 @@ export default function Products() {
       isNewLaunch: p.isNewLaunch ?? false,
       newLaunchUntil: p.newLaunchUntil ?? '',
       didYouKnow: p.didYouKnow ?? '',
+      videoUrl: p.videoUrl ?? '',
+      kitRole: p.kitRole,
     });
     setEditId(p.id); setShowForm(true);
   }
@@ -70,6 +73,8 @@ export default function Products() {
       pricePerUnit: priceToStore,
       ...(form.newLaunchUntil ? {} : { newLaunchUntil: undefined }),
       ...(form.didYouKnow?.trim() ? {} : { didYouKnow: undefined }),
+      ...((form as any).videoUrl?.trim() ? {} : { videoUrl: undefined }),
+      ...((form as any).kitRole ? {} : { kitRole: undefined }),
     };
     setSaving(true);
     try {
@@ -404,6 +409,31 @@ export default function Products() {
                   <p className="text-xs text-gray-400 mt-1">Leave blank = show indefinitely</p>
                 </div>
               )}
+            </div>
+
+            {/* Video URL */}
+            <div className="px-5">
+              <label className="block text-sm font-medium text-gray-700 mb-1">▶ Usage Video URL <span className="text-gray-400 font-normal">(optional — shown on kit page)</span></label>
+              <input
+                type="url" value={(form as any).videoUrl ?? ''}
+                onChange={e => setForm(f => ({ ...f, videoUrl: e.target.value } as any))}
+                placeholder="https://www.instagram.com/reel/…"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
+              />
+            </div>
+
+            {/* Kit Role */}
+            <div className="px-5">
+              <label className="block text-sm font-medium text-gray-700 mb-1">👶 Postpartum Kit Role <span className="text-gray-400 font-normal">(optional)</span></label>
+              <select
+                value={(form as any).kitRole ?? ''}
+                onChange={e => setForm(f => ({ ...f, kitRole: e.target.value || undefined } as any))}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-orange-400 bg-white"
+              >
+                <option value="">Not in kit</option>
+                <option value="mandatory">🔒 Mandatory — always included</option>
+                <option value="optional">✅ Optional — customer can toggle</option>
+              </select>
             </div>
 
             {/* Did You Know */}

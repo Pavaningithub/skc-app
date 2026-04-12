@@ -9,6 +9,8 @@ const OrderConfirmation        = lazy(() => import('./pages/customer/OrderConfir
 const SubscriptionConfirmation = lazy(() => import('./pages/customer/SubscriptionConfirmation'));
 const FeedbackPage             = lazy(() => import('./pages/customer/FeedbackPage'));
 const MyAccountPage     = lazy(() => import('./pages/customer/MyAccountPage'));
+const PostpartumKitPage = lazy(() => import('./pages/customer/PostpartumKitPage'));
+const GiftCardPage      = lazy(() => import('./pages/customer/GiftCardPage'));
 
 // Admin pages
 const AdminLayout      = lazy(() => import('./pages/admin/AdminLayout'));
@@ -32,6 +34,7 @@ const AnalyticsPage        = lazy(() => import('./pages/admin/AnalyticsPage'));
 const SubscriptionAnalyticsPage = lazy(() => import('./pages/admin/SubscriptionAnalyticsPage'));
 const FeaturesPage         = lazy(() => import('./pages/admin/FeaturesPage'));
 const LoadingFactsPage     = lazy(() => import('./pages/admin/LoadingFactsPage'));
+const PostpartumKitAdmin   = lazy(() => import('./pages/admin/PostpartumKitAdmin'));
 
 // Agent portal
 const AgentLogin   = lazy(() => import('./pages/agent/AgentLogin'));
@@ -69,6 +72,8 @@ export default function App() {
             <Route path="/feedback/:orderId" element={<FeedbackPage />} />
             <Route path="/my-referral" element={<Navigate to="/my-orders?tab=referral" replace />} />
             <Route path="/my-orders" element={<MyAccountPage />} />
+            <Route path="/kit" element={<PostpartumKitPage />} />
+            <Route path="/gift-card/:code" element={<GiftCardPage />} />
 
             {/* ── Agent portal ─────────────────────────────────────── */}
             <Route path="/agent/login" element={<AgentLogin />} />
@@ -96,6 +101,7 @@ export default function App() {
               <Route path="referral-settings" element={<ReferralSettingsPage />} />
               <Route path="features" element={<FeaturesPage />} />
               <Route path="loading-facts" element={<LoadingFactsPage />} />
+              <Route path="postpartum-kit" element={<PostpartumKitAdmin />} />
               <Route path="settings" element={<SettingsPage />} />
             </Route>
 
