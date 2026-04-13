@@ -6,13 +6,13 @@ import {
   Search
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { productsService, feedbackService, ordersService, customersService, stockService, subscriptionsService, loadingFactsService, kitConfigService } from '../../lib/services';
+import { productsService, feedbackService, ordersService, customersService, stockService, subscriptionsService, loadingFactsService } from '../../lib/services';
 import { generateOrderNumber, generateSubscriptionOrderNumber, formatCurrency, computeReferralDiscountFromTiers, computeCreditRedemption, normalizeWhatsapp } from '../../lib/utils';
 import { useReferralConfig } from '../../lib/useReferralConfig';
 import { useSubscriptionConfig } from '../../lib/useSubscriptionConfig';
 import { useFeatureFlags } from '../../lib/useFeatureFlags';
 import { APP_CONFIG } from '../../config';
-import type { Product, Feedback, OrderItem, Order, LoadingFact, PostpartumKitConfig } from '../../lib/types';
+import type { Product, Feedback, OrderItem, Order, LoadingFact } from '../../lib/types';
 
 interface CartItem extends OrderItem {}
 
@@ -50,19 +50,6 @@ export default function StoreFront() {
   const [standingDiscount, setStandingDiscount] = useState(0); // auto-applied from customer's discountApplyToNew
   const { config: referralConfig } = useReferralConfig();
   const { flags: featureFlags } = useFeatureFlags();
-  const [kitConfig, setKitConfig] = useState<PostpartumKitConfig | null>(null);
-  const [showKitTada, setShowKitTada] = useState(false);
-  useEffect(() => {
-    const unsub = kitConfigService.subscribe(cfg => {
-      setKitConfig(cfg);
-      if (cfg.isActive) {
-        const seen = sessionStorage.getItem('skc_kit_tada_shown');
-        if (!seen) { setShowKitTada(true); sessionStorage.setItem('skc_kit_tada_shown', '1'); }
-      }
-    });
-    return () => unsub();
-  }, []);
-
   const [scrolledPastHero, setScrolledPastHero] = useState(false);
   const [loadingFact, setLoadingFact]   = useState<LoadingFact | null>(null); // single random fact for loading screen
   const [factsReady, setFactsReady]     = useState(false); // true once fact + duration loaded from Firestore
@@ -467,32 +454,6 @@ export default function StoreFront() {
   return (
     <div className="min-h-screen font-sans" style={{ background: '#fdf5e6' }}>
 
-      {/* ── Postpartum Kit TADA Modal ── */}
-      {showKitTada && kitConfig?.isActive && (
-        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-4"
-          style={{ background: 'rgba(0,0,0,0.6)' }}
-          onClick={() => setShowKitTada(false)}>
-          <div
-            className="relative w-full max-w-sm rounded-3xl p-6 text-center animate-bounce-in"
-            style={{ background: 'linear-gradient(145deg, #fff8ec, #fff)', border: '2px solid #c8821a', boxShadow: '0 20px 60px rgba(200,130,26,0.3)' }}
-            onClick={e => e.stopPropagation()}>
-            <button onClick={() => setShowKitTada(false)}
-              className="absolute top-3 right-4 text-gray-400 text-2xl leading-none">×</button>
-            <div className="text-5xl mb-2">👶</div>
-            <h2 className="text-xl font-bold" style={{ color: '#3d1c02' }}>{kitConfig.title}</h2>
-            <p className="text-sm text-gray-600 mt-2 leading-relaxed">{kitConfig.tagline}</p>
-            <a href="/kit"
-              className="mt-5 block w-full py-3 rounded-2xl text-white font-bold text-base"
-              style={{ background: '#c8821a' }}
-              onClick={() => setShowKitTada(false)}>
-              Explore Kit →
-            </a>
-            <button onClick={() => setShowKitTada(false)}
-              className="mt-2 text-xs text-gray-400 underline">Maybe later</button>
-          </div>
-        </div>
-      )}
-
       {/* Header — slides up out of view when scrolled past hero */}
       <header ref={headerRef}
         className="sticky top-0 z-40 transition-transform duration-300"
@@ -858,22 +819,6 @@ export default function StoreFront() {
           <h2 className="text-xl font-bold" style={{ color: '#3d1c02', fontFamily: 'Georgia, serif' }}>🌿 Our Products</h2>
         </div>
         <p className="text-xs text-gray-400 mb-4">Tap any product to add to cart · Made fresh in small batches 🙏</p>
-
-        {/* ── Postpartum Kit Banner ── */}
-        {kitConfig?.isActive && (
-          <a href="/kit"
-            className="mb-4 flex items-center gap-3 rounded-2xl px-4 py-3 relative overflow-hidden no-underline"
-            style={{ background: 'linear-gradient(135deg, #fff1e0, #ffe4b8)', border: '1.5px solid #c8821a' }}>
-            <span className="text-2xl flex-shrink-0 animate-bounce">👶</span>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-bold" style={{ color: '#3d1c02' }}>
-                {kitConfig.title}
-              </p>
-              <p className="text-xs mt-0.5" style={{ color: '#7a3b0a' }}>{kitConfig.tagline}</p>
-            </div>
-            <span className="text-xs font-bold px-3 py-1.5 rounded-xl text-white flex-shrink-0" style={{ background: '#c8821a' }}>Explore →</span>
-          </a>
-        )}
 
         {/* ── New Launch Banner ── */}
         {bannerLaunch && (
