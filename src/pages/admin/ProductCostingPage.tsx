@@ -213,14 +213,14 @@ function RecipeEditor({
           {/* Yield settings */}
           <div className="flex items-center gap-4 flex-wrap">
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Yield (kg per batch)</label>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Batch size (kg output)</label>
               <input type="number" min="0.1" step="0.1" value={recipe.yieldKg}
                 onChange={e => mutate(r => ({ ...r, yieldKg: parseFloat(e.target.value) || 1 }))}
                 className="w-24 border border-gray-200 rounded-xl px-3 py-1.5 text-sm outline-none focus:border-orange-400"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Pieces per kg (optional)</label>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Pieces per kg (for per-piece price)</label>
               <input type="number" min="0" step="1" value={recipe.piecesPerKg ?? ''}
                 onChange={e => mutate(r => ({ ...r, piecesPerKg: parseInt(e.target.value) || undefined }))}
                 placeholder="e.g. 54"
@@ -231,7 +231,7 @@ function RecipeEditor({
 
           {/* Ingredients table */}
           <div>
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">🧂 Ingredients (per {recipe.yieldKg}kg batch)</p>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">🧂 Ingredients — quantities for a {recipe.yieldKg}kg batch</p>
             <table className="w-full text-sm border-collapse">
               <thead>
                 <tr className="bg-gray-50 text-xs text-gray-500">
