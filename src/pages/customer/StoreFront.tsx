@@ -309,7 +309,12 @@ export default function StoreFront() {
         orderNumber, type: 'regular', customerId,
         customerName: orderForm.name.trim(), customerWhatsapp: wa,
         customerPlace: orderForm.place.trim(),
-        items: cart, subtotal: cartTotal,
+        // Stamp handledBy from product catalogue (internal tracking only, not shown to customer)
+        items: cart.map(item => ({
+          ...item,
+          handledBy: products.find(p => p.id === item.productId)?.handledBy ?? 'Sree Lakshmi',
+        })),
+        subtotal: cartTotal,
         discount: totalDiscountAmt, total: finalTotal,
         status: 'pending', paymentStatus: 'pending',
         notes: orderForm.notes,
@@ -378,6 +383,7 @@ export default function StoreFront() {
         productId: p.id, productName: p.name,
         unit: p.unit as 'gram', quantity: 50, pricePerUnit: 0, totalPrice: 0,
         customizationNote: '', isOnDemand: false,
+        handledBy: p.handledBy ?? 'Sree Lakshmi',
       }));
       const order: Omit<Order, 'id'> = {
         orderNumber, type: 'sample', customerId,

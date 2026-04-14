@@ -389,6 +389,26 @@ export default function OrderDetail() {
               {item.customizationNote && (
                 <p className="text-xs font-medium text-amber-700">{item.customizationNote}</p>
               )}
+              <span className="inline-flex items-center gap-1 mt-0.5">
+                <span className="text-xs text-gray-400">👤</span>
+                <select
+                  value={item.handledBy ?? 'Sree Lakshmi'}
+                  onChange={async e => {
+                    const updatedItems = order.items.map((it, j) =>
+                      j === i ? { ...it, handledBy: e.target.value } : it
+                    );
+                    await ordersService.update(order.id, { items: updatedItems });
+                    load();
+                  }}
+                  className="text-xs text-blue-600 bg-transparent border-none outline-none cursor-pointer hover:underline"
+                >
+                  <option value="Sree Lakshmi">Sree Lakshmi</option>
+                  <option value="Others">Others</option>
+                  {item.handledBy && !['Sree Lakshmi','Others'].includes(item.handledBy) && (
+                    <option value={item.handledBy}>{item.handledBy}</option>
+                  )}
+                </select>
+              </span>
             </div>
             <p className="font-semibold text-gray-800">{formatCurrency(item.totalPrice)}</p>
           </div>

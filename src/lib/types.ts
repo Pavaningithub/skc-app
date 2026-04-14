@@ -63,6 +63,7 @@ export interface Product {
   isNewLaunch?: boolean;          // show "New!" badge and launch banner on storefront
   newLaunchUntil?: string;        // ISO date — badge/banner hidden after this date
   didYouKnow?: string;            // short 1–2 line fact shown on product card (expandable)
+  handledBy?: string;              // who manufactures/handles this product, e.g. 'Sree Lakshmi'
   createdAt: string;
   updatedAt: string;
 }
@@ -169,6 +170,7 @@ export interface OrderItem {
   rawMaterialCost?: number;       // for on-demand: actual raw material cost
   profitAmount?: number;          // selling price - raw material cost
   agentMarkup?: number;           // ₹ markup added by agent on top of SKC base price (per unit)
+  handledBy?: string;              // who handles this item — copied from Product.handledBy at order time
 }
 
 // ─── Order ───────────────────────────────────────────────────────────────────

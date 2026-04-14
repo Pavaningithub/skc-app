@@ -28,6 +28,7 @@ const emptyForm: Omit<Product, 'id' | 'createdAt' | 'updatedAt'> = {
   minOrderQty: 0, category: 'Other', isActive: true,
   isOnDemand: false, isPopular: false, allowCustomization: false, customizationHint: '', sortOrder: 0,
   hasGarlicOption: false, isNewLaunch: false, newLaunchUntil: '', didYouKnow: '',
+  handledBy: 'Sree Lakshmi',
 };
 
 export default function Products() {
@@ -56,6 +57,7 @@ export default function Products() {
       isNewLaunch: p.isNewLaunch ?? false,
       newLaunchUntil: p.newLaunchUntil ?? '',
       didYouKnow: p.didYouKnow ?? '',
+      handledBy: p.handledBy ?? 'Sree Lakshmi',
     });
     setEditId(p.id); setShowForm(true);
   }
@@ -218,6 +220,7 @@ export default function Products() {
                   {p.hasGarlicOption && <span className="text-xs bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full border border-amber-200" title="Prepared with separate utensils for garlic &amp; non-garlic versions">🧄 With/Without Garlic</span>}
                   {p.isOnDemand && <span className="text-xs bg-orange-50 text-orange-500 px-2 py-0.5 rounded-full">🔥 On-demand</span>}
                   {!p.isActive && <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">Inactive</span>}
+                  <span className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full" title="Handled by">👤 {p.handledBy ?? 'Sree Lakshmi'}</span>
                 </div>
                 {p.description && <p className="text-sm text-gray-500 mt-0.5">{p.description}</p>}
               </div>
@@ -416,6 +419,18 @@ export default function Products() {
                 rows={2}
                 className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-orange-300"
               />
+            </div>
+
+            {/* Managed By */}
+            <div className="px-5">
+              <label className="block text-sm font-medium text-gray-700 mb-1">👤 Handled By <span className="text-gray-400 font-normal">(who manufactures this product)</span></label>
+              <input
+                value={form.handledBy ?? 'Sree Lakshmi'}
+                onChange={e => setForm(f => ({ ...f, handledBy: e.target.value }))}
+                placeholder="e.g. Sree Lakshmi"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
+              />
+              <p className="text-xs text-gray-400 mt-1">This will be stamped on each order item so revenue can be tracked per person.</p>
             </div>
 
             {/* Footer buttons */}
