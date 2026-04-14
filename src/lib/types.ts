@@ -376,3 +376,55 @@ export interface DashboardStats {
   topProducts: { name: string; qty: number; revenue: number }[];
   revenueByDay: { date: string; revenue: number }[];
 }
+
+// ─── Raw Material Cost Sheet ──────────────────────────────────────────────────
+// Stored as a single document at settings/raw_material_costs
+// Structure: { materials: RawMaterialRow[], batches: BatchColumn[], cells: Record<matId_batchId, number> }
+export interface RawMaterialRow {
+  id: string;          // uuid
+  nameEn: string;
+  nameKn: string;      // Kannada name
+  unit: 'gram' | 'kg' | 'piece';
+}
+
+export interface BatchColumn {
+  id: string;          // uuid
+  batchNumber: string;
+  date: string;        // ISO date YYYY-MM-DD
+}
+
+export interface RawMaterialCostSheet {
+  materials: RawMaterialRow[];
+  batches: BatchColumn[];
+  // key = `${materialId}__${batchId}`, value = cost per kg (or per piece)
+  cells: Record<string, number>;
+  updatedAt: string;
+}
+
+// ─── Product Recipe / Costing ────────────────────────────────────────────────
+// Each product has one recipe doc stored in collection 'productRecipes'
+export interface RecipeIngredient {
+  materialId: string;   // references RawMaterialRow.id
+  materialName: string; // denormalised for display
+  quantityGrams: number; // quantity needed per 1kg of finished product (grams)
+}
+
+export interface RecipeOverhead {
+  id: string;
+  label: string;       // e.g. 'Labour', 'Gas', 'Delivery'
+  type: 'fixed' | 'pct'; // fixed ₹ or % of raw material cost
+  value: number;
+}
+
+export interface ProductRecipe {
+  id: string;           // Firestore doc id = productId
+  productId: string;
+  productName: string;
+  yieldKg: number;      // how many kg does one batch make (default 1)
+  piecesPerKg?: number; // e.g. 54 for Besan Laddu
+  ingredients: RecipeIngredient[];
+  overheads: RecipeOverhead[];
+  profitType: 'fixed' | 'pct';
+  profitValue: number;
+  updatedAt: string;
+}

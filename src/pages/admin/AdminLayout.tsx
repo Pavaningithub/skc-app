@@ -4,7 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import {
   LayoutDashboard, ShoppingBag, Package, BarChart3, Users,
   RefreshCw, MessageSquare, Settings, Menu,
-  Leaf, LogOut, Bell, Megaphone, Handshake, Boxes, Gift, TrendingUp, ToggleLeft, Lightbulb,
+  Leaf, LogOut, Bell, Megaphone, Handshake, Boxes, Gift, TrendingUp, ToggleLeft, Lightbulb, FlaskConical, Calculator,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { ordersService } from '../../lib/services';
@@ -17,6 +17,8 @@ const navItems = [
   { to: '/admin/orders',    icon: ShoppingBag,      label: 'Orders' },
   { to: '/admin/packing',   icon: Boxes,           label: 'Packing' },
   { to: '/admin/products',  icon: Package,         label: 'Products' },
+  { to: '/admin/raw-material-costs', icon: FlaskConical, label: 'Raw Costs' },
+  { to: '/admin/product-costing',    icon: Calculator,   label: 'Costing' },
   // { to: '/admin/stock', icon: BarChart3, label: 'Stock' },        // disabled — enable when needed
   // { to: '/admin/batches', icon: FlaskConical, label: 'Production' }, // disabled — enable when needed
   // { to: '/admin/expenses', icon: Receipt, label: 'Expenses' },     // disabled — enable when needed

@@ -32,6 +32,8 @@ const AnalyticsPage        = lazy(() => import('./pages/admin/AnalyticsPage'));
 const SubscriptionAnalyticsPage = lazy(() => import('./pages/admin/SubscriptionAnalyticsPage'));
 const FeaturesPage         = lazy(() => import('./pages/admin/FeaturesPage'));
 const LoadingFactsPage     = lazy(() => import('./pages/admin/LoadingFactsPage'));
+const RawMaterialCostsPage = lazy(() => import('./pages/admin/RawMaterialCostsPage'));
+const ProductCostingPage   = lazy(() => import('./pages/admin/ProductCostingPage'));
 
 // Agent portal
 const AgentLogin   = lazy(() => import('./pages/agent/AgentLogin'));
@@ -96,6 +98,8 @@ export default function App() {
               <Route path="referral-settings" element={<ReferralSettingsPage />} />
               <Route path="features" element={<FeaturesPage />} />
               <Route path="loading-facts" element={<LoadingFactsPage />} />
+              <Route path="raw-material-costs" element={<RawMaterialCostsPage />} />
+              <Route path="product-costing" element={<ProductCostingPage />} />
               <Route path="settings" element={<SettingsPage />} />
             </Route>
 
