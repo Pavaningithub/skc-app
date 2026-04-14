@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { Plus, Save, X, Search, TrendingUp, TrendingDown, Minus as FlatIcon } from 'lucide-react';
+import { Plus, X, Search, TrendingUp, TrendingDown, Minus as FlatIcon, CloudUpload } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { rawMaterialCostSheetService } from '../../lib/services';
 import type { RawMaterialCostSheet, RawMaterialRow, BatchColumn } from '../../lib/types';
@@ -7,6 +7,21 @@ import type { RawMaterialCostSheet, RawMaterialRow, BatchColumn } from '../../li
 // ── helpers ────────────────────────────────────────────────────────────────
 function uid() {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+}
+
+/** Auto-generate next batch number based on the last batch in the sheet.
+ *  Pattern: B-001 → B-002, Batch5 → Batch6, anything else → B-001
+ */
+function nextBatchNumber(batches: BatchColumn[]): string {
+  if (batches.length === 0) return 'B-001';
+  const last = batches[batches.length - 1].batchNumber;
+  // Match trailing digits
+  const m = last.match(/^(.*?)([0-9]+)$/);
+  if (!m) return last + '-2';
+  const prefix = m[1];
+  const num = parseInt(m[2], 10) + 1;
+  const padded = String(num).padStart(m[2].length, '0');
+  return prefix + padded;
 }
 
 const EMPTY_SHEET: RawMaterialCostSheet = {
@@ -19,20 +34,17 @@ const EMPTY_SHEET: RawMaterialCostSheet = {
 // ── component ──────────────────────────────────────────────────────────────
 export default function RawMaterialCostsPage() {
   const [sheet, setSheet] = useState<RawMaterialCostSheet>(EMPTY_SHEET);
-  const [saving, setSaving] = useState(false);
-  const [dirty, setDirty] = useState(false);
+  const [saveState, setSaveState] = useState<'saved' | 'saving' | 'pending'>('saved');
   const [search, setSearch] = useState('');
-
-  // new batch form
-  const [showAddBatch, setShowAddBatch] = useState(false);
-  const [newBatch, setNewBatch] = useState({ batchNumber: '', date: new Date().toISOString().slice(0, 10) });
+  const autosaveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const sheetRef = useRef<RawMaterialCostSheet>(EMPTY_SHEET);
 
   // new material form
   const [showAddMaterial, setShowAddMaterial] = useState(false);
   const [newMaterial, setNewMaterial] = useState({ nameEn: '', nameKn: '', unit: 'gram' as RawMaterialRow['unit'] });
 
   // inline cell editing
-  const [editingCell, setEditingCell] = useState<string | null>(null); // `matId__batchId`
+  const [editingCell, setEditingCell] = useState<string | null>(null);
   const [cellDraft, setCellDraft] = useState('');
   const cellInputRef = useRef<HTMLInputElement>(null);
 
@@ -40,53 +52,62 @@ export default function RawMaterialCostsPage() {
 
   // Load from Firestore on mount, then subscribe
   useEffect(() => {
-    rawMaterialCostSheetService.get().then(s => { if (s) setSheet(s); });
+    rawMaterialCostSheetService.get().then(s => { if (s) { setSheet(s); sheetRef.current = s; } });
     const unsub = rawMaterialCostSheetService.subscribe(s => {
       setSheet(s);
-      setDirty(false);
+      sheetRef.current = s;
+      setSaveState('saved');
     });
-    return () => unsub();
+    return () => { unsub(); if (autosaveRef.current) clearTimeout(autosaveRef.current); };
   }, []);
 
   useEffect(() => {
     if (editingCell && cellInputRef.current) cellInputRef.current.focus();
   }, [editingCell]);
 
-  async function saveSheet(s: RawMaterialCostSheet) {
-    setSaving(true);
+  async function persistSheet(s: RawMaterialCostSheet) {
+    setSaveState('saving');
     try {
       await rawMaterialCostSheetService.save(s);
-      setDirty(false);
-      toast.success('Saved');
-    } catch { toast.error('Save failed'); }
-    finally { setSaving(false); }
+      setSaveState('saved');
+    } catch {
+      toast.error('Auto-save failed — check connection');
+      setSaveState('pending');
+    }
   }
 
   function mutate(updater: (s: RawMaterialCostSheet) => RawMaterialCostSheet) {
     setSheet(prev => {
       const next = updater(prev);
-      setDirty(true);
+      sheetRef.current = next;
+      setSaveState('pending');
+      // Debounce: save 1.5s after last change
+      if (autosaveRef.current) clearTimeout(autosaveRef.current);
+      autosaveRef.current = setTimeout(() => persistSheet(sheetRef.current), 1500);
       return next;
     });
   }
 
-  // ── Add batch column ──
+  // ── Add batch column — one click, auto-increments ──
   function addBatch() {
-    if (!newBatch.batchNumber.trim()) return toast.error('Enter a batch number');
-    if (!newBatch.date) return toast.error('Pick a date');
-    const col: BatchColumn = { id: uid(), batchNumber: newBatch.batchNumber.trim(), date: newBatch.date };
+    const batchNumber = nextBatchNumber(sheet.batches);
+    const date = new Date().toISOString().slice(0, 10);
+    const col: BatchColumn = { id: uid(), batchNumber, date };
     mutate(s => ({ ...s, batches: [...s.batches, col] }));
-    setNewBatch({ batchNumber: '', date: new Date().toISOString().slice(0, 10) });
-    setShowAddBatch(false);
+    toast.success(`Batch ${batchNumber} added — click the date to edit if needed`);
   }
 
   function removeBatch(batchId: string) {
-    if (!confirm('Remove this batch column?')) return;
+    if (!confirm('Remove this batch column and all its cost data?')) return;
     mutate(s => {
       const cells = { ...s.cells };
       Object.keys(cells).forEach(k => { if (k.endsWith('__' + batchId)) delete cells[k]; });
       return { ...s, batches: s.batches.filter(b => b.id !== batchId), cells };
     });
+  }
+
+  function updateBatchDate(batchId: string, date: string) {
+    mutate(s => ({ ...s, batches: s.batches.map(b => b.id === batchId ? { ...b, date } : b) }));
   }
 
   // ── Add material row ──
@@ -168,38 +189,20 @@ export default function RawMaterialCostsPage() {
             className="flex items-center gap-1.5 text-sm bg-gray-100 text-gray-700 px-3 py-2 rounded-xl hover:bg-gray-200 font-medium">
             <Plus className="w-3.5 h-3.5" /> Add Material
           </button>
-          <button onClick={() => setShowAddBatch(true)}
+          <button onClick={addBatch}
             className="flex items-center gap-1.5 text-sm bg-orange-500 text-white px-3 py-2 rounded-xl hover:bg-orange-600 font-medium">
             <Plus className="w-3.5 h-3.5" /> Add Batch
           </button>
-          {dirty && (
-            <button onClick={() => saveSheet(sheet)} disabled={saving}
-              className="flex items-center gap-1.5 text-sm bg-green-500 text-white px-3 py-2 rounded-xl hover:bg-green-600 font-medium disabled:opacity-50">
-              <Save className="w-3.5 h-3.5" /> {saving ? 'Saving…' : 'Save'}
-            </button>
-          )}
+          <span className={`flex items-center gap-1.5 text-xs px-3 py-2 rounded-xl font-medium ${
+            saveState === 'saving' ? 'text-orange-500 bg-orange-50' :
+            saveState === 'pending' ? 'text-amber-600 bg-amber-50' :
+            'text-green-600 bg-green-50'
+          }`}>
+            <CloudUpload className="w-3.5 h-3.5" />
+            {saveState === 'saving' ? 'Saving…' : saveState === 'pending' ? 'Unsaved…' : 'All saved'}
+          </span>
         </div>
       </div>
-
-      {/* ── Add Batch form ── */}
-      {showAddBatch && (
-        <div className="flex-shrink-0 px-4 py-3 bg-orange-50 border-b border-orange-100 flex items-center gap-3 flex-wrap">
-          <input
-            value={newBatch.batchNumber}
-            onChange={e => setNewBatch(p => ({ ...p, batchNumber: e.target.value }))}
-            placeholder="Batch number e.g. B-042"
-            className="border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-orange-400 w-44"
-            onKeyDown={e => e.key === 'Enter' && addBatch()}
-            autoFocus
-          />
-          <input type="date" value={newBatch.date}
-            onChange={e => setNewBatch(p => ({ ...p, date: e.target.value }))}
-            className="border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-orange-400"
-          />
-          <button onClick={addBatch} className="bg-orange-500 text-white px-4 py-2 rounded-xl text-sm font-semibold">Add</button>
-          <button onClick={() => setShowAddBatch(false)} className="text-gray-400 hover:text-gray-600"><X className="w-4 h-4" /></button>
-        </div>
-      )}
 
       {/* ── Add Material form ── */}
       {showAddMaterial && (
@@ -247,20 +250,25 @@ export default function RawMaterialCostsPage() {
                 <th className="sticky left-[180px] z-20 bg-gray-100 border border-gray-200 px-3 py-2.5 text-left font-semibold text-gray-500 text-xs min-w-[60px] whitespace-nowrap">
                   Unit
                 </th>
-                {sheet.batches.map((batch, bIdx) => (
-                  <th key={batch.id} className="border border-gray-200 px-3 py-2.5 text-center bg-gray-50 min-w-[110px]">
-                    <div className="flex items-center justify-between gap-1">
-                      <div className="text-left">
+                {sheet.batches.map((batch) => (
+                  <th key={batch.id} className="border border-gray-200 px-3 py-2.5 text-center bg-gray-50 min-w-[120px] group/col">
+                    <div className="flex items-start justify-between gap-1">
+                      <div className="text-left flex-1">
                         <p className="font-semibold text-gray-700 text-xs">{batch.batchNumber}</p>
-                        <p className="text-gray-400 text-xs font-normal">
-                          {new Date(batch.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' })}
-                        </p>
+                        <input
+                          type="date"
+                          value={batch.date}
+                          onChange={e => updateBatchDate(batch.id, e.target.value)}
+                          className="text-gray-400 text-xs font-normal bg-transparent border-none outline-none cursor-pointer w-full mt-0.5"
+                          title="Click to change date"
+                        />
                       </div>
-                      {bIdx === sheet.batches.length - 1 && (
-                        <button onClick={() => removeBatch(batch.id)} className="text-gray-300 hover:text-red-400 ml-1">
-                          <X className="w-3 h-3" />
-                        </button>
-                      )}
+                      <button
+                        onClick={() => removeBatch(batch.id)}
+                        className="opacity-0 group-hover/col:opacity-100 text-gray-300 hover:text-red-400 ml-1 mt-0.5 transition-opacity flex-shrink-0"
+                        title={`Delete ${batch.batchNumber}`}>
+                        <X className="w-3 h-3" />
+                      </button>
                     </div>
                   </th>
                 ))}
@@ -277,7 +285,8 @@ export default function RawMaterialCostsPage() {
                         {mat.nameKn && <p className="text-xs text-gray-400">{mat.nameKn}</p>}
                       </div>
                       <button onClick={() => removeMaterial(mat.id)}
-                        className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 transition-opacity ml-1">
+                        className="text-gray-300 hover:text-red-400 ml-1 flex-shrink-0"
+                        title="Remove material">
                         <X className="w-3 h-3" />
                       </button>
                     </div>
