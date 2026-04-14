@@ -62,8 +62,6 @@ function RecipeEditor({
   const [addIngMat, setAddIngMat] = useState('');
   const [addIngQty, setAddIngQty] = useState('');
 
-  useEffect(() => { setRecipe(initial); recipeRef.current = initial; }, [initial.productId]);
-
   function mutate(updater: (r: ProductRecipe) => ProductRecipe) {
     setRecipe(prev => {
       const next = updater(prev);
@@ -389,6 +387,17 @@ function RecipeEditor({
   );
 }
 
+// Module-level cache for empty recipes: stable across renders, never recreated.
+// Without this, emptyRecipe() runs uid() on every render producing a new object
+// that would cascade into child component re-mounts.
+const _emptyRecipeCache: Record<string, ProductRecipe> = {};
+function getOrCreateEmpty(productId: string, productName: string): ProductRecipe {
+  if (!_emptyRecipeCache[productId]) {
+    _emptyRecipeCache[productId] = emptyRecipe(productId, productName);
+  }
+  return _emptyRecipeCache[productId];
+}
+
 // ── Main page ──────────────────────────────────────────────────────────────────
 export default function ProductCostingPage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -407,11 +416,7 @@ export default function ProductCostingPage() {
 
   async function saveRecipe(recipe: ProductRecipe) {
     await productRecipeService.save(recipe);
-    setRecipes(prev => {
-      const exists = prev.find(r => r.productId === recipe.productId);
-      if (exists) return prev.map(r => r.productId === recipe.productId ? recipe : r);
-      return [...prev, recipe];
-    });
+    // subscribe listener will update recipes state automatically
   }
 
   async function deleteRecipe(productId: string) {
@@ -480,7 +485,7 @@ export default function ProductCostingPage() {
       <div className="space-y-2">
         {filteredProducts.map(product => {
           const existing = recipes.find(r => r.productId === product.id);
-          const recipe = existing ?? emptyRecipe(product.id, product.name);
+          const recipe = existing ?? getOrCreateEmpty(product.id, product.name);
           return (
             <RecipeEditor
               key={product.id}
