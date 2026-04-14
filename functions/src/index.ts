@@ -2,7 +2,7 @@ import * as admin from "firebase-admin";
 import {setGlobalOptions} from "firebase-functions";
 import {onDocumentCreated} from "firebase-functions/v2/firestore";
 import {onRequest} from "firebase-functions/v2/https";
-import {defineSecret} from "firebase-functions/params";
+import {defineSecret, defineString} from "firebase-functions/params";
 import * as logger from "firebase-functions/logger";
 
 admin.initializeApp();
@@ -12,12 +12,12 @@ setGlobalOptions({maxInstances: 10, region: "asia-south1"});
 
 const TELEGRAM_BOT_TOKEN = defineSecret("TELEGRAM_BOT_TOKEN");
 const TELEGRAM_CHAT_ID = defineSecret("TELEGRAM_CHAT_ID");
+const UPI_ID_PARAM = defineString("UPI_ID", {default: "***REMOVED***"});
 
 const ADMIN_BASE_URL = "https://YOUR_DOMAIN/admin/orders";
 const ADMIN_SUBS_URL = "https://YOUR_DOMAIN/admin/subscriptions";
 const WA_GROUP_LINK = "https://chat.whatsapp.com/***REMOVED***";
 const STORE_URL = "https://YOUR_DOMAIN";
-const UPI_ID = process.env.UPI_ID ?? "***REMOVED***";
 
 // ─── Shared types ────────────────────────────────────────────────────────────
 
@@ -157,12 +157,12 @@ function buildOrderTelegramText(order: Order, orderId: string, isNew = false): s
     "",
     "<b>Items:</b>",
     itemLines,
-    order.notes ? `\n📝 <b>Note:</b> ${order.notes}` : "",
+    order.notes ? `\n📝 <b>Note:</b> ${order.notes}` : null,
     isSample ? "\n🎁 FREE SAMPLE" : `\n💰 Total: ₹${order.total}`,
     "",
     statusLine,
     payLine,
-  ].filter((l) => !!l).join("\n");
+  ].filter((l) => l !== null && l !== undefined).join("\n");
 }
 
 function buildOrderActionButtons(orderId: string, order: Order): InlineButton[][] {
@@ -184,10 +184,11 @@ function buildOrderActionButtons(orderId: string, order: Order): InlineButton[][
   const buildWaCustomerUrl = (msg: string) =>
     phone ? `https://api.whatsapp.com/send?phone=91${phone}&text=${encodeURIComponent(msg)}` : null;
 
-  const upiLink = `upi://pay?pa=${UPI_ID}&pn=SriKrishnaCondiments&am=${order.total}&tn=${encodeURIComponent("Order " + order.orderNumber)}&cu=INR`;
+  const upiId = UPI_ID_PARAM.value();
+  const upiLink = `upi://pay?pa=${upiId}&pn=SriKrishnaCondiments&am=${order.total}&tn=${encodeURIComponent("Order " + order.orderNumber)}&cu=INR`;
 
   const confirmedMsg = `🙏 *Hare Krishna!* 🪷\n\nHi *${order.customerName}*, your order *#${order.orderNumber}* is confirmed! ✅\n\nWe will keep you updated. Thank you for choosing Sri Krishna Condiments! 🌿`;
-  const ofdMsg = `🙏 *Hare Krishna!* 🪷\n\nHi *${order.customerName}*, your order *#${order.orderNumber}* is out for delivery! 🚚\n\n💳 *Payment Due: ₹${order.total}*\nPay via GPay / PhonePe / any UPI app:\n📲 UPI ID: \`${UPI_ID}\`\n🔗 Tap to pay: ${upiLink}\n\nThank you! 🌿`;
+  const ofdMsg = `🙏 *Hare Krishna!* 🪷\n\nHi *${order.customerName}*, your order *#${order.orderNumber}* is out for delivery! 🚚\n\n💳 *Payment Due: ₹${order.total}*\nPay via GPay / PhonePe / any UPI app:\n📲 UPI ID: \`${upiId}\`\n🔗 Tap to pay: ${upiLink}\n\nThank you! 🌿`;
   const deliveredMsg = `🙏 *Hare Krishna!* 🪷\n\nHi *${order.customerName}*, your order *#${order.orderNumber}* has been delivered! 🎉\n\n📝 Please share your feedback: ${STORE_URL}/feedback\n\n💬 Join our WhatsApp group for offers: ${WA_GROUP_LINK}\n\nSri Krishna Condiments — Pure & Healthy 🌿`;
   const cancelledMsg = `❌ *Sri Krishna Condiments*\n\nHi *${order.customerName}*, your order *#${order.orderNumber}* has been cancelled.\n\nSorry for the inconvenience. We hope to serve you soon! 🙏`;
 
@@ -315,13 +316,18 @@ export const telegramWebhook = onRequest(
     }
 
     const token = TELEGRAM_BOT_TOKEN.value();
-    const chatId = TELEGRAM_CHAT_ID.value();
+    // Use the actual chat id from the callback message (more reliable than the stored secret)
+    const callbackChatId = String(cq.message?.chat?.id ?? TELEGRAM_CHAT_ID.value());
     const callbackId = cq.id;
     const adminName = cq.from.first_name ?? cq.from.username ?? "Admin";
     const messageId = cq.message?.message_id;
 
     try {
-      const [action, orderId, value] = cq.data.split(":");
+      // Use limit=3 so the orderId (which may be long) isn't accidentally split further
+      const parts = cq.data.split(":", 3);
+      const action = parts[0];
+      const orderId = parts[1];
+      const value = parts[2];
       if (!action || !orderId || !value) {
         await answerCallbackQuery(token, callbackId, "❓ Unknown action");
         res.status(200).send("OK");
@@ -339,6 +345,7 @@ export const telegramWebhook = onRequest(
       const order = orderSnap.data() as Order;
 
       let toastMessage = "";
+      const now = new Date().toISOString();
 
       if (action === "STATUS") {
         const validStatuses = ["pending", "confirmed", "out_for_delivery", "delivered", "cancelled"];
@@ -347,10 +354,11 @@ export const telegramWebhook = onRequest(
           res.status(200).send("OK");
           return;
         }
+        // Mirror services.ts updateStatus: set deliveredAt when delivered
         await orderRef.update({
           status: value,
-          updatedAt: new Date().toISOString(),
-          [`statusHistory.${value}`]: new Date().toISOString(),
+          updatedAt: now,
+          ...(value === "delivered" ? {deliveredAt: now} : {}),
         });
         order.status = value;
         toastMessage = `${STATUS_EMOJI[value] ?? "🔄"} ${order.orderNumber} → ${STATUS_LABEL[value] ?? value} (by ${adminName})`;
@@ -361,12 +369,23 @@ export const telegramWebhook = onRequest(
           res.status(200).send("OK");
           return;
         }
-        await orderRef.update({
-          paymentStatus: value,
-          updatedAt: new Date().toISOString(),
-          ...(value === "paid" ? {paidAt: new Date().toISOString()} : {}),
-        });
+        // Mirror services.ts updatePayment: update order then recalc customer pendingAmount
+        await orderRef.update({paymentStatus: value, updatedAt: now});
         order.paymentStatus = value;
+        // Recalculate customer pendingAmount so the admin panel stays in sync
+        const customerId = (orderSnap.data() as {customerId?: string}).customerId;
+        if (customerId) {
+          const ordersSnap = await db.collection("orders")
+            .where("customerId", "==", customerId)
+            .get();
+          const pendingTotal = ordersSnap.docs
+            .map((d) => d.data() as {paymentStatus?: string; total?: number})
+            .filter((o) => o.paymentStatus === "pending")
+            .reduce((sum, o) => sum + (o.total ?? 0), 0);
+          await db.collection("customers").doc(customerId).update({
+            pendingAmount: Math.max(0, pendingTotal),
+          });
+        }
         toastMessage = `${PAY_EMOJI[value] ?? "💸"} ${order.orderNumber} payment → ${PAY_LABEL[value] ?? value} (by ${adminName})`;
       } else {
         await answerCallbackQuery(token, callbackId, "❓ Unknown action");
@@ -381,7 +400,7 @@ export const telegramWebhook = onRequest(
       if (messageId) {
         const updatedText = buildOrderTelegramText(order, orderId);
         const updatedButtons = buildOrderActionButtons(orderId, order);
-        await editTelegramMessage(token, chatId, messageId, updatedText, updatedButtons);
+        await editTelegramMessage(token, callbackChatId, messageId, updatedText, updatedButtons);
       }
 
       logger.info("Telegram webhook processed", {action, orderId, value, adminName});
