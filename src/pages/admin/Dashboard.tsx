@@ -72,12 +72,16 @@ export default function Dashboard() {
     const monthExpenses  = expenses.filter(e => e.date >= monthStart && e.date <= monthEnd);
     const lowStock       = stock.filter(s => s.quantityAvailable <= s.lowStockThreshold);
 
-    // Revenue breakdown by handledBy (from order items this month)
+    // Revenue breakdown by handledBy — allocate each order's actual total
+    // proportionally by item price share, so handler totals always sum to monthlyRevenue.
     const handlerRevenue: Record<string, number> = {};
     for (const order of monthOrders) {
+      const itemsTotal = order.items.reduce((s, i) => s + i.totalPrice, 0);
       for (const item of order.items) {
         const handler = item.handledBy ?? 'Sree Lakshmi';
-        handlerRevenue[handler] = (handlerRevenue[handler] ?? 0) + item.totalPrice;
+        // Proportional share of the actual order total (after discounts/charges)
+        const share = itemsTotal > 0 ? (item.totalPrice / itemsTotal) * order.total : 0;
+        handlerRevenue[handler] = (handlerRevenue[handler] ?? 0) + share;
       }
     }
 

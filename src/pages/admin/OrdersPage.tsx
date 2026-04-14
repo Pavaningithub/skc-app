@@ -39,7 +39,9 @@ export default function OrdersPage() {
       if (!showSubscriptions && o.type === 'subscription') return false;
       const matchSearch = o.customerName.toLowerCase().includes(search.toLowerCase()) ||
         o.orderNumber.toLowerCase().includes(search.toLowerCase()) ||
-        o.customerPlace.toLowerCase().includes(search.toLowerCase());
+        o.customerPlace.toLowerCase().includes(search.toLowerCase()) ||
+        (o.customerWhatsapp ?? '').includes(search.replace(/\s+/g, '')) ||
+        String(o.total).includes(search.replace('₹', '').trim());
       const matchStatus = statusFilter === 'all' || o.status === statusFilter;
       const matchPay = payFilter === 'all'
         ? true
