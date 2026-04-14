@@ -11,6 +11,7 @@ import type {
   Product, StockItem, RawMaterial, RawMaterialPurchase,
   Batch, Customer, Order, Expense, Subscription, Feedback, AdminAction, AdminActionType, AdminUser, Agent,
   ReferralConfig, SubscriptionConfig, FeatureFlags, LoadingFact,
+  RawMaterialCostSheet, ProductRecipe,
 } from "./types";
 import { DEFAULT_REFERRAL_CONFIG, DEFAULT_SUBSCRIPTION_CONFIG, DEFAULT_FEATURE_FLAGS } from "./types";
 
@@ -33,6 +34,8 @@ export const COLLECTIONS = {
   ADMIN_USERS:           "adminUsers",
   AGENTS:                "agents",
   LOADING_FACTS:         "loadingFacts",
+  RAW_MATERIAL_COSTS:    "settings",   // doc id = 'raw_material_costs' inside 'settings'
+  PRODUCT_RECIPES:       "productRecipes",
 } as const;
 
 function now() { return new Date().toISOString(); }
@@ -760,5 +763,42 @@ export const loadingFactsService = {
         cb(items);
       }
     );
+  },
+};
+
+// ─── Raw Material Cost Sheet ──────────────────────────────────────────────────
+const RAW_COST_DOC = 'raw_material_costs';
+export const rawMaterialCostSheetService = {
+  async get(): Promise<RawMaterialCostSheet | null> {
+    const snap = await getDoc(doc(db, COLLECTIONS.RAW_MATERIAL_COSTS, RAW_COST_DOC));
+    if (!snap.exists()) return null;
+    return snap.data() as RawMaterialCostSheet;
+  },
+  async save(sheet: Omit<RawMaterialCostSheet, 'updatedAt'>): Promise<void> {
+    await setDoc(doc(db, COLLECTIONS.RAW_MATERIAL_COSTS, RAW_COST_DOC), { ...sheet, updatedAt: now() });
+  },
+  subscribe(cb: (sheet: RawMaterialCostSheet) => void): Unsubscribe {
+    return onSnapshot(doc(db, COLLECTIONS.RAW_MATERIAL_COSTS, RAW_COST_DOC), snap => {
+      if (snap.exists()) cb(snap.data() as RawMaterialCostSheet);
+    });
+  },
+};
+
+// ─── Product Recipes ──────────────────────────────────────────────────────────
+export const productRecipeService = {
+  async getAll(): Promise<ProductRecipe[]> {
+    const snap = await getDocs(collection(db, COLLECTIONS.PRODUCT_RECIPES));
+    return snap.docs.map(d => ({ ...d.data(), id: d.id } as ProductRecipe));
+  },
+  async save(recipe: ProductRecipe): Promise<void> {
+    await setDoc(doc(db, COLLECTIONS.PRODUCT_RECIPES, recipe.productId), { ...recipe, updatedAt: now() });
+  },
+  async delete(productId: string): Promise<void> {
+    await deleteDoc(doc(db, COLLECTIONS.PRODUCT_RECIPES, productId));
+  },
+  subscribe(cb: (recipes: ProductRecipe[]) => void): Unsubscribe {
+    return onSnapshot(collection(db, COLLECTIONS.PRODUCT_RECIPES), snap => {
+      cb(snap.docs.map(d => ({ ...d.data(), id: d.id } as ProductRecipe)));
+    });
   },
 };
