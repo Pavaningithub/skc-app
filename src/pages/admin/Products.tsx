@@ -67,11 +67,11 @@ export default function Products() {
     if (form.pricePerUnit <= 0) return toast.error('Price must be greater than 0');
     // gram-unit products: admin enters price per kg — convert to per gram for storage
     const priceToStore = form.unit === 'gram' ? form.pricePerUnit / 1000 : form.pricePerUnit;
+    const { newLaunchUntil, didYouKnow, ...rest } = { ...form, pricePerUnit: priceToStore };
     const formToSave = {
-      ...form,
-      pricePerUnit: priceToStore,
-      ...(form.newLaunchUntil ? {} : { newLaunchUntil: undefined }),
-      ...(form.didYouKnow?.trim() ? {} : { didYouKnow: undefined }),
+      ...rest,
+      ...(newLaunchUntil ? { newLaunchUntil } : {}),
+      ...(didYouKnow?.trim() ? { didYouKnow } : {}),
     };
     setSaving(true);
     try {

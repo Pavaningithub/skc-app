@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useRef } from 'react';
-import { Plus, Trash2, X, Search, ChevronDown, ChevronUp, IndianRupee, CloudUpload } from 'lucide-react';
+import { Plus, Trash2, X, Search, ChevronDown, ChevronUp, IndianRupee, CloudUpload, TrendingUp, TrendingDown } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { productsService, rawMaterialCostSheetService, productRecipeService } from '../../lib/services';
 import type { Product } from '../../lib/types';
@@ -13,12 +13,44 @@ function uid() { return Math.random().toString(36).slice(2, 10) + Date.now().toS
 // Get cost per gram for a material from the latest batch in the sheet
 function latestCostPerGram(matId: string, sheet: RawMaterialCostSheet): number {
   if (sheet.batches.length === 0) return 0;
-  // Walk batches newest-last, pick most recent non-zero entry
   for (let i = sheet.batches.length - 1; i >= 0; i--) {
     const val = sheet.cells[`${matId}__${sheet.batches[i].id}`];
-    if (val && val > 0) return val / 1000; // stored as /kg → convert to /gram
+    if (val && val > 0) return val / 1000;
   }
   return 0;
+}
+
+// Get cost per gram from the second-most-recent batch (for diff comparison)
+function previousBatchCostPerGram(matId: string, sheet: RawMaterialCostSheet): number {
+  if (sheet.batches.length < 2) return 0;
+  // Find index of the latest batch that has a value for this material
+  let latestIdx = -1;
+  for (let i = sheet.batches.length - 1; i >= 0; i--) {
+    const val = sheet.cells[`${matId}__${sheet.batches[i].id}`];
+    if (val && val > 0) { latestIdx = i; break; }
+  }
+  if (latestIdx <= 0) return 0;
+  // Walk backwards from the batch before latestIdx
+  for (let i = latestIdx - 1; i >= 0; i--) {
+    const val = sheet.cells[`${matId}__${sheet.batches[i].id}`];
+    if (val && val > 0) return val / 1000;
+  }
+  return 0;
+}
+
+// Compute total suggested price/kg for a recipe given a cost-per-gram lookup fn
+function computeSuggestedPricePerKg(
+  recipe: ProductRecipe,
+  costFn: (matId: string) => number
+): number {
+  const rawCost = recipe.ingredients.reduce((sum, ing) => sum + costFn(ing.materialId) * ing.quantityGrams, 0);
+  const overheadCost = recipe.overheads.reduce((sum, o) => {
+    if (o.type === 'fixed') return sum + (o.value || 0);
+    return sum + rawCost * (o.value || 0) / 100;
+  }, 0);
+  const total = rawCost + overheadCost;
+  const profit = recipe.profitType === 'fixed' ? recipe.profitValue : total * recipe.profitValue / 100;
+  return (total + profit) / (recipe.yieldKg || 1);
 }
 
 function emptyRecipe(productId: string, productName: string): ProductRecipe {
@@ -52,6 +84,7 @@ function RecipeEditor({
   onSave: (r: ProductRecipe) => Promise<void>;
   onDelete: () => Promise<void>;
 }) {
+  const hasPrevBatch = sheet.batches.length >= 2;
   const [recipe, setRecipe] = useState<ProductRecipe>(initial);
   const [saveState, setSaveState] = useState<'saved' | 'saving' | 'pending'>('saved');
   const [expanded, setExpanded] = useState(false);
@@ -132,6 +165,13 @@ function RecipeEditor({
 
   const hasRates = sheet.batches.length > 0;
 
+  // Cost diff: compare latest batch vs previous batch
+  const prevPricePerKg = hasPrevBatch
+    ? computeSuggestedPricePerKg(recipe, (id) => previousBatchCostPerGram(id, sheet))
+    : null;
+  const priceDiff = prevPricePerKg && prevPricePerKg > 0 ? pricePerKg - prevPricePerKg : null;
+  const priceDiffPct = priceDiff && prevPricePerKg ? (priceDiff / prevPricePerKg) * 100 : null;
+
   return (
     <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
       {/* Header row */}
@@ -153,6 +193,14 @@ function RecipeEditor({
             <>
               <p className="text-sm font-bold text-orange-600">₹{Math.ceil(pricePerKg)}/kg</p>
               {pricePerPiece && <p className="text-xs text-gray-500">≈ ₹{Math.ceil(pricePerPiece)}/pc</p>}
+              {priceDiff !== null && priceDiffPct !== null && (
+                <p className={`text-xs font-semibold flex items-center justify-end gap-0.5 mt-0.5 ${
+                  priceDiff > 0 ? 'text-red-500' : priceDiff < 0 ? 'text-green-600' : 'text-gray-400'
+                }`}>
+                  {priceDiff > 0 ? <TrendingUp className="w-3 h-3" /> : priceDiff < 0 ? <TrendingDown className="w-3 h-3" /> : null}
+                  {priceDiff > 0 ? '+' : ''}{priceDiffPct.toFixed(1)}% vs prev batch
+                </p>
+              )}
             </>
           ) : (
             <p className="text-xs text-gray-400">Add batch costs first</p>
@@ -364,6 +412,22 @@ function RecipeEditor({
                 <p className="text-xs text-amber-600 self-center">⚠️ Add costs in Raw Material Costs page to see actual prices</p>
               )}
             </div>
+            {priceDiff !== null && priceDiffPct !== null && prevPricePerKg !== null && (
+              <div className={`flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium border ${
+                priceDiff > 0
+                  ? 'bg-red-50 border-red-200 text-red-700'
+                  : priceDiff < 0
+                  ? 'bg-green-50 border-green-200 text-green-700'
+                  : 'bg-gray-50 border-gray-200 text-gray-500'
+              }`}>
+                {priceDiff > 0 ? <TrendingUp className="w-4 h-4 flex-shrink-0" /> : <TrendingDown className="w-4 h-4 flex-shrink-0" />}
+                <span>
+                  vs previous batch: ₹{Math.ceil(prevPricePerKg)}/kg →{' '}
+                  <strong>₹{Math.ceil(pricePerKg)}/kg</strong>{' '}
+                  ({priceDiff > 0 ? '+' : ''}{priceDiffPct.toFixed(1)}%{' '}— consider {priceDiff > 0 ? 'increasing' : 'decreasing'} selling price)
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Actions */}
@@ -415,7 +479,10 @@ export default function ProductCostingPage() {
   }, []);
 
   async function saveRecipe(recipe: ProductRecipe) {
-    await productRecipeService.save(recipe);
+    // Strip undefined fields — Firestore rejects undefined values
+    const { piecesPerKg, ...rest } = recipe;
+    const toSave: ProductRecipe = piecesPerKg ? { ...rest, piecesPerKg } : rest as ProductRecipe;
+    await productRecipeService.save(toSave);
     // subscribe listener will update recipes state automatically
   }
 
