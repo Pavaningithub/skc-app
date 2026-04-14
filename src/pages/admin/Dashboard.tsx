@@ -52,7 +52,7 @@ export default function Dashboard() {
     );
   }
 
-  const { stats, recentOrders, lowStockItems, overdueOrders, allPendingPayment, stuckOrders } = useMemo(() => {
+  const { stats, recentOrders, lowStockItems, overdueOrders, allPendingPayment, stuckOrders, handlerRevenue } = useMemo(() => {
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
     const monthEnd   = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).toISOString();
@@ -72,6 +72,15 @@ export default function Dashboard() {
     const monthExpenses  = expenses.filter(e => e.date >= monthStart && e.date <= monthEnd);
     const lowStock       = stock.filter(s => s.quantityAvailable <= s.lowStockThreshold);
 
+    // Revenue breakdown by handledBy (from order items this month)
+    const handlerRevenue: Record<string, number> = {};
+    for (const order of monthOrders) {
+      for (const item of order.items) {
+        const handler = item.handledBy ?? 'Sree Lakshmi';
+        handlerRevenue[handler] = (handlerRevenue[handler] ?? 0) + item.totalPrice;
+      }
+    }
+
     return {
       stats: {
         pendingOrders:        pendingOrders.length,
@@ -88,6 +97,7 @@ export default function Dashboard() {
       overdueOrders:     overdue,
       allPendingPayment: allPendingPay,
       stuckOrders:       stuck,
+      handlerRevenue,
     };
   }, [orders, stock, customers, expenses]);
 
@@ -183,6 +193,34 @@ export default function Dashboard() {
           )}
         </div>
       </div>
+
+      {/* Revenue by Handler */}
+      {Object.keys(handlerRevenue).length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Users className="w-4 h-4 text-blue-500" />
+            <h2 className="font-semibold text-gray-800 text-sm">Revenue by Handler — This Month</h2>
+          </div>
+          <div className="space-y-2">
+            {Object.entries(handlerRevenue)
+              .sort((a, b) => b[1] - a[1])
+              .map(([handler, revenue]) => {
+                const pct = stats.monthlyRevenue > 0 ? (revenue / stats.monthlyRevenue) * 100 : 0;
+                return (
+                  <div key={handler}>
+                    <div className="flex items-center justify-between text-sm mb-1">
+                      <span className="font-medium text-gray-700">👤 {handler}</span>
+                      <span className="font-bold text-gray-800">{formatCurrency(revenue)} <span className="text-xs font-normal text-gray-400">({pct.toFixed(0)}%)</span></span>
+                    </div>
+                    <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                      <div className="h-full bg-orange-400 rounded-full transition-all" style={{ width: `${pct}%` }} />
+                    </div>
+                  </div>
+                );
+              })}
+          </div>
+        </div>
+      )}
 
       {/* Payment Overdue — 3+ days */}
       {overdueOrders.length > 0 && (

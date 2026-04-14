@@ -222,9 +222,8 @@ export default function RawMaterialCostsPage() {
           />
           <select value={newMaterial.unit} onChange={e => setNewMaterial(p => ({ ...p, unit: e.target.value as RawMaterialRow['unit'] }))}
             className="border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-orange-400 bg-white">
-            <option value="gram">per kg</option>
-            <option value="kg">per kg (kg)</option>
-            <option value="piece">per piece</option>
+            <option value="gram">₹ per kg</option>
+            <option value="piece">₹ per piece</option>
           </select>
           <button onClick={addMaterial} className="bg-blue-500 text-white px-4 py-2 rounded-xl text-sm font-semibold">Add</button>
           <button onClick={() => setShowAddMaterial(false)} className="text-gray-400 hover:text-gray-600"><X className="w-4 h-4" /></button>
@@ -244,10 +243,10 @@ export default function RawMaterialCostsPage() {
             <thead>
               <tr className="bg-gray-50">
                 {/* Frozen header: Material name */}
-                <th className="sticky left-0 z-20 bg-gray-100 border border-gray-200 px-3 py-2.5 text-left font-semibold text-gray-700 min-w-[180px] whitespace-nowrap">
+                <th className="sticky left-0 z-20 bg-gray-100 border border-gray-200 px-3 py-2.5 text-left font-semibold text-gray-700 min-w-[220px] whitespace-nowrap">
                   Raw Material
                 </th>
-                <th className="sticky left-[180px] z-20 bg-gray-100 border border-gray-200 px-3 py-2.5 text-left font-semibold text-gray-500 text-xs min-w-[60px] whitespace-nowrap">
+                <th className="sticky left-[220px] z-20 bg-gray-100 border border-gray-200 px-3 py-2.5 text-left font-semibold text-gray-500 text-xs min-w-[70px] whitespace-nowrap">
                   Unit
                 </th>
                 {sheet.batches.map((batch) => (
@@ -278,7 +277,7 @@ export default function RawMaterialCostsPage() {
               {filteredMaterials.map(mat => (
                 <tr key={mat.id} className="hover:bg-orange-50/30 group">
                   {/* Frozen material name */}
-                  <td className="sticky left-0 z-10 bg-white border border-gray-200 px-3 py-2 min-w-[180px]">
+                  <td className="sticky left-0 z-10 bg-white border border-gray-200 px-3 py-2 min-w-[220px]">
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="font-medium text-gray-800 text-sm">{mat.nameEn}</p>
@@ -292,8 +291,8 @@ export default function RawMaterialCostsPage() {
                     </div>
                   </td>
                   {/* Unit label */}
-                  <td className="sticky left-[180px] z-10 bg-white border border-gray-200 px-3 py-2 text-xs text-gray-400 min-w-[60px] whitespace-nowrap">
-                    {mat.unit === 'piece' ? '/pc' : '/kg'}
+                  <td className="sticky left-[220px] z-10 bg-white border border-gray-200 px-3 py-2 text-xs text-gray-500 font-medium min-w-[70px] whitespace-nowrap">
+                    {mat.unit === 'piece' ? '₹/pc' : '₹/kg'}
                   </td>
                   {/* Cost cells */}
                   {sheet.batches.map((batch, bIdx) => {

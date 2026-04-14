@@ -91,6 +91,7 @@ export default function CreateOrderModal({ onClose, onCreated }: Props) {
         pricePerUnit: product.pricePerUnit,
         totalPrice: qty * product.pricePerUnit,
         ...(garlicNote ? { customizationNote: garlicNote } : {}),
+        handledBy: product.handledBy ?? 'Sree Lakshmi',
       }]);
     }
   }
