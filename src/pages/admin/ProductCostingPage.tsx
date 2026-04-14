@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Plus, Save, Trash2, X, Search, ChevronDown, ChevronUp, IndianRupee } from 'lucide-react';
+import { useRef } from 'react';
+import { Plus, Trash2, X, Search, ChevronDown, ChevronUp, IndianRupee, CloudUpload } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { productsService, rawMaterialCostSheetService, productRecipeService } from '../../lib/services';
 import type { Product } from '../../lib/types';
@@ -52,24 +53,30 @@ function RecipeEditor({
   onDelete: () => Promise<void>;
 }) {
   const [recipe, setRecipe] = useState<ProductRecipe>(initial);
-  const [saving, setSaving] = useState(false);
+  const [saveState, setSaveState] = useState<'saved' | 'saving' | 'pending'>('saved');
   const [expanded, setExpanded] = useState(false);
+  const autosaveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const recipeRef = useRef<ProductRecipe>(initial);
 
   // New ingredient form
   const [addIngMat, setAddIngMat] = useState('');
   const [addIngQty, setAddIngQty] = useState('');
 
-  useEffect(() => { setRecipe(initial); }, [initial.productId]);
+  useEffect(() => { setRecipe(initial); recipeRef.current = initial; }, [initial.productId]);
 
   function mutate(updater: (r: ProductRecipe) => ProductRecipe) {
-    setRecipe(prev => updater(prev));
-  }
-
-  async function save() {
-    setSaving(true);
-    try { await onSave(recipe); toast.success('Recipe saved'); }
-    catch { toast.error('Save failed'); }
-    finally { setSaving(false); }
+    setRecipe(prev => {
+      const next = updater(prev);
+      recipeRef.current = next;
+      setSaveState('pending');
+      if (autosaveRef.current) clearTimeout(autosaveRef.current);
+      autosaveRef.current = setTimeout(async () => {
+        setSaveState('saving');
+        try { await onSave(recipeRef.current); setSaveState('saved'); }
+        catch { setSaveState('pending'); }
+      }, 1500);
+      return next;
+    });
   }
 
   function addIngredient() {
@@ -362,15 +369,19 @@ function RecipeEditor({
           </div>
 
           {/* Actions */}
-          <div className="flex gap-3 justify-end">
+          <div className="flex gap-3 justify-between items-center">
             <button onClick={() => { if (confirm('Delete this recipe?')) onDelete(); }}
               className="flex items-center gap-1.5 text-xs text-red-400 hover:text-red-600">
               <Trash2 className="w-3.5 h-3.5" /> Delete recipe
             </button>
-            <button onClick={save} disabled={saving}
-              className="flex items-center gap-1.5 text-sm bg-green-500 text-white px-4 py-2 rounded-xl hover:bg-green-600 disabled:opacity-50 font-semibold">
-              <Save className="w-3.5 h-3.5" /> {saving ? 'Saving…' : 'Save Recipe'}
-            </button>
+            <span className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl font-medium ${
+              saveState === 'saving' ? 'text-orange-500 bg-orange-50' :
+              saveState === 'pending' ? 'text-amber-600 bg-amber-50' :
+              'text-green-600 bg-green-50'
+            }`}>
+              <CloudUpload className="w-3.5 h-3.5" />
+              {saveState === 'saving' ? 'Saving…' : saveState === 'pending' ? 'Unsaved…' : 'All saved'}
+            </span>
           </div>
         </div>
       )}
