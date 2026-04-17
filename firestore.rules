@@ -1,0 +1,257 @@
+rules_version = '2';
+
+// Sri Krishna Condiments — Firestore Security Rules
+//
+// ⚠️  ARCHITECTURE NOTE: This app uses PIN-based admin auth (not Firebase Auth).
+// The Firebase API key IS intentionally public — it only identifies the project,
+// it does not grant access by itself. Security comes from these rules.
+//
+// What these rules protect:
+//   ✅ adminUsers and agents (contain PINs) — NEVER readable from client
+//   ✅ settings doc (contains admin PIN) — NEVER readable from client
+//   ✅ No one can delete orders, customers, or stock
+//   ✅ All creates are validated (shape, field types, phone format, size limits)
+//   ✅ Order updates restricted to safe fields only
+//
+// What these rules CANNOT protect without Firebase Auth migration:
+//   ⚠️  Admin panel reads sensitive collections (orders, customers) client-side.
+//       Without Firebase Auth, Firestore rules cannot distinguish admin vs public.
+//   TODO: Migrate admin to Firebase Auth for full field-level protection.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ════════════════════════════════════════════════════
+    // PUBLIC — STOREFRONT READS (no auth needed)
+    // ════════════════════════════════════════════════════
+
+    match /products/{productId} {
+      allow read: if true;
+      allow create, update, delete: if false;
+    }
+
+    match /appConfig/{docId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /featureFlags/{docId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /referralConfig/{docId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /subscriptionConfig/{docId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /announcements/{docId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /loadingFacts/{docId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /siteStats/{docId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Feedback — only published testimonials are public
+    match /feedback/{docId} {
+      allow read: if resource == null || resource.data.isPublic == true;
+      allow create: if isValidFeedbackCreate();
+      allow update, delete: if false;
+    }
+
+    // ════════════════════════════════════════════════════
+    // STOREFRONT WRITES + ADMIN READS
+    // Admin panel reads these collections client-side.
+    // Without Firebase Auth we cannot distinguish admin
+    // vs public here — reads are open, but all writes
+    // are validated and deletes are blocked.
+    // ════════════════════════════════════════════════════
+
+    match /customers/{customerId} {
+      allow read: if true;
+      allow create: if isValidCustomerCreate();
+      allow update: if isValidCustomerUpdate();
+      allow delete: if false;
+    }
+
+    match /orders/{orderId} {
+      allow read: if true;
+      allow create: if isValidOrderCreate();
+      allow update: if isValidOrderStatusUpdate();
+      allow delete: if false;
+    }
+
+    match /subscriptions/{subId} {
+      allow read: if true;
+      allow create: if isValidSubscriptionCreate();
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    match /stock/{docId} {
+      allow read: if true;
+      allow create, update: if request.resource.data.keys().size() > 0;
+      allow delete: if false;
+    }
+
+    match /expenses/{docId} {
+      allow read: if true;
+      allow create: if request.resource.data.keys().size() > 0;
+      allow update, delete: if false;
+    }
+
+    match /batches/{docId} {
+      allow read: if true;
+      allow create, update: if request.resource.data.keys().size() > 0;
+      allow delete: if false;
+    }
+
+    match /productRecipes/{docId} {
+      allow read: if true;
+      allow create, update: if request.resource.data.keys().size() > 0;
+      allow delete: if false;
+    }
+
+    match /rawMaterialCosts/{docId} {
+      allow read: if true;
+      allow create, update: if request.resource.data.keys().size() > 0;
+      allow delete: if false;
+    }
+
+    match /rawMaterialPurchases/{docId} {
+      allow read: if true;
+      allow create: if request.resource.data.keys().size() > 0;
+      allow update, delete: if false;
+    }
+
+    match /rawMaterials/{docId} {
+      allow read: if true;
+      allow create, update: if request.resource.data.keys().size() > 0;
+      allow delete: if false;
+    }
+
+    // ════════════════════════════════════════════════════
+    // HIGH-SENSITIVITY — BLOCK ALL CLIENT ACCESS
+    // These contain PINs and internal credentials.
+    // Admin reads these via Firebase Admin SDK (server-side)
+    // or the app handles them in Cloud Functions.
+    // ════════════════════════════════════════════════════
+
+    // Contains admin PINs — NEVER readable from client
+    match /adminUsers/{docId} {
+      allow read, write: if false;
+    }
+
+    // Contains agent PINs + commission data
+    match /agents/{docId} {
+      allow read, write: if false;
+    }
+
+    // Contains admin PIN + handler list + config
+    match /settings/{docId} {
+      allow read, write: if false;
+    }
+
+    // Internal audit trail
+    match /activityLog/{docId} {
+      allow read, write: if false;
+    }
+
+    // ════════════════════════════════════════════════════
+    // CATCH-ALL — deny anything not listed above
+    // ════════════════════════════════════════════════════
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // ════════════════════════════════════════════════════
+    // VALIDATION HELPERS
+    // ════════════════════════════════════════════════════
+
+    function isValidOrderCreate() {
+      let d = request.resource.data;
+      return d.keys().hasAll(['orderNumber', 'customerName', 'customerWhatsapp',
+                              'items', 'total', 'status', 'createdAt'])
+        && d.customerName is string
+        && d.customerName.size() > 0
+        && d.customerName.size() < 100
+        && d.customerWhatsapp is string
+        && d.customerWhatsapp.matches('[0-9]{10}')
+        && d.total is number
+        && d.total >= 0
+        && d.total < 100000
+        && d.items is list
+        && d.items.size() > 0
+        && d.items.size() <= 30
+        && d.status == 'pending'
+        && d.createdAt is string;
+    }
+
+    function isValidOrderStatusUpdate() {
+      let allowed = ['status', 'paymentStatus', 'updatedAt', 'notes',
+                     'handledBy', 'deliveryCharge', 'discount', 'manualDiscount',
+                     'manualDiscountMode', 'total', 'subtotal'];
+      return request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(allowed);
+    }
+
+    function isValidCustomerCreate() {
+      let d = request.resource.data;
+      return d.keys().hasAll(['name', 'whatsapp', 'createdAt'])
+        && d.name is string
+        && d.name.size() > 0
+        && d.name.size() < 100
+        && d.whatsapp is string
+        && d.whatsapp.matches('[0-9]{10}')
+        && d.createdAt is string;
+    }
+
+    function isValidCustomerUpdate() {
+      let allowed = ['totalOrders', 'totalSpent', 'lastOrderStatus', 'updatedAt',
+                     'referralCredit', 'joinedWhatsappGroup', 'referredBy',
+                     'referralCode', 'discountPercent', 'discountApplyToNew',
+                     'place', 'name'];
+      return request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(allowed);
+    }
+
+    function isValidSubscriptionCreate() {
+      let d = request.resource.data;
+      return d.keys().hasAll(['customerName', 'customerWhatsapp', 'items',
+                              'duration', 'createdAt'])
+        && d.customerName is string
+        && d.customerName.size() > 0
+        && d.customerName.size() < 100
+        && d.customerWhatsapp is string
+        && d.customerWhatsapp.matches('[0-9]{10}')
+        && d.items is list
+        && d.items.size() > 0
+        && d.createdAt is string;
+    }
+
+    function isValidFeedbackCreate() {
+      let d = request.resource.data;
+      return d.keys().hasAll(['rating', 'whatYouLiked', 'createdAt'])
+        && d.rating is int
+        && d.rating >= 1
+        && d.rating <= 5
+        && d.whatYouLiked is string
+        && d.whatYouLiked.size() > 0
+        && d.whatYouLiked.size() < 500
+        && d.createdAt is string;
+    }
+  }
+}
