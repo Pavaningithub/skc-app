@@ -12,11 +12,12 @@ setGlobalOptions({maxInstances: 10, region: "asia-south1"});
 
 const TELEGRAM_BOT_TOKEN = defineSecret("TELEGRAM_BOT_TOKEN");
 const TELEGRAM_CHAT_ID = defineSecret("TELEGRAM_CHAT_ID");
-const UPI_ID_PARAM = defineString("UPI_ID", {default: "***REMOVED***"});
+const UPI_ID_PARAM = defineString("UPI_ID", {default: ""});
+const WA_GROUP_LINK_PARAM = defineString("WA_GROUP_LINK", {default: ""});
+
 
 const ADMIN_BASE_URL = "https://YOUR_DOMAIN/admin/orders";
 const ADMIN_SUBS_URL = "https://YOUR_DOMAIN/admin/subscriptions";
-const WA_GROUP_LINK = "https://chat.whatsapp.com/***REMOVED***";
 const STORE_URL = "https://YOUR_DOMAIN";
 
 // ─── Shared types ────────────────────────────────────────────────────────────
@@ -180,17 +181,81 @@ function buildOrderActionButtons(orderId: string, order: Order): InlineButton[][
   ].filter(Boolean).join("\n");
   const waGroupUrl = `https://wa.me/?text=${encodeURIComponent(waGroupLines)}`;
 
-  // WA direct customer message (status update)
+  // WA direct customer message — use wa.me (more reliable than api.whatsapp.com/send on mobile)
   const buildWaCustomerUrl = (msg: string) =>
-    phone ? `https://api.whatsapp.com/send?phone=91${phone}&text=${encodeURIComponent(msg)}` : null;
+    phone ? `https://wa.me/91${phone}?text=${encodeURIComponent(msg)}` : null;
 
   const upiId = UPI_ID_PARAM.value();
   const upiLink = `upi://pay?pa=${upiId}&pn=SriKrishnaCondiments&am=${order.total}&tn=${encodeURIComponent("Order " + order.orderNumber)}&cu=INR`;
 
-  const confirmedMsg = `🙏 *Hare Krishna!* 🪷\n\nHi *${order.customerName}*, your order *#${order.orderNumber}* is confirmed! ✅\n\nWe will keep you updated. Thank you for choosing Sri Krishna Condiments! 🌿`;
-  const ofdMsg = `🙏 *Hare Krishna!* 🪷\n\nHi *${order.customerName}*, your order *#${order.orderNumber}* is out for delivery! 🚚\n\n💳 *Payment Due: ₹${order.total}*\nPay via GPay / PhonePe / any UPI app:\n📲 UPI ID: \`${upiId}\`\n🔗 Tap to pay: ${upiLink}\n\nThank you! 🌿`;
-  const deliveredMsg = `🙏 *Hare Krishna!* 🪷\n\nHi *${order.customerName}*, your order *#${order.orderNumber}* has been delivered! 🎉\n\n📝 Please share your feedback: ${STORE_URL}/feedback\n\n💬 Join our WhatsApp group for offers: ${WA_GROUP_LINK}\n\nSri Krishna Condiments — Pure & Healthy 🌿`;
-  const cancelledMsg = `❌ *Sri Krishna Condiments*\n\nHi *${order.customerName}*, your order *#${order.orderNumber}* has been cancelled.\n\nSorry for the inconvenience. We hope to serve you soon! 🙏`;
+  // Items list for confirmed message
+  const itemsList = (order.items ?? [])
+    .map((i) => `  • ${i.productName}: ${i.quantity}${i.unit !== "piece" ? "g" : " pc"}`)
+    .join("\n");
+  const discountLine = (order.discount ?? 0) > 0 ? `\nDiscount: -₹${order.discount}` : "";
+
+  // ── Message templates (mirrors utils.ts exactly) ──────────────────────────
+
+  const confirmedMsg = [
+    "🙏 *Hare Krishna!* 🪷",
+    "",
+    `Hi *${order.customerName}*, your order is confirmed! 🎉`,
+    "",
+    `Order No: *#${order.orderNumber}*`,
+    "",
+    "*Items:*",
+    itemsList,
+    discountLine,
+    `*Total: ${order.type === "sample" && order.total === 0 ? "FREE SAMPLE" : `₹${order.total}`}*`,
+    "",
+    "We will keep you updated on your order.",
+    `Thank you for choosing Sri Krishna Condiments! 🌿`,
+  ].filter((l) => l !== null).join("\n");
+
+  const ofdPayBlock = order.type === "sample" && order.total === 0
+    ? "\n✅ FREE SAMPLE — no payment needed."
+    : `\n💳 *Payment Due: ₹${order.total}*\n\nPay via GPay / PhonePe / any UPI app:\n📲 UPI ID: \`${upiId}\`\n🔗 Tap to pay (Android): ${upiLink}`;
+
+  const ofdMsg = [
+    "🙏 *Hare Krishna!* 🪷",
+    "",
+    `Hi *${order.customerName}*, your order is on the way! 🚀`,
+    "",
+    `Order No: *#${order.orderNumber}*`,
+    ofdPayBlock,
+    "",
+    "Thank you for choosing Sri Krishna Condiments! 🌿",
+    "_Pure • Fresh • Handcrafted with Love_ 🙏",
+  ].join("\n");
+
+  const deliveredMsg = [
+    "🙏 *Hare Krishna!* 🪷",
+    "",
+    `Hi *${order.customerName}*, your order has been delivered! 🎉`,
+    "",
+    `Order No: *#${order.orderNumber}*`,
+    "",
+    "We hope you love our products! 🙏",
+    "",
+    "📝 *Please share your feedback* (takes 30 seconds):",
+    `${STORE_URL}/feedback/${orderId}`,
+    "",
+    "💬 *Join our WhatsApp group* for offers & updates:",
+    WA_GROUP_LINK_PARAM.value() || "(ask us for the group link!)",
+    "",
+    "Sri Krishna Condiments — Pure & Healthy 🌿",
+  ].join("\n");
+
+  const cancelledMsg = [
+    "❌ *Sri Krishna Condiments*",
+    "",
+    `Hi *${order.customerName}*, your order *#${order.orderNumber}* has been cancelled.`,
+    "",
+    "If you have any questions, please reach out to us on WhatsApp.",
+    "",
+    "Sorry for the inconvenience. We hope to serve you soon! 🙏",
+    "Sri Krishna Condiments — Pure & Healthy 🌿",
+  ].join("\n");
 
   const waConfirmedUrl = buildWaCustomerUrl(confirmedMsg);
   const waOfdUrl = buildWaCustomerUrl(ofdMsg);

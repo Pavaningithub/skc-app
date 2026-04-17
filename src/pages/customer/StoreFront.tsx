@@ -992,8 +992,9 @@ export default function StoreFront() {
               <span className="ml-auto text-xs font-bold px-2 py-0.5 rounded-full flex-shrink-0" style={{ background: '#25d366', color: '#fff' }}>DM</span>
             </a>
 
-            {/* WhatsApp Community — always shown */}
-            <a href="https://chat.whatsapp.com/***REMOVED***" target="_blank" rel="noreferrer"
+            {/* WhatsApp Community — shown only when VITE_WA_COMMUNITY_URL is set */}
+            {APP_CONFIG.WHATSAPP_COMMUNITY_URL && (
+            <a href={APP_CONFIG.WHATSAPP_COMMUNITY_URL} target="_blank" rel="noreferrer"
               className="flex items-center gap-3 rounded-xl px-4 py-3 text-left"
               style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)' }}>
               <svg className="w-6 h-6 flex-shrink-0" viewBox="0 0 32 32" fill="#25d366"><path d="M16 3C9.373 3 4 8.373 4 15c0 2.385.668 4.61 1.822 6.51L4 29l7.701-1.797A12.93 12.93 0 0 0 16 28c6.627 0 12-5.373 12-12S22.627 3 16 3zm0 2c5.523 0 10 4.477 10 10S21.523 25 16 25c-1.97 0-3.8-.57-5.35-1.55l-.37-.23-4.57 1.07 1.1-4.46-.25-.38A9.96 9.96 0 0 1 6 15c0-5.523 4.477-10 10-10zm-3.5 5.5c-.28 0-.73.1-1.11.52-.38.42-1.45 1.41-1.45 3.44 0 2.03 1.48 3.99 1.69 4.27.2.27 2.9 4.63 7.13 6.31 3.54 1.4 4.25 1.12 5.02.99.76-.13 2.46-.89 2.81-1.76.35-.87.35-1.61.24-1.76-.1-.16-.37-.26-.78-.46-.4-.2-2.38-.96-2.75-1.07-.36-.1-.63-.16-.89.16-.27.33-1.03 1.07-1.26 1.29-.23.21-.46.24-.86.08-.4-.16-1.69-.54-3.21-1.72-1.19-.92-1.99-2.06-2.22-2.41-.23-.35-.02-.54.17-.72.18-.16.4-.42.6-.63.2-.21.27-.35.4-.59.14-.24.07-.45-.02-.63-.08-.18-.87-2.13-1.21-2.92-.32-.77-.65-.65-.89-.66l-.76-.02z"/></svg>
@@ -1003,6 +1004,7 @@ export default function StoreFront() {
               </div>
               <span className="ml-auto text-xs font-bold px-2 py-0.5 rounded-full flex-shrink-0" style={{ background: 'rgba(37,211,102,0.2)', color: '#25d366', border: '1px solid rgba(37,211,102,0.4)' }}>Join</span>
             </a>
+            )}
 
             {/* WA Group */}
             {APP_CONFIG.WHATSAPP_GROUP_LINK && (

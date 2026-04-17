@@ -46,3 +46,9 @@ playwright-report/
 .agents/
 .claude/
 skills-lock.json
+
+# Firebase functions env (contains UPI ID and WA links — never commit)
+functions/.env.*
+
+# Husky hooks are local-only
+.husky/

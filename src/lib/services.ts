@@ -543,10 +543,10 @@ export const adminUsersService = {
 };
 
 export const settingsService = {
-  async getPin(): Promise<string> {
+  async getPin(): Promise<string | null> {
     const docSnap = await getDoc(doc(db, COLLECTIONS.SETTINGS, "admin"));
-    if (!docSnap.exists()) return "1234";
-    return (docSnap.data().pin as string) || "1234";
+    if (!docSnap.exists()) return null;
+    return (docSnap.data().pin as string) || null;
   },
   async setPin(pin: string): Promise<void> {
     await setDoc(doc(db, COLLECTIONS.SETTINGS, "admin"), { pin }, { merge: true });
