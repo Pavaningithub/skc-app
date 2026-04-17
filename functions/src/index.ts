@@ -14,11 +14,12 @@ const TELEGRAM_BOT_TOKEN = defineSecret("TELEGRAM_BOT_TOKEN");
 const TELEGRAM_CHAT_ID = defineSecret("TELEGRAM_CHAT_ID");
 const UPI_ID_PARAM = defineString("UPI_ID", {default: ""});
 const WA_GROUP_LINK_PARAM = defineString("WA_GROUP_LINK", {default: ""});
+const APP_DOMAIN_PARAM = defineString("APP_DOMAIN", {default: ""});
 
 
-const ADMIN_BASE_URL = "https://YOUR_DOMAIN/admin/orders";
-const ADMIN_SUBS_URL = "https://YOUR_DOMAIN/admin/subscriptions";
-const STORE_URL = "https://YOUR_DOMAIN";
+const ADMIN_BASE_URL = () => `https://${APP_DOMAIN_PARAM.value()}/admin/orders`;
+const ADMIN_SUBS_URL = () => `https://${APP_DOMAIN_PARAM.value()}/admin/subscriptions`;
+const STORE_URL = () => `https://${APP_DOMAIN_PARAM.value()}`;
 
 // ─── Shared types ────────────────────────────────────────────────────────────
 
@@ -168,7 +169,7 @@ function buildOrderTelegramText(order: Order, orderId: string, isNew = false): s
 
 function buildOrderActionButtons(orderId: string, order: Order): InlineButton[][] {
   const isSample = order.type === "sample";
-  const adminLink = `${ADMIN_BASE_URL}/${orderId}`;
+  const adminLink = `${ADMIN_BASE_URL()}/${orderId}`;
 
   // WA group share line
   const phone = order.customerWhatsapp ?? "";
@@ -238,7 +239,7 @@ function buildOrderActionButtons(orderId: string, order: Order): InlineButton[][
     "We hope you love our products! 🙏",
     "",
     "📝 *Please share your feedback* (takes 30 seconds):",
-    `${STORE_URL}/feedback/${orderId}`,
+    `${STORE_URL()}/feedback/${orderId}`,
     "",
     "💬 *Join our WhatsApp group* for offers & updates:",
     WA_GROUP_LINK_PARAM.value() || "(ask us for the group link!)",
@@ -529,7 +530,7 @@ export const notifyNewSubscription = onDocumentCreated(
       .map((i) => `  • ${i.productName} × ${i.quantity}g — ₹${i.totalPrice}/mo`)
       .join("\n");
 
-    const adminLink = `${ADMIN_SUBS_URL}`;
+    const adminLink = `${ADMIN_SUBS_URL()}`;
 
     const telegramText = [
       `🌿 <b>New Subscription — ${subNum}</b>`,

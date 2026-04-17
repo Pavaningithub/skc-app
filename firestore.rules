@@ -85,22 +85,22 @@ service cloud.firestore {
     match /customers/{customerId} {
       allow read: if true;
       allow create: if isValidCustomerCreate();
-      allow update: if isValidCustomerUpdate();
-      allow delete: if false;
+      allow update: if true;
+      allow delete: if true;
     }
 
     match /orders/{orderId} {
       allow read: if true;
       allow create: if isValidOrderCreate();
-      allow update: if isValidOrderStatusUpdate();
-      allow delete: if false;
+      allow update: if true;
+      allow delete: if true;
     }
 
     match /subscriptions/{subId} {
       allow read: if true;
       allow create: if isValidSubscriptionCreate();
-      allow update: if false;
-      allow delete: if false;
+      allow update: if true;
+      allow delete: if true;
     }
 
     match /stock/{docId} {
@@ -162,7 +162,7 @@ service cloud.firestore {
     // Contains agent PINs + commission data — readable for PIN login
     match /agents/{docId} {
       allow read: if true;
-      allow write: if false;
+      allow write: if true;
     }
 
     // settings/handlers — readable and writable (handler names shown/managed in UI)
@@ -211,7 +211,7 @@ service cloud.firestore {
         && d.items is list
         && d.items.size() > 0
         && d.items.size() <= 30
-        && d.status == 'pending'
+        && d.status in ['pending', 'confirmed']
         && d.createdAt is string;
     }
 
