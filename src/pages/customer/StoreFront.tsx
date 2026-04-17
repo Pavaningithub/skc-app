@@ -2190,7 +2190,14 @@ function OrderFormModal({
               <div className="flex justify-between items-center px-4 py-2.5 font-bold text-sm"
                 style={{ background: '#fff4eb', borderTop: '1px solid #f0d9c8' }}>
                 <span>Total</span>
-                <span style={{ color: '#c8821a' }}>₹{cartTotal}</span>
+                {standingDiscountAmt > 0 ? (
+                  <span className="flex items-center gap-2">
+                    <span className="line-through text-gray-400 font-normal text-xs">₹{cartTotal}</span>
+                    <span style={{ color: '#16a34a' }}>₹{Math.max(0, cartTotal - standingDiscountAmt)}</span>
+                  </span>
+                ) : (
+                  <span style={{ color: '#c8821a' }}>₹{cartTotal}</span>
+                )}
               </div>
             </div>
           )}
@@ -2214,7 +2221,14 @@ function OrderFormModal({
                 <div className="absolute right-3 top-3.5 w-4 h-4 border-2 border-orange-400 border-t-transparent rounded-full animate-spin" />
               )}
             </div>
-
+            {/* Discount notice inline — appears immediately after phone lookup */}
+            {!isSample && standingDiscountAmt > 0 && (
+              <div className="flex items-center gap-2 rounded-xl px-3 py-2 mt-2 text-xs font-semibold"
+                style={{ background: '#f0fdf4', border: '1px solid #86efac', color: '#166534' }}>
+                <span>🏷️</span>
+                <span>{standingDiscount}% special discount applied — you pay <strong>₹{Math.max(0, cartTotal - standingDiscountAmt)}</strong> instead of ₹{cartTotal}</span>
+              </div>
+            )}
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">Your Area / Place</label>

@@ -1,8 +1,8 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Plus, Pencil, Trash2, ToggleLeft, ToggleRight, Search, ArrowUpDown, Filter, TrendingUp, AlertTriangle, CheckCircle2, X, ChevronDown, ChevronUp } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Portal from '../../components/Portal';
-import { productsService, ordersService } from '../../lib/services';
+import { productsService, ordersService, handlersService } from '../../lib/services';
 import { useRealtimeCollection } from '../../lib/useRealtimeCollection';
 import { formatCurrency } from '../../lib/utils';
 import { UNIT_LABELS } from '../../lib/constants';
@@ -43,6 +43,11 @@ export default function Products() {
   const [onDemandOnly, setOnDemandOnly] = useState(false);
   const [garlicOnly, setGarlicOnly] = useState(false);
   const [sortKey, setSortKey] = useState<ProdSort>('name_asc');
+  const [handlers, setHandlers] = useState<string[]>(['Sree Lakshmi']);
+  const [addingHandler, setAddingHandler] = useState(false);
+  const [newHandlerDraft, setNewHandlerDraft] = useState('');
+
+  useEffect(() => { return handlersService.subscribe(setHandlers); }, []);
 
   function openAdd() { setForm({ ...emptyForm }); setEditId(null); setShowForm(true); }
   function openEdit(p: Product) {
@@ -76,9 +81,16 @@ export default function Products() {
     };
     setSaving(true);
     try {
+      const handlerName = formToSave.handledBy?.trim() || 'Sree Lakshmi';
+      // Persist new handler name to the shared list if not already there
+      if (handlerName && !handlers.includes(handlerName)) {
+        await handlersService.save([...handlers, handlerName]);
+      }
       if (editId) {
         await productsService.update(editId, formToSave);
-        toast.success('Product updated');
+        // Backfill handledBy on all open orders that contain this product
+        const count = await ordersService.backfillHandledBy(editId, handlerName);
+        toast.success(`Product updated${count > 0 ? ` · ${count} open order${count !== 1 ? 's' : ''} updated` : ''}`);
       } else {
         await productsService.add(formToSave as Omit<Product, 'id'>);
         toast.success('Product added');
@@ -428,13 +440,58 @@ export default function Products() {
             {/* Managed By */}
             <div className="px-5">
               <label className="block text-sm font-medium text-gray-700 mb-1">👤 Handled By <span className="text-gray-400 font-normal">(who manufactures this product)</span></label>
-              <input
-                value={form.handledBy ?? 'Sree Lakshmi'}
-                onChange={e => setForm(f => ({ ...f, handledBy: e.target.value }))}
-                placeholder="e.g. Sree Lakshmi"
-                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
-              />
-              <p className="text-xs text-gray-400 mt-1">This will be stamped on each order item so revenue can be tracked per person.</p>
+              {addingHandler ? (
+                <div className="flex gap-2">
+                  <input
+                    autoFocus
+                    value={newHandlerDraft}
+                    onChange={e => setNewHandlerDraft(e.target.value)}
+                    placeholder="Enter person's name"
+                    className="flex-1 border border-orange-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        const name = newHandlerDraft.trim();
+                        if (!name) return;
+                        setForm(f => ({ ...f, handledBy: name }));
+                        setAddingHandler(false);
+                        setNewHandlerDraft('');
+                      } else if (e.key === 'Escape') {
+                        setAddingHandler(false);
+                        setNewHandlerDraft('');
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const name = newHandlerDraft.trim();
+                      if (!name) return;
+                      setForm(f => ({ ...f, handledBy: name }));
+                      setAddingHandler(false);
+                      setNewHandlerDraft('');
+                    }}
+                    className="px-3 py-2 bg-orange-500 text-white rounded-xl text-sm font-medium hover:bg-orange-600"
+                  >Add</button>
+                  <button type="button" onClick={() => { setAddingHandler(false); setNewHandlerDraft(''); }}
+                    className="px-3 py-2 border border-gray-200 text-gray-500 rounded-xl text-sm hover:bg-gray-50">✕</button>
+                </div>
+              ) : (
+                <select
+                  value={form.handledBy ?? 'Sree Lakshmi'}
+                  onChange={e => {
+                    if (e.target.value === '__add_new__') { setAddingHandler(true); return; }
+                    setForm(f => ({ ...f, handledBy: e.target.value }));
+                  }}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300 bg-white"
+                >
+                  {handlers.map(h => <option key={h} value={h}>{h}</option>)}
+                  {form.handledBy && !handlers.includes(form.handledBy) && (
+                    <option value={form.handledBy}>{form.handledBy}</option>
+                  )}
+                  <option value="__add_new__">+ Add new person…</option>
+                </select>
+              )}
+              <p className="text-xs text-gray-400 mt-1">Saving will also update all open orders that contain this product.</p>
             </div>
 
             {/* Footer buttons */}
