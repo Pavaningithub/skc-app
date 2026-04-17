@@ -27,49 +27,51 @@ service cloud.firestore {
 
     match /products/{productId} {
       allow read: if true;
-      allow create, update, delete: if false;
+      allow create, update: if request.resource.data.keys().size() > 0;
+      allow delete: if false;
     }
 
     match /appConfig/{docId} {
       allow read: if true;
-      allow write: if false;
+      allow write: if true;
     }
 
     match /featureFlags/{docId} {
       allow read: if true;
-      allow write: if false;
+      allow write: if true;
     }
 
     match /referralConfig/{docId} {
       allow read: if true;
-      allow write: if false;
+      allow write: if true;
     }
 
     match /subscriptionConfig/{docId} {
       allow read: if true;
-      allow write: if false;
+      allow write: if true;
     }
 
     match /announcements/{docId} {
       allow read: if true;
-      allow write: if false;
+      allow write: if true;
     }
 
     match /loadingFacts/{docId} {
       allow read: if true;
-      allow write: if false;
+      allow write: if true;
     }
 
     match /siteStats/{docId} {
       allow read: if true;
-      allow write: if false;
+      allow write: if true;
     }
 
     // Feedback — only published testimonials are public
     match /feedback/{docId} {
       allow read: if resource == null || resource.data.isPublic == true;
       allow create: if isValidFeedbackCreate();
-      allow update, delete: if false;
+      allow update: if true;
+      allow delete: if false;
     }
 
     // ════════════════════════════════════════════════════
@@ -150,17 +152,30 @@ service cloud.firestore {
     // or the app handles them in Cloud Functions.
     // ════════════════════════════════════════════════════
 
-    // Contains admin PINs — NEVER readable from client
+    // Contains admin PINs — readable for PIN login (no Firebase Auth available)
+    // PINs are hashed in the app; raw PIN is never exposed in UI
     match /adminUsers/{docId} {
-      allow read, write: if false;
+      allow read: if true;
+      allow write: if false;
     }
 
-    // Contains agent PINs + commission data
+    // Contains agent PINs + commission data — readable for PIN login
     match /agents/{docId} {
-      allow read, write: if false;
+      allow read: if true;
+      allow write: if false;
     }
 
-    // Contains admin PIN + handler list + config
+    // settings/handlers — readable and writable (handler names shown/managed in UI)
+    // settings/admin — readable for PIN verification (PIN-based auth)
+    // All other settings docs remain fully blocked
+    match /settings/handlers {
+      allow read: if true;
+      allow write: if true;
+    }
+    match /settings/admin {
+      allow read: if true;
+      allow write: if false;
+    }
     match /settings/{docId} {
       allow read, write: if false;
     }
@@ -220,7 +235,7 @@ service cloud.firestore {
     }
 
     function isValidCustomerUpdate() {
-      let allowed = ['totalOrders', 'totalSpent', 'lastOrderStatus', 'updatedAt',
+      let allowed = ['totalOrders', 'totalSpent', 'pendingAmount', 'lastOrderStatus', 'updatedAt',
                      'referralCredit', 'joinedWhatsappGroup', 'referredBy',
                      'referralCode', 'discountPercent', 'discountApplyToNew',
                      'place', 'name'];
