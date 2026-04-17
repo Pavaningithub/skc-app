@@ -39,7 +39,20 @@ export default function StoreFront() {
   const [sampleStep, setSampleStep]     = useState<'pick' | 'contact'>('pick');
   const [samplePhoneError, setSamplePhoneError] = useState('');   // inline duplicate error
   const [sampleCheckingPhone, setSampleCheckingPhone] = useState(false);
-  const [orderForm, setOrderForm] = useState({ name: '', whatsapp: '', place: '', notes: '', referralCode: urlRefCode });
+  const [orderForm, setOrderForm] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('skc_contact') ?? 'null');
+      return {
+        name: saved?.name ?? '',
+        whatsapp: saved?.whatsapp ?? '',
+        place: saved?.place ?? '',
+        notes: '',
+        referralCode: urlRefCode,
+      };
+    } catch {
+      return { name: '', whatsapp: '', place: '', notes: '', referralCode: urlRefCode };
+    }
+  });
   // Referral: customer's own code shown after phone lookup, and validated referrer
   const [myReferralCode, setMyReferralCode] = useState<string | null>(null);
   const [isReturningCustomer, setIsReturningCustomer] = useState(false); // true = has prior orders, referral code blocked
@@ -346,12 +359,15 @@ export default function StoreFront() {
         await customersService.update(customerId, { referredBy: referralCodeUsed });
       }
 
+      // Save contact details for autofill on next visit
+      try { localStorage.setItem('skc_contact', JSON.stringify({ name: orderForm.name.trim(), whatsapp: wa, place: orderForm.place.trim() })); } catch {}
+
       // Navigate first to avoid storefront flash, then clear state
       navigate(`/order-confirmation/${orderId}`);
       setCart([]); setShowOrderForm(false);
       setMyReferralCode(null); setIsReturningCustomer(false); setReferralDiscount(0); setReferralError(''); setStandingDiscount(0);
       setUseCredit(false);
-      setOrderForm({ name: '', whatsapp: '', place: '', notes: '', referralCode: '' });
+      setOrderForm(prev => ({ name: prev.name, whatsapp: prev.whatsapp, place: prev.place, notes: '', referralCode: '' }));
       toast.success('Order placed! 🎉');
     } catch (err) { console.error('Order error:', err); toast.error('Something went wrong: ' + (err instanceof Error ? err.message : String(err))); }
     finally { setSubmitting(false); }
@@ -1130,7 +1146,16 @@ export default function StoreFront() {
                   <span className="text-xl font-bold" style={{ color: '#c8821a' }}>{formatCurrency(cartTotal)}</span>
                 </div>
                 <button
-                  onClick={() => { setShowCart(false); setShowOrderForm(true); setOrderForm({ name: '', whatsapp: '', place: '', notes: '', referralCode: urlRefCode }); }}
+                  onClick={() => {
+                    setShowCart(false);
+                    setShowOrderForm(true);
+                    try {
+                      const saved = JSON.parse(localStorage.getItem('skc_contact') ?? 'null');
+                      setOrderForm({ name: saved?.name ?? '', whatsapp: saved?.whatsapp ?? '', place: saved?.place ?? '', notes: '', referralCode: urlRefCode });
+                    } catch {
+                      setOrderForm({ name: '', whatsapp: '', place: '', notes: '', referralCode: urlRefCode });
+                    }
+                  }}
                   className="w-full text-white font-semibold py-3.5 rounded-2xl text-sm"
                   style={{ background: '#c8821a' }}>
                   Proceed to Order →
