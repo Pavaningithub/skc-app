@@ -47,7 +47,7 @@ export default function OrderDetail() {
 
   // Handlers (managed-by persons)
   const [handlers, setHandlers] = useState<string[]>(['Sree Lakshmi']);
-  const [addingHandler, setAddingHandler] = useState(false);
+  const [addingHandlerIdx, setAddingHandlerIdx] = useState<number | null>(null);
   const [newHandlerInput, setNewHandlerInput] = useState('');
 
   useEffect(() => { if (orderId) load(); }, [orderId]);
@@ -397,7 +397,7 @@ export default function OrderDetail() {
               )}
               <span className="inline-flex items-center gap-1 mt-0.5">
                 <span className="text-xs text-gray-400">👤</span>
-                {addingHandler ? (
+                {addingHandlerIdx === i ? (
                   <span className="flex items-center gap-1">
                     <input
                       autoFocus
@@ -413,25 +413,25 @@ export default function OrderDetail() {
                             j === i ? { ...it, handledBy: name } : it
                           );
                           await ordersService.update(order.id, { items: updatedItems });
-                          setAddingHandler(false);
+                          setAddingHandlerIdx(null);
                           setNewHandlerInput('');
                           load();
                         } else if (e.key === 'Escape') {
-                          setAddingHandler(false);
+                          setAddingHandlerIdx(null);
                           setNewHandlerInput('');
                         }
                       }}
                       placeholder="Name, then Enter"
                       className="text-xs border border-orange-300 rounded px-1.5 py-0.5 outline-none w-28"
                     />
-                    <button onClick={() => { setAddingHandler(false); setNewHandlerInput(''); }} className="text-gray-400 hover:text-gray-600 text-xs">✕</button>
+                    <button onClick={() => { setAddingHandlerIdx(null); setNewHandlerInput(''); }} className="text-gray-400 hover:text-gray-600 text-xs">✕</button>
                   </span>
                 ) : (
                   <select
                     value={item.handledBy ?? 'Sree Lakshmi'}
                     onChange={async e => {
                       const val = e.target.value;
-                      if (val === '__add_new__') { setAddingHandler(true); return; }
+                      if (val === '__add_new__') { setAddingHandlerIdx(i); return; }
                       const updatedItems = order.items.map((it, j) =>
                         j === i ? { ...it, handledBy: val } : it
                       );

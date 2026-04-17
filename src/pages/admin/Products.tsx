@@ -88,9 +88,7 @@ export default function Products() {
       }
       if (editId) {
         await productsService.update(editId, formToSave);
-        // Backfill handledBy on all open orders that contain this product
-        const count = await ordersService.backfillHandledBy(editId, handlerName);
-        toast.success(`Product updated${count > 0 ? ` · ${count} open order${count !== 1 ? 's' : ''} updated` : ''}`);
+        toast.success('Product updated');
       } else {
         await productsService.add(formToSave as Omit<Product, 'id'>);
         toast.success('Product added');
