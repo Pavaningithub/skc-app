@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, MessageCircle, ChevronDown, ChevronUp, TrendingUp, Trash2, XCircle, Pencil, Plus, Minus, Tag } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { ordersService, productsService, customersService, activityService } from '../../lib/services';
+import { ordersService, productsService, customersService, activityService, handlersService } from '../../lib/services';
 import {
   formatCurrency, formatDateTime, buildCustomerWhatsAppUrl, buildWABusinessUrl,
   orderConfirmedToCustomer, outForDeliveryToCustomer, deliveredToCustomer,
@@ -45,7 +45,13 @@ export default function OrderDetail() {
   const [editReferralDiscount, setEditReferralDiscount] = useState(0);
   const [savingDetails, setSavingDetails] = useState(false);
 
+  // Handlers (managed-by persons)
+  const [handlers, setHandlers] = useState<string[]>(['Sree Lakshmi']);
+  const [addingHandler, setAddingHandler] = useState(false);
+  const [newHandlerInput, setNewHandlerInput] = useState('');
+
   useEffect(() => { if (orderId) load(); }, [orderId]);
+  useEffect(() => { return handlersService.subscribe(setHandlers); }, []);
 
   async function load() {
     setLoading(true);
@@ -391,23 +397,56 @@ export default function OrderDetail() {
               )}
               <span className="inline-flex items-center gap-1 mt-0.5">
                 <span className="text-xs text-gray-400">👤</span>
-                <select
-                  value={item.handledBy ?? 'Sree Lakshmi'}
-                  onChange={async e => {
-                    const updatedItems = order.items.map((it, j) =>
-                      j === i ? { ...it, handledBy: e.target.value } : it
-                    );
-                    await ordersService.update(order.id, { items: updatedItems });
-                    load();
-                  }}
-                  className="text-xs text-blue-600 bg-transparent border-none outline-none cursor-pointer hover:underline"
-                >
-                  <option value="Sree Lakshmi">Sree Lakshmi</option>
-                  <option value="Others">Others</option>
-                  {item.handledBy && !['Sree Lakshmi','Others'].includes(item.handledBy) && (
-                    <option value={item.handledBy}>{item.handledBy}</option>
-                  )}
-                </select>
+                {addingHandler ? (
+                  <span className="flex items-center gap-1">
+                    <input
+                      autoFocus
+                      value={newHandlerInput}
+                      onChange={e => setNewHandlerInput(e.target.value)}
+                      onKeyDown={async e => {
+                        if (e.key === 'Enter') {
+                          const name = newHandlerInput.trim();
+                          if (!name) return;
+                          const updated = handlers.includes(name) ? handlers : [...handlers, name];
+                          await handlersService.save(updated);
+                          const updatedItems = order.items.map((it, j) =>
+                            j === i ? { ...it, handledBy: name } : it
+                          );
+                          await ordersService.update(order.id, { items: updatedItems });
+                          setAddingHandler(false);
+                          setNewHandlerInput('');
+                          load();
+                        } else if (e.key === 'Escape') {
+                          setAddingHandler(false);
+                          setNewHandlerInput('');
+                        }
+                      }}
+                      placeholder="Name, then Enter"
+                      className="text-xs border border-orange-300 rounded px-1.5 py-0.5 outline-none w-28"
+                    />
+                    <button onClick={() => { setAddingHandler(false); setNewHandlerInput(''); }} className="text-gray-400 hover:text-gray-600 text-xs">✕</button>
+                  </span>
+                ) : (
+                  <select
+                    value={item.handledBy ?? 'Sree Lakshmi'}
+                    onChange={async e => {
+                      const val = e.target.value;
+                      if (val === '__add_new__') { setAddingHandler(true); return; }
+                      const updatedItems = order.items.map((it, j) =>
+                        j === i ? { ...it, handledBy: val } : it
+                      );
+                      await ordersService.update(order.id, { items: updatedItems });
+                      load();
+                    }}
+                    className="text-xs text-blue-600 bg-transparent border-none outline-none cursor-pointer hover:underline"
+                  >
+                    {handlers.map(h => <option key={h} value={h}>{h}</option>)}
+                    {item.handledBy && !handlers.includes(item.handledBy) && (
+                      <option value={item.handledBy}>{item.handledBy}</option>
+                    )}
+                    <option value="__add_new__">+ Add new person…</option>
+                  </select>
+                )}
               </span>
             </div>
             <p className="font-semibold text-gray-800">{formatCurrency(item.totalPrice)}</p>
