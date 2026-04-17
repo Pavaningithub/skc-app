@@ -50,6 +50,22 @@ function PageLoader() {
   );
 }
 
+function SubdomainRedirect() {
+  const hostname = window.location.hostname;
+  const domain = import.meta.env.VITE_APP_DOMAIN as string | undefined;
+  if (domain) {
+    if (hostname === `admin.${domain}` && !window.location.pathname.startsWith('/admin')) {
+      window.location.replace('/admin');
+      return null;
+    }
+    if (hostname === `agents.${domain}` && !window.location.pathname.startsWith('/agent')) {
+      window.location.replace('/agent/login');
+      return null;
+    }
+  }
+  return null;
+}
+
 export default function App() {
   return (
     <BrowserRouter>
@@ -62,6 +78,7 @@ export default function App() {
             success: { iconTheme: { primary: "#f97316", secondary: "#fff" } },
           }}
         />
+        <SubdomainRedirect />
         <Suspense fallback={<PageLoader />}>
           <Routes>
             {/* ── Storefront ──────────────────────────────────────── */}
