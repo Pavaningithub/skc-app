@@ -365,6 +365,23 @@ export const ordersService = {
   async update(id: string, data: Partial<Order>): Promise<void> {
     await updateDoc(doc(db, COLLECTIONS.ORDERS, id), { ...data, updatedAt: now() });
   },
+  /** Backfill handledBy on every non-delivered, non-cancelled order that contains productId */
+  async backfillHandledBy(productId: string, handledBy: string): Promise<number> {
+    const snap = await getDocs(collection(db, COLLECTIONS.ORDERS));
+    const toUpdate = snap.docs.filter(d => {
+      const o = d.data() as Order;
+      if (o.status === 'delivered' || o.status === 'cancelled') return false;
+      return (o.items ?? []).some((item: any) => item.productId === productId);
+    });
+    await Promise.all(toUpdate.map(d => {
+      const o = d.data() as Order;
+      const updatedItems = o.items.map((item: any) =>
+        item.productId === productId ? { ...item, handledBy } : item
+      );
+      return updateDoc(d.ref, { items: updatedItems, updatedAt: now() });
+    }));
+    return toUpdate.length;
+  },
   async delete(id: string): Promise<void> {
     await deleteDoc(doc(db, COLLECTIONS.ORDERS, id));
   },
@@ -763,6 +780,24 @@ export const loadingFactsService = {
         cb(items);
       }
     );
+  },
+};
+
+// ─── Handlers (Managed-by persons) ───────────────────────────────────────────
+const HANDLERS_DOC = 'handlers';
+export const handlersService = {
+  async get(): Promise<string[]> {
+    const snap = await getDoc(doc(db, COLLECTIONS.SETTINGS, HANDLERS_DOC));
+    if (!snap.exists()) return ['Sree Lakshmi'];
+    return (snap.data().list as string[]) ?? ['Sree Lakshmi'];
+  },
+  async save(list: string[]): Promise<void> {
+    await setDoc(doc(db, COLLECTIONS.SETTINGS, HANDLERS_DOC), { list });
+  },
+  subscribe(cb: (list: string[]) => void): Unsubscribe {
+    return onSnapshot(doc(db, COLLECTIONS.SETTINGS, HANDLERS_DOC), snap => {
+      cb(snap.exists() ? ((snap.data().list as string[]) ?? ['Sree Lakshmi']) : ['Sree Lakshmi']);
+    });
   },
 };
 
