@@ -187,7 +187,6 @@ function buildOrderActionButtons(orderId: string, order: Order): InlineButton[][
     phone ? `https://wa.me/91${phone}?text=${encodeURIComponent(msg)}` : null;
 
   const upiId = UPI_ID_PARAM.value();
-  const upiLink = `upi://pay?pa=${upiId}&pn=SriKrishnaCondiments&am=${order.total}&tn=${encodeURIComponent("Order " + order.orderNumber)}&cu=INR`;
 
   // Items list for confirmed message
   const itemsList = (order.items ?? [])
@@ -215,7 +214,7 @@ function buildOrderActionButtons(orderId: string, order: Order): InlineButton[][
 
   const ofdPayBlock = order.type === "sample" && order.total === 0
     ? "\n✅ FREE SAMPLE — no payment needed."
-    : `\n💳 *Payment Due: ₹${order.total}*\n\nPay via GPay / PhonePe / any UPI app:\n📲 UPI ID: \`${upiId}\`\n🔗 Tap to pay (Android): ${upiLink}`;
+    : `\n💳 *Payment Due: ₹${order.total}*\n\nPay via GPay / PhonePe / any UPI app:\n📲 UPI ID: *${upiId}*`;
 
   const ofdMsg = [
     "🙏 *Hare Krishna!* 🪷",

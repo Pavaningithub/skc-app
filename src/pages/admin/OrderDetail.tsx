@@ -277,7 +277,7 @@ export default function OrderDetail() {
   );
   if (!order) return <div className="p-6 text-gray-500">Order not found</div>;
 
-  const storeOrigin = 'https://YOUR_DOMAIN'; // Customer storefront domain (NOT admin)
+  const storeOrigin = window.location.origin.replace('/admin', '').replace('admin.', ''); // Customer storefront domain
 
   return (
     <div className="p-4 md:p-6 space-y-4 max-w-2xl animate-fade-in">

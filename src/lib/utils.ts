@@ -107,7 +107,6 @@ Thank you for choosing ${BUSINESS_NAME}! 🌿${referralLine}`;
 
 // Sent TO CUSTOMER when out for delivery
 export function outForDeliveryToCustomer(order: Order): string {
-  const upiLink = buildUPILink(order.total, order.orderNumber);
   return `🙏 *Hare Krishna!* 🪷
 
 Hi *${order.customerName}*, your order is on the way! 🚀
@@ -118,8 +117,7 @@ ${order.type === 'sample' && order.total === 0
   : `\n💳 *Payment Due: ₹${order.total}*${order.type === 'sample' ? ' (sample charge)' : ''}
 
 Pay via GPay / PhonePe / any UPI app:
-📲 UPI ID: \`${APP_CONFIG.UPI_ID}\`
-🔗 Tap to pay (Android): ${upiLink}`}
+📲 UPI ID: *${APP_CONFIG.UPI_ID}*`}
 
 Thank you for choosing ${BUSINESS_NAME}! 🌿
 _Pure • Fresh • Handcrafted with Love_ 🙏`;
