@@ -107,6 +107,7 @@ Thank you for choosing ${BUSINESS_NAME}! 🌿${referralLine}`;
 
 // Sent TO CUSTOMER when out for delivery
 export function outForDeliveryToCustomer(order: Order): string {
+  const upiLink = `upi://pay?pa=${APP_CONFIG.UPI_ID}&pn=SriKrishnaCondiments&am=${order.total}&tn=Order%20${order.orderNumber}&cu=INR`;
   return `🙏 *Hare Krishna!* 🪷
 
 Hi *${order.customerName}*, your order is on the way! 🚀
@@ -114,10 +115,7 @@ Hi *${order.customerName}*, your order is on the way! 🚀
 Order No: *${order.orderNumber}*
 ${order.type === 'sample' && order.total === 0
   ? '\n✅ FREE SAMPLE — no payment needed.'
-  : `\n💳 *Payment Due: ₹${order.total}*${order.type === 'sample' ? ' (sample charge)' : ''}
-
-Pay via GPay / PhonePe / any UPI app:
-📲 UPI ID: *${APP_CONFIG.UPI_ID}*`}
+  : `\n💳 *Payment Due: ₹${order.total}*${order.type === 'sample' ? ' (sample charge)' : ''}\n\nPay via GPay / PhonePe / any UPI app:\n📲 UPI ID: *${APP_CONFIG.UPI_ID}*\n🔗 Tap to pay (Android): ${upiLink}`}
 
 Thank you for choosing ${BUSINESS_NAME}! 🌿
 _Pure • Fresh • Handcrafted with Love_ 🙏`;
