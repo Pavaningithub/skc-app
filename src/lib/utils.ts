@@ -93,7 +93,7 @@ export function orderConfirmedToCustomer(order: Order, referralCode?: string, st
 
 Hi *${order.customerName}*, your order is confirmed! 🎉
 
-Order No: *#${order.orderNumber}*
+Order No: *${order.orderNumber}*
 
 *Items:*
 ${items}
@@ -111,7 +111,7 @@ export function outForDeliveryToCustomer(order: Order): string {
 
 Hi *${order.customerName}*, your order is on the way! 🚀
 
-Order No: *#${order.orderNumber}*
+Order No: *${order.orderNumber}*
 ${order.type === 'sample' && order.total === 0
   ? '\n✅ FREE SAMPLE — no payment needed.'
   : `\n💳 *Payment Due: ₹${order.total}*${order.type === 'sample' ? ' (sample charge)' : ''}
@@ -129,7 +129,7 @@ export function deliveredToCustomer(order: Order, feedbackUrl: string): string {
 
 Hi *${order.customerName}*, your order has been delivered! 🎉
 
-Order No: *#${order.orderNumber}*
+Order No: *${order.orderNumber}*
 
 We hope you love our products! 🙏
 
@@ -150,7 +150,7 @@ export function newOrderAlertToAdmin(order: Order, consoleBaseUrl: string): stri
   const consoleLink = `${consoleBaseUrl}/admin/orders/${order.id}`;
   return `🔔 *New ${order.type === 'sample' ? 'SAMPLE ' : ''}Order — ${BUSINESS_NAME}*
 
-Order No: *#${order.orderNumber}*
+Order No: *${order.orderNumber}*
 Customer: ${order.customerName}
 WhatsApp: ${order.customerWhatsapp}
 Place: ${order.customerPlace || '—'}
@@ -196,7 +196,7 @@ export function statusChangeAlertToGroup(order: Order, newStatus: string, adminB
 export function orderCancelledToCustomer(order: Order): string {
   return `❌ *${BUSINESS_NAME}*
 
-Hi *${order.customerName}*, your order *#${order.orderNumber}* has been cancelled.
+Hi *${order.customerName}*, your order *${order.orderNumber}* has been cancelled.
 
 If you have any questions, please reach out to us on WhatsApp.
 
@@ -214,7 +214,7 @@ export function paymentReminderToCustomer(order: Order): string {
 
 Hi *${order.customerName}*, hope you're enjoying your order! 😊
 
-Just a gentle reminder that payment of *₹${order.total}* is pending for your order *#${order.orderNumber}*.
+Just a gentle reminder that payment of *₹${order.total}* is pending for your order *${order.orderNumber}*.
 
 *Order Summary:*
 ${items}${order.discount > 0 ? `\nDiscount: -₹${order.discount}` : ''}
