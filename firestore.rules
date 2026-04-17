@@ -165,19 +165,11 @@ service cloud.firestore {
       allow write: if true;
     }
 
-    // settings/handlers — readable and writable (handler names shown/managed in UI)
-    // settings/admin — readable for PIN verification (PIN-based auth)
-    // All other settings docs remain fully blocked
-    match /settings/handlers {
+    // settings — all docs readable and writable by the app
+    // (feature_flags, referral_config, subscription_config, loading_facts_config, handlers, admin)
+    match /settings/{docId} {
       allow read: if true;
       allow write: if true;
-    }
-    match /settings/admin {
-      allow read: if true;
-      allow write: if false;
-    }
-    match /settings/{docId} {
-      allow read, write: if false;
     }
 
     // Internal audit trail
