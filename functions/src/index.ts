@@ -2,6 +2,7 @@ import * as admin from "firebase-admin";
 import {setGlobalOptions} from "firebase-functions";
 import {onDocumentCreated} from "firebase-functions/v2/firestore";
 import {onRequest} from "firebase-functions/v2/https";
+import {onSchedule} from "firebase-functions/v2/scheduler";
 import {defineSecret, defineString} from "firebase-functions/params";
 import * as logger from "firebase-functions/logger";
 
@@ -573,5 +574,92 @@ export const notifyNewSubscription = onDocumentCreated(
     } catch (err) {
       logger.error("Failed to send subscription Telegram notification", {subId, err});
     }
+  }
+);
+
+// ─── Weekly unpaid summary → Telegram ────────────────────────────────────────
+// Runs every Monday at 9 AM IST (3:30 AM UTC)
+
+export const weeklyUnpaidSummary = onSchedule(
+  {
+    schedule: "30 3 * * 1",
+    timeZone: "Asia/Kolkata",
+    secrets: [TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID],
+    region: "asia-south1",
+  },
+  async () => {
+    const token = TELEGRAM_BOT_TOKEN.value();
+    const chatId = TELEGRAM_CHAT_ID.value();
+    const upiId = UPI_ID_PARAM.value();
+
+    const snap = await db.collection("orders")
+      .where("status", "==", "delivered")
+      .where("paymentStatus", "==", "pending")
+      .get();
+
+    if (snap.empty) {
+      await sendTelegram(token, chatId,
+        "✅ <b>Weekly Unpaid Summary</b>\n\nNo unpaid delivered orders. All clear! 🎉"
+      );
+      return;
+    }
+
+    const orders = snap.docs.map((d) => ({
+      id: d.id,
+      createdAt: (d.data().createdAt as string) ?? "",
+      ...(d.data() as Order),
+    }));
+    orders.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+
+    // Header message
+    await sendTelegram(token, chatId,
+      `💸 <b>Weekly Unpaid Summary</b> — ${orders.length} delivered order${orders.length !== 1 ? "s" : ""} awaiting payment`
+    );
+
+    for (const order of orders) {
+      const phone = order.customerWhatsapp ?? "";
+      const adminLink = `${ADMIN_BASE_URL()}/${order.id}`;
+
+      // WA reminder message — no & or # to avoid URL truncation
+      const reminderLines = [
+        "🙏 *Hare Krishna!* 🪷",
+        "",
+        `Hi *${order.customerName}*, hope you're enjoying your order! 😊`,
+        "",
+        `Just a gentle reminder that payment of *₹${order.total}* is pending for your order *${order.orderNumber}*.`,
+        "",
+        "Pay via GPay / PhonePe / any UPI app:",
+        `📲 UPI ID: *${upiId}*`,
+        `🔗 Tap to pay (Android): upi://pay?pa=${upiId}%26pn=SriKrishnaCondiments%26am=${order.total}%26tn=Order%20${order.orderNumber}%26cu=INR`,
+        "",
+        "Thank you so much! 🙏",
+        "_Sri Krishna Condiments — Pure • Fresh • Handcrafted_",
+      ].join("\n");
+
+      const waReminderUrl = phone
+        ? `https://wa.me/91${phone}?text=${encodeURIComponent(reminderLines)}`
+        : null;
+
+      // Telegram card for this order
+      const cardText = [
+        `💸 <b>${order.orderNumber}</b>`,
+        `👤 ${order.customerName}`,
+        `📍 ${order.customerPlace || "—"}`,
+        `📱 +91 ${phone.slice(0, 5)} ${phone.slice(5)}`,
+        `💰 <b>₹${order.total}</b> — Delivered, Unpaid`,
+      ].join("\n");
+
+      const buttons: InlineButton[][] = [
+        [
+          {text: "✅ Mark Paid", callback_data: `PAY:${order.id}:paid`},
+          ...(waReminderUrl ? [{text: "📲 Send Reminder", url: waReminderUrl}] : []),
+        ],
+        [{text: "📋 Admin Panel", url: adminLink}],
+      ];
+
+      await sendTelegram(token, chatId, cardText, buttons);
+    }
+
+    logger.info("Weekly unpaid summary sent", {count: orders.length});
   }
 );
