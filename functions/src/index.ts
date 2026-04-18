@@ -93,7 +93,7 @@ async function editTelegramMessage(
     text,
     parse_mode: "HTML",
   };
-  if (buttons && buttons.length > 0) {
+  if (buttons !== undefined) {
     body.reply_markup = {inline_keyboard: buttons};
   }
   await fetch(`https://api.telegram.org/bot${token}/editMessageText`, {
@@ -460,36 +460,65 @@ export const telegramWebhook = onRequest(
           });
         }
         toastMessage = `${PAY_EMOJI[value] ?? "💸"} ${order.orderNumber} payment → ${PAY_LABEL[value] ?? value} (by ${adminName})`;
-      } else if (action === "PAYALL") {
-        // orderId field holds comma-separated list of order IDs
-        const ids = orderId.split(",").filter(Boolean);
-        const now2 = new Date().toISOString();
-        await Promise.all(ids.map(async (id) => {
-          const ref = db.collection("orders").doc(id);
+      } else if (action === "WPAY") {
+        // Mark this order paid + recalc customer pendingAmount
+        await orderRef.update({paymentStatus: "paid", updatedAt: now});
+        const customerId2 = (orderSnap.data() as {customerId?: string}).customerId;
+        if (customerId2) {
+          const ordersSnap3 = await db.collection("orders").where("customerId", "==", customerId2).get();
+          const pendingTotal3 = ordersSnap3.docs
+            .map((d) => d.data() as {paymentStatus?: string; total?: number})
+            .filter((o) => o.paymentStatus === "pending")
+            .reduce((sum, o) => sum + (o.total ?? 0), 0);
+          await db.collection("customers").doc(customerId2).update({pendingAmount: Math.max(0, pendingTotal3)});
+        }
+        // Update state and rebuild the single summary message
+        const stateRef = db.collection("settings").doc("weekly_summary_state");
+        const stateSnap = await stateRef.get();
+        if (stateSnap.exists) {
+          const state = stateSnap.data() as {messageId: number; chatId: string; orders: WeeklySummaryOrder[]};
+          const updatedOrders = state.orders.map((o) =>
+            o.id === orderId ? {...o, paid: true} : o
+          );
+          const {text: newText, buttons: newButtons} = buildWeeklySummaryContent(updatedOrders);
+          await editTelegramMessage(token, state.chatId, state.messageId, newText, newButtons);
+          await stateRef.update({orders: updatedOrders, updatedAt: now});
+        }
+        await answerCallbackQuery(token, callbackId, `✅ ${order.orderNumber} marked paid`);
+        res.status(200).send("OK");
+        return;
+      } else if (action === "WPAYALL") {
+        // Mark all unpaid orders from summary as paid
+        const stateRef2 = db.collection("settings").doc("weekly_summary_state");
+        const stateSnap2 = await stateRef2.get();
+        if (!stateSnap2.exists) {
+          await answerCallbackQuery(token, callbackId, "❓ Summary state not found");
+          res.status(200).send("OK");
+          return;
+        }
+        const state2 = stateSnap2.data() as {messageId: number; chatId: string; orders: WeeklySummaryOrder[]};
+        const unpaidOrders = state2.orders.filter((o) => !o.paid);
+        const nowAll = new Date().toISOString();
+        await Promise.all(unpaidOrders.map(async (o) => {
+          const ref = db.collection("orders").doc(o.id);
           const snap2 = await ref.get();
           if (!snap2.exists) return;
-          await ref.update({paymentStatus: "paid", updatedAt: now2});
-          // Recalculate customer pendingAmount
+          await ref.update({paymentStatus: "paid", updatedAt: nowAll});
           const cid = (snap2.data() as {customerId?: string}).customerId;
           if (cid) {
             const ordersSnap2 = await db.collection("orders").where("customerId", "==", cid).get();
             const pendingTotal2 = ordersSnap2.docs
               .map((d) => d.data() as {paymentStatus?: string; total?: number})
-              .filter((o) => o.paymentStatus === "pending")
-              .reduce((sum, o) => sum + (o.total ?? 0), 0);
+              .filter((ord) => ord.paymentStatus === "pending")
+              .reduce((sum, ord) => sum + (ord.total ?? 0), 0);
             await db.collection("customers").doc(cid).update({pendingAmount: Math.max(0, pendingTotal2)});
           }
         }));
-        toastMessage = `✅ ${ids.length} orders marked paid`;
-        await answerCallbackQuery(token, callbackId, toastMessage);
-        if (messageId) {
-          await editTelegramMessage(token, callbackChatId, messageId,
-            `✅ <b>All ${ids.length} orders marked as paid!</b>`, []);
-        }
-        res.status(200).send("OK");
-        return;
-      } else {
-        await answerCallbackQuery(token, callbackId, "❓ Unknown action");
+        const allPaidOrders = state2.orders.map((o) => ({...o, paid: true}));
+        const {text: allPaidText, buttons: allPaidButtons} = buildWeeklySummaryContent(allPaidOrders);
+        await editTelegramMessage(token, state2.chatId, state2.messageId, allPaidText, allPaidButtons);
+        await stateRef2.update({orders: allPaidOrders, updatedAt: nowAll});
+        await answerCallbackQuery(token, callbackId, `✅ ${unpaidOrders.length} orders marked paid`);
         res.status(200).send("OK");
         return;
       }
@@ -606,11 +635,43 @@ export const notifyNewSubscription = onDocumentCreated(
 );
 
 // ─── Weekly unpaid summary → Telegram ────────────────────────────────────────
-// Runs every Monday at 9 AM IST (3:30 AM UTC)
+// Runs every Monday at 9 AM IST
+
+interface WeeklySummaryOrder {
+  id: string;
+  orderNumber: string;
+  customerName: string;
+  total: number;
+  waUrl: string | null;
+  paid: boolean;
+}
+
+function buildWeeklySummaryContent(orders: WeeklySummaryOrder[]): {text: string; buttons: InlineButton[][]} {
+  const unpaidCount = orders.filter((o) => !o.paid).length;
+  const header = unpaidCount > 0
+    ? `💸 <b>Weekly Unpaid Summary</b>  —  ${unpaidCount} pending`
+    : `✅ <b>Weekly Unpaid Summary</b>  —  All paid! 🎉`;
+  const lines = orders.map((o) =>
+    o.paid
+      ? `  ✅  <code>${o.orderNumber}</code>  ${o.customerName}  ₹${o.total}`
+      : `  💸  <code>${o.orderNumber}</code>  ${o.customerName}  ₹${o.total}`
+  );
+  const text = [header, "", ...lines].join("\n");
+  const buttons: InlineButton[][] = orders
+    .filter((o) => !o.paid)
+    .map((o) => [
+      ...(o.waUrl ? [{text: "📲 Remind", url: o.waUrl}] : []),
+      {text: `✅ ${o.orderNumber}`, callback_data: `WPAY:${o.id}:paid`},
+    ]);
+  if (unpaidCount > 1) {
+    buttons.push([{text: `✅ Mark All ${unpaidCount} Paid`, callback_data: "WPAYALL:all:paid"}]);
+  }
+  return {text, buttons};
+}
 
 export const weeklyUnpaidSummary = onSchedule(
   {
-    schedule: "30 3 * * 1",
+    schedule: "30 9 * * 1",
     timeZone: "Asia/Kolkata",
     secrets: [TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID],
     region: "asia-south1",
@@ -632,27 +693,15 @@ export const weeklyUnpaidSummary = onSchedule(
       return;
     }
 
-    const orders = snap.docs.map((d) => ({
+    const rawOrders = snap.docs.map((d) => ({
       id: d.id,
       createdAt: (d.data().createdAt as string) ?? "",
       ...(d.data() as Order),
     }));
-    orders.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    rawOrders.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 
-    // Header message
-    const headerText = [
-      `💸 <b>Weekly Unpaid Summary</b> — ${orders.length} order${orders.length !== 1 ? "s" : ""} pending payment`,
-      "",
-      "<code>Order       Name              Phone   Amount</code>",
-    ].join("\n");
-    await sendTelegram(token, chatId, headerText);
-
-    for (const order of orders) {
+    const summaryOrders: WeeklySummaryOrder[] = rawOrders.map((order) => {
       const phone = order.customerWhatsapp ?? "";
-      const shortId = order.orderNumber ?? order.id.slice(-8).toUpperCase();
-      const maskedPhone = phone.length >= 4 ? `...${phone.slice(-4)}` : phone;
-
-      // WA reminder message — no & or # to avoid URL truncation
       const reminderLines = [
         "🙏 *Hare Krishna!* 🪷",
         "",
@@ -667,33 +716,29 @@ export const weeklyUnpaidSummary = onSchedule(
         "Thank you so much! 🙏",
         "_Sri Krishna Condiments — Pure • Fresh • Handcrafted_",
       ].join("\n");
+      return {
+        id: order.id,
+        orderNumber: order.orderNumber ?? order.id.slice(-8).toUpperCase(),
+        customerName: order.customerName,
+        total: order.total,
+        waUrl: phone ? `https://wa.me/91${phone}?text=${encodeURIComponent(reminderLines)}` : null,
+        paid: false,
+      };
+    });
 
-      const waReminderUrl = phone
-        ? `https://wa.me/91${phone}?text=${encodeURIComponent(reminderLines)}`
-        : null;
+    const {text, buttons} = buildWeeklySummaryContent(summaryOrders);
+    const sent = await sendTelegram(token, chatId, text, buttons);
 
-      // Compact single-line card
-      const lineText = `<code>${shortId}</code>  ${order.customerName}  📱${maskedPhone}  💰₹${order.total}`;
-
-      const buttons: InlineButton[][] = [
-        [
-          ...(waReminderUrl ? [{text: "📲 Remind", url: waReminderUrl}] : []),
-          {text: "✅ Mark Paid", callback_data: `PAY:${order.id}:paid`},
-        ],
-      ];
-
-      await sendTelegram(token, chatId, lineText, buttons);
+    // Save state so webhook can update this message when buttons are tapped
+    if (sent?.message_id) {
+      await db.collection("settings").doc("weekly_summary_state").set({
+        messageId: sent.message_id,
+        chatId,
+        orders: summaryOrders,
+        updatedAt: new Date().toISOString(),
+      });
     }
 
-    // All Clear button — marks all orders paid at once
-    const allIds = orders.map((o) => o.id).join(",");
-    await sendTelegram(
-      token,
-      chatId,
-      `✅ <b>Mark all ${orders.length} orders as paid?</b>`,
-      [[{text: "✅ All Clear — Mark All Paid", callback_data: `PAYALL:${allIds}:paid`}]]
-    );
-
-    logger.info("Weekly unpaid summary sent", {count: orders.length});
+    logger.info("Weekly unpaid summary sent", {count: summaryOrders.length});
   }
 );
