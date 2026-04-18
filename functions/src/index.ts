@@ -460,6 +460,34 @@ export const telegramWebhook = onRequest(
           });
         }
         toastMessage = `${PAY_EMOJI[value] ?? "💸"} ${order.orderNumber} payment → ${PAY_LABEL[value] ?? value} (by ${adminName})`;
+      } else if (action === "PAYALL") {
+        // orderId field holds comma-separated list of order IDs
+        const ids = orderId.split(",").filter(Boolean);
+        const now2 = new Date().toISOString();
+        await Promise.all(ids.map(async (id) => {
+          const ref = db.collection("orders").doc(id);
+          const snap2 = await ref.get();
+          if (!snap2.exists) return;
+          await ref.update({paymentStatus: "paid", updatedAt: now2});
+          // Recalculate customer pendingAmount
+          const cid = (snap2.data() as {customerId?: string}).customerId;
+          if (cid) {
+            const ordersSnap2 = await db.collection("orders").where("customerId", "==", cid).get();
+            const pendingTotal2 = ordersSnap2.docs
+              .map((d) => d.data() as {paymentStatus?: string; total?: number})
+              .filter((o) => o.paymentStatus === "pending")
+              .reduce((sum, o) => sum + (o.total ?? 0), 0);
+            await db.collection("customers").doc(cid).update({pendingAmount: Math.max(0, pendingTotal2)});
+          }
+        }));
+        toastMessage = `✅ ${ids.length} orders marked paid`;
+        await answerCallbackQuery(token, callbackId, toastMessage);
+        if (messageId) {
+          await editTelegramMessage(token, callbackChatId, messageId,
+            `✅ <b>All ${ids.length} orders marked as paid!</b>`, []);
+        }
+        res.status(200).send("OK");
+        return;
       } else {
         await answerCallbackQuery(token, callbackId, "❓ Unknown action");
         res.status(200).send("OK");
@@ -612,13 +640,17 @@ export const weeklyUnpaidSummary = onSchedule(
     orders.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 
     // Header message
-    await sendTelegram(token, chatId,
-      `💸 <b>Weekly Unpaid Summary</b> — ${orders.length} delivered order${orders.length !== 1 ? "s" : ""} awaiting payment`
-    );
+    const headerText = [
+      `💸 <b>Weekly Unpaid Summary</b> — ${orders.length} order${orders.length !== 1 ? "s" : ""} pending payment`,
+      "",
+      "<code>Order       Name              Phone   Amount</code>",
+    ].join("\n");
+    await sendTelegram(token, chatId, headerText);
 
     for (const order of orders) {
       const phone = order.customerWhatsapp ?? "";
-      const adminLink = `${ADMIN_BASE_URL()}/${order.id}`;
+      const shortId = order.orderNumber ?? order.id.slice(-8).toUpperCase();
+      const maskedPhone = phone.length >= 4 ? `...${phone.slice(-4)}` : phone;
 
       // WA reminder message — no & or # to avoid URL truncation
       const reminderLines = [
@@ -640,25 +672,27 @@ export const weeklyUnpaidSummary = onSchedule(
         ? `https://wa.me/91${phone}?text=${encodeURIComponent(reminderLines)}`
         : null;
 
-      // Telegram card for this order
-      const cardText = [
-        `💸 <b>${order.orderNumber}</b>`,
-        `👤 ${order.customerName}`,
-        `📍 ${order.customerPlace || "—"}`,
-        `📱 +91 ${phone.slice(0, 5)} ${phone.slice(5)}`,
-        `💰 <b>₹${order.total}</b> — Delivered, Unpaid`,
-      ].join("\n");
+      // Compact single-line card
+      const lineText = `<code>${shortId}</code>  ${order.customerName}  📱${maskedPhone}  💰₹${order.total}`;
 
       const buttons: InlineButton[][] = [
         [
+          ...(waReminderUrl ? [{text: "📲 Remind", url: waReminderUrl}] : []),
           {text: "✅ Mark Paid", callback_data: `PAY:${order.id}:paid`},
-          ...(waReminderUrl ? [{text: "📲 Send Reminder", url: waReminderUrl}] : []),
         ],
-        [{text: "📋 Admin Panel", url: adminLink}],
       ];
 
-      await sendTelegram(token, chatId, cardText, buttons);
+      await sendTelegram(token, chatId, lineText, buttons);
     }
+
+    // All Clear button — marks all orders paid at once
+    const allIds = orders.map((o) => o.id).join(",");
+    await sendTelegram(
+      token,
+      chatId,
+      `✅ <b>Mark all ${orders.length} orders as paid?</b>`,
+      [[{text: "✅ All Clear — Mark All Paid", callback_data: `PAYALL:${allIds}:paid`}]]
+    );
 
     logger.info("Weekly unpaid summary sent", {count: orders.length});
   }
