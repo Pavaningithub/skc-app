@@ -247,10 +247,10 @@ function buildOrderActionButtons(orderId: string, order: Order): InlineButton[][
     "📝 *Please share your feedback* (takes 30 seconds):",
     `${STORE_URL()}/feedback/${orderId}`,
     "",
-    "💬 *Join our WhatsApp group* for offers & updates:",
+    "💬 *Join our WhatsApp group* for offers and updates:",
     WA_GROUP_LINK_PARAM.value() || "(ask us for the group link!)",
     "",
-    "Sri Krishna Condiments — Pure & Healthy 🌿",
+    "Sri Krishna Condiments — Pure and Healthy 🌿",
   ].join("\n");
 
   const cancelledMsg = [
@@ -261,7 +261,7 @@ function buildOrderActionButtons(orderId: string, order: Order): InlineButton[][
     "If you have any questions, please reach out to us on WhatsApp.",
     "",
     "Sorry for the inconvenience. We hope to serve you soon! 🙏",
-    "Sri Krishna Condiments — Pure & Healthy 🌿",
+    "Sri Krishna Condiments — Pure and Healthy 🌿",
   ].join("\n");
 
   const waConfirmedUrl = buildWaCustomerUrl(confirmedMsg);

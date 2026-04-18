@@ -87,7 +87,7 @@ export function orderConfirmedToCustomer(order: Order, referralCode?: string, st
     .map(i => `  • ${i.productName}: ${formatQuantity(i.quantity, i.unit)} = ₹${i.totalPrice}`)
     .join('\n');
   const referralLine = referralCode
-    ? `\n\n🎁 *Refer a friend & earn store credit!*\nShare your link: ${storeUrl ?? 'https://YOUR_DOMAIN'}?ref=${referralCode}`
+    ? `\n\n🎁 *Refer a friend and earn store credit!*\nShare your link: ${storeUrl ?? window.location.origin}?ref=${referralCode}`
     : '';
   return `🙏 *Hare Krishna!* 🪷
 
@@ -134,11 +134,10 @@ We hope you love our products! 🙏
 📝 *Please share your feedback* (takes 30 seconds):
 ${feedbackUrl}
 
-💬 *Join our WhatsApp group* for offers & updates:
+💬 *Join our WhatsApp group* for offers and updates:
 ${APP_CONFIG.WHATSAPP_GROUP_LINK}
 
-${BUSINESS_NAME} — Pure & Healthy 🌿`;
-}
+${BUSINESS_NAME} — Pure and Healthy 🌿`;
 
 // Alert sent TO ADMIN when new order arrives — includes console link to action it
 export function newOrderAlertToAdmin(order: Order, consoleBaseUrl: string): string {
@@ -199,7 +198,7 @@ Hi *${order.customerName}*, your order *${order.orderNumber}* has been cancelled
 If you have any questions, please reach out to us on WhatsApp.
 
 Sorry for the inconvenience. We hope to serve you soon! 🙏
-${BUSINESS_NAME} — Pure & Healthy 🌿`;
+${BUSINESS_NAME} — Pure and Healthy 🌿`;
 }
 
 // Friendly payment reminder sent to customer
