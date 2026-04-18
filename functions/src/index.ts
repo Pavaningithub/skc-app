@@ -28,6 +28,7 @@ interface OrderItem {
   quantity: number;
   unit: string;
   total: number;
+  totalPrice: number;
   customizationNote?: string;
 }
 
@@ -188,9 +189,14 @@ function buildOrderActionButtons(orderId: string, order: Order): InlineButton[][
 
   const upiId = UPI_ID_PARAM.value();
 
-  // Items list for confirmed message
+  // Items list — mirrors utils.ts orderConfirmedToCustomer format
+  const formatQty = (qty: number, unit: string) => {
+    if (unit === "gram") return qty >= 1000 ? `${qty / 1000}kg` : `${qty}g`;
+    if (unit === "kg") return `${qty}kg`;
+    return `${qty} pc`;
+  };
   const itemsList = (order.items ?? [])
-    .map((i) => `  • ${i.productName}: ${i.quantity}${i.unit !== "piece" ? "g" : " pc"}`)
+    .map((i) => `  • ${i.productName}: ${formatQty(i.quantity, i.unit)} = ₹${i.totalPrice ?? i.total}`)
     .join("\n");
   const discountLine = (order.discount ?? 0) > 0 ? `\nDiscount: -₹${order.discount}` : "";
 
@@ -207,14 +213,15 @@ function buildOrderActionButtons(orderId: string, order: Order): InlineButton[][
     itemsList,
     discountLine,
     `*Total: ${order.type === "sample" && order.total === 0 ? "FREE SAMPLE" : `₹${order.total}`}*`,
+    order.type === "sample" && order.total === 0 ? "\n✅ This is a *FREE SAMPLE* — no payment needed." : "",
     "",
     "We will keep you updated on your order.",
     `Thank you for choosing Sri Krishna Condiments! 🌿`,
-  ].filter((l) => l !== null).join("\n");
+  ].filter((l) => l !== null && l !== undefined).join("\n");
 
   const ofdPayBlock = order.type === "sample" && order.total === 0
     ? "\n✅ FREE SAMPLE — no payment needed."
-    : `\n💳 *Payment Due: ₹${order.total}*\n\nPay via GPay / PhonePe / any UPI app:\n📲 UPI ID: *${upiId}*\n🔗 Tap to pay (Android): upi://pay?pa=${upiId}&pn=SriKrishnaCondiments&am=${order.total}&tn=Order%20${order.orderNumber}&cu=INR`;
+    : `\n💳 *Payment Due: ₹${order.total}*\n\nPay via GPay / PhonePe / any UPI app:\n📲 UPI ID: *${upiId}*\n🔗 Tap to pay (Android): upi://pay?pa=${upiId}%26pn=SriKrishnaCondiments%26am=${order.total}%26tn=Order%20${order.orderNumber}%26cu=INR`;
 
   const ofdMsg = [
     "🙏 *Hare Krishna!* 🪷",

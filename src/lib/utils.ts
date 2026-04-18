@@ -107,7 +107,7 @@ Thank you for choosing ${BUSINESS_NAME}! 🌿${referralLine}`;
 
 // Sent TO CUSTOMER when out for delivery
 export function outForDeliveryToCustomer(order: Order): string {
-  const upiLink = `upi://pay?pa=${APP_CONFIG.UPI_ID}&pn=SriKrishnaCondiments&am=${order.total}&tn=Order%20${order.orderNumber}&cu=INR`;
+  const upiLink = `upi://pay?pa=${APP_CONFIG.UPI_ID}%26pn=SriKrishnaCondiments%26am=${order.total}%26tn=Order%20${order.orderNumber}%26cu=INR`;
   return `🙏 *Hare Krishna!* 🪷
 
 Hi *${order.customerName}*, your order is on the way! 🚀
