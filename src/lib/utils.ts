@@ -138,6 +138,7 @@ ${feedbackUrl}
 ${APP_CONFIG.WHATSAPP_GROUP_LINK}
 
 ${BUSINESS_NAME} — Pure and Healthy 🌿`;
+}
 
 // Alert sent TO ADMIN when new order arrives — includes console link to action it
 export function newOrderAlertToAdmin(order: Order, consoleBaseUrl: string): string {
@@ -218,7 +219,7 @@ ${items}${order.discount > 0 ? `\nDiscount: -₹${order.discount}` : ''}
 *Total Due: ₹${order.total}*
 
 Pay via GPay / PhonePe / any UPI app:
-📲 UPI ID: \`${APP_CONFIG.UPI_ID}\`
+📲 UPI ID: *${APP_CONFIG.UPI_ID}*
 🔗 Tap to pay (Android): ${upiLink}
 
 Thank you so much! 🙏

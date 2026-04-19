@@ -1,13 +1,27 @@
 import { useState } from 'react';
 import { Star } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { feedbackService } from '../../lib/services';
 import { useRealtimeCollection } from '../../lib/useRealtimeCollection';
 import { formatDate } from '../../lib/utils';
 import type { Feedback } from '../../lib/types';
 
 export default function FeedbackAdmin() {
-  const [feedback, loading] = useRealtimeCollection<Feedback>(feedbackService.subscribe.bind(feedbackService));
+  const [feedback, loading] = useRealtimeCollection<Feedback>(feedbackService.subscribeAll.bind(feedbackService));
   const [tab, setTab] = useState<'all' | 'public' | 'private'>('all');
+  const [toggling, setToggling] = useState<string | null>(null);
+
+  async function togglePublic(fb: Feedback) {
+    setToggling(fb.id);
+    try {
+      await feedbackService.update(fb.id, { isPublic: !fb.isPublic });
+      toast.success(!fb.isPublic ? '⭐ Marked as testimonial' : 'Removed from testimonials');
+    } catch {
+      toast.error('Failed to update');
+    } finally {
+      setToggling(null);
+    }
+  }
 
   const filtered = feedback.filter(f => {
     if (tab === 'public') return f.isPublic;
@@ -97,8 +111,20 @@ export default function FeedbackAdmin() {
                   <p className="text-sm text-gray-700">"{fb.improvement}"</p>
                 </div>
               )}
-              <div className="flex items-center gap-2 text-xs text-gray-500">
-                {fb.recommend && <span className="bg-green-50 text-green-600 px-2 py-1 rounded-full">👍 Would recommend</span>}
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 text-xs text-gray-500">
+                  {fb.recommend && <span className="bg-green-50 text-green-600 px-2 py-1 rounded-full">👍 Would recommend</span>}
+                </div>
+                <button
+                  onClick={() => togglePublic(fb)}
+                  disabled={toggling === fb.id}
+                  className={`text-xs px-3 py-1 rounded-full font-medium transition-colors ${
+                    fb.isPublic
+                      ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}>
+                  {toggling === fb.id ? '...' : fb.isPublic ? '⭐ Testimonial — remove' : 'Add as testimonial'}
+                </button>
               </div>
             </div>
           ))}

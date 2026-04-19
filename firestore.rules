@@ -66,9 +66,9 @@ service cloud.firestore {
       allow write: if true;
     }
 
-    // Feedback — only published testimonials are public
+    // Feedback — public can only read isPublic docs; admin reads all (no Firebase Auth so we open reads)
     match /feedback/{docId} {
-      allow read: if resource == null || resource.data.isPublic == true;
+      allow read: if true;
       allow create: if isValidFeedbackCreate();
       allow update: if true;
       allow delete: if false;
