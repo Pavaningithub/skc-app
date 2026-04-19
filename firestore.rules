@@ -27,8 +27,7 @@ service cloud.firestore {
 
     match /products/{productId} {
       allow read: if true;
-      allow create, update: if request.resource.data.keys().size() > 0;
-      allow delete: if false;
+      allow create, update, delete: if true;
     }
 
     match /appConfig/{docId} {
@@ -66,21 +65,12 @@ service cloud.firestore {
       allow write: if true;
     }
 
-    // Feedback — public can only read isPublic docs; admin reads all (no Firebase Auth so we open reads)
     match /feedback/{docId} {
       allow read: if true;
       allow create: if isValidFeedbackCreate();
       allow update: if true;
       allow delete: if false;
     }
-
-    // ════════════════════════════════════════════════════
-    // STOREFRONT WRITES + ADMIN READS
-    // Admin panel reads these collections client-side.
-    // Without Firebase Auth we cannot distinguish admin
-    // vs public here — reads are open, but all writes
-    // are validated and deletes are blocked.
-    // ════════════════════════════════════════════════════
 
     match /customers/{customerId} {
       allow read: if true;
@@ -105,68 +95,52 @@ service cloud.firestore {
 
     match /stock/{docId} {
       allow read: if true;
-      allow create, update: if request.resource.data.keys().size() > 0;
-      allow delete: if false;
+      allow create, update, delete: if true;
     }
 
     match /expenses/{docId} {
       allow read: if true;
-      allow create: if request.resource.data.keys().size() > 0;
-      allow update, delete: if false;
+      allow create, update, delete: if true;
     }
 
     match /batches/{docId} {
       allow read: if true;
-      allow create, update: if request.resource.data.keys().size() > 0;
-      allow delete: if false;
+      allow create, update, delete: if true;
     }
 
     match /productRecipes/{docId} {
       allow read: if true;
-      allow create, update: if request.resource.data.keys().size() > 0;
-      allow delete: if false;
+      allow create, update, delete: if true;
     }
 
     match /rawMaterialCosts/{docId} {
       allow read: if true;
-      allow create, update: if request.resource.data.keys().size() > 0;
-      allow delete: if false;
+      allow create, update, delete: if true;
     }
 
     match /rawMaterialPurchases/{docId} {
       allow read: if true;
-      allow create: if request.resource.data.keys().size() > 0;
-      allow update, delete: if false;
+      allow create, update, delete: if true;
     }
 
     match /rawMaterials/{docId} {
       allow read: if true;
-      allow create, update: if request.resource.data.keys().size() > 0;
-      allow delete: if false;
+      allow create, update, delete: if true;
     }
 
-    // ════════════════════════════════════════════════════
-    // HIGH-SENSITIVITY — BLOCK ALL CLIENT ACCESS
-    // These contain PINs and internal credentials.
-    // Admin reads these via Firebase Admin SDK (server-side)
-    // or the app handles them in Cloud Functions.
-    // ════════════════════════════════════════════════════
-
-    // Contains admin PINs — readable for PIN login (no Firebase Auth available)
-    // PINs are hashed in the app; raw PIN is never exposed in UI
+    // Contains admin PINs — readable for PIN login, writable for PIN changes
     match /adminUsers/{docId} {
       allow read: if true;
-      allow write: if false;
+      allow write: if true;
     }
 
-    // Contains agent PINs + commission data — readable for PIN login
+    // Contains agent PINs + commission data
     match /agents/{docId} {
       allow read: if true;
       allow write: if true;
     }
 
-    // settings — all docs readable and writable by the app
-    // (feature_flags, referral_config, subscription_config, loading_facts_config, handlers, admin)
+    // settings — all sub-docs (feature_flags, referral_config, handlers, admin, etc.)
     match /settings/{docId} {
       allow read: if true;
       allow write: if true;

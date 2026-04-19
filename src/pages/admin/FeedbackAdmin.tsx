@@ -116,14 +116,14 @@ export default function FeedbackAdmin() {
                   {fb.recommend && <span className="bg-green-50 text-green-600 px-2 py-1 rounded-full">👍 Would recommend</span>}
                 </div>
                 <button
-                  onClick={() => togglePublic(fb)}
-                  disabled={toggling === fb.id}
+                  onClick={() => !fb.isPublic && togglePublic(fb)}
+                  disabled={toggling === fb.id || fb.isPublic}
                   className={`text-xs px-3 py-1 rounded-full font-medium transition-colors ${
                     fb.isPublic
-                      ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
+                      ? 'bg-yellow-100 text-yellow-700 cursor-default'
                       : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                   }`}>
-                  {toggling === fb.id ? '...' : fb.isPublic ? '⭐ Testimonial — remove' : 'Add as testimonial'}
+                  {toggling === fb.id ? '...' : fb.isPublic ? '⭐ Testimonial' : 'Add as testimonial'}
                 </button>
               </div>
             </div>
