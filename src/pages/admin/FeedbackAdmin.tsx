@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Star } from 'lucide-react';
+import { Star, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { feedbackService } from '../../lib/services';
 import { useRealtimeCollection } from '../../lib/useRealtimeCollection';
@@ -9,6 +9,7 @@ import type { Feedback } from '../../lib/types';
 export default function FeedbackAdmin() {
   const [feedback, loading] = useRealtimeCollection<Feedback>(feedbackService.subscribeAll.bind(feedbackService));
   const [tab, setTab] = useState<'all' | 'public' | 'private'>('all');
+  const [ratingFilter, setRatingFilter] = useState<number | null>(null);
   const [toggling, setToggling] = useState<string | null>(null);
 
   async function togglePublic(fb: Feedback) {
@@ -24,8 +25,9 @@ export default function FeedbackAdmin() {
   }
 
   const filtered = feedback.filter(f => {
-    if (tab === 'public') return f.isPublic;
-    if (tab === 'private') return !f.isPublic;
+    if (tab === 'public' && !f.isPublic) return false;
+    if (tab === 'private' && f.isPublic) return false;
+    if (ratingFilter !== null && f.rating !== ratingFilter) return false;
     return true;
   });
 
@@ -64,13 +66,30 @@ export default function FeedbackAdmin() {
         </div>
       )}
 
-      {/* Tabs */}
-      <div className="flex gap-2">
+      {/* Visibility Tabs */}
+      <div className="flex gap-2 flex-wrap">
         {(['all', 'public', 'private'] as const).map(t => (
           <button key={t} onClick={() => setTab(t)}
             className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors
               ${tab === t ? 'bg-orange-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
-            {t === 'all' ? 'All' : t === 'public' ? '⭐ Testimonials (4+)' : '📋 For Improvement (<4)'}
+            {t === 'all' ? `All (${feedback.length})` : t === 'public' ? `⭐ Testimonials (${feedback.filter(f => f.isPublic).length})` : `📋 Private (${feedback.filter(f => !f.isPublic).length})`}
+          </button>
+        ))}
+      </div>
+
+      {/* Rating Filter */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-xs text-gray-500 font-medium">Filter by rating:</span>
+        <button onClick={() => setRatingFilter(null)}
+          className={`px-3 py-1 rounded-full text-xs font-medium transition-colors
+            ${ratingFilter === null ? 'bg-orange-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+          All
+        </button>
+        {[5, 4, 3, 2, 1].map(r => (
+          <button key={r} onClick={() => setRatingFilter(ratingFilter === r ? null : r)}
+            className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium transition-colors
+              ${ratingFilter === r ? 'bg-yellow-400 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+            {r} <Star className="w-3 h-3" style={{ fill: 'currentColor' }} />
           </button>
         ))}
       </div>
@@ -115,16 +134,30 @@ export default function FeedbackAdmin() {
                 <div className="flex items-center gap-2 text-xs text-gray-500">
                   {fb.recommend && <span className="bg-green-50 text-green-600 px-2 py-1 rounded-full">👍 Would recommend</span>}
                 </div>
-                <button
-                  onClick={() => !fb.isPublic && togglePublic(fb)}
-                  disabled={toggling === fb.id || fb.isPublic}
-                  className={`text-xs px-3 py-1 rounded-full font-medium transition-colors ${
-                    fb.isPublic
-                      ? 'bg-yellow-100 text-yellow-700 cursor-default'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}>
-                  {toggling === fb.id ? '...' : fb.isPublic ? '⭐ Testimonial' : 'Add as testimonial'}
-                </button>
+                <div className="flex items-center gap-2">
+                  {fb.isPublic && (
+                    <button
+                      onClick={() => togglePublic(fb)}
+                      disabled={toggling === fb.id}
+                      title="Remove from testimonials"
+                      className="flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-red-50 text-red-500 hover:bg-red-100 transition-colors">
+                      <X className="w-3 h-3" /> Remove
+                    </button>
+                  )}
+                  {!fb.isPublic && (
+                    <button
+                      onClick={() => togglePublic(fb)}
+                      disabled={toggling === fb.id}
+                      className="text-xs px-3 py-1 rounded-full font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors">
+                      {toggling === fb.id ? '...' : 'Add as testimonial'}
+                    </button>
+                  )}
+                  {fb.isPublic && (
+                    <span className="text-xs px-3 py-1 rounded-full font-medium bg-yellow-100 text-yellow-700">
+                      ⭐ Testimonial
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
           ))}
