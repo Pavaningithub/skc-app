@@ -11,6 +11,7 @@ import {
 import { ORDER_STATUS_COLORS, ORDER_STATUS_LABELS } from '../../lib/constants';
 import type { Order, OrderItem, Product } from '../../lib/types';
 import type { OrderStatus } from '../../lib/constants';
+import { APP_CONFIG } from '../../config';
 
 export default function OrderDetail() {
   const { orderId } = useParams<{ orderId: string }>();
@@ -277,7 +278,10 @@ export default function OrderDetail() {
   );
   if (!order) return <div className="p-6 text-gray-500">Order not found</div>;
 
-  const storeOrigin = window.location.origin.replace('/admin', '').replace('admin.', ''); // Customer storefront domain
+  // Strip admin subdomain to get the customer storefront origin
+  // e.g. https://admin.skctreats.in → https://skctreats.in
+  const storeOrigin = APP_CONFIG.STORE_URL ||
+    window.location.origin.replace(/^(https?:\/\/)admin\./, '$1');
 
   return (
     <div className="p-4 md:p-6 space-y-4 max-w-2xl animate-fade-in">

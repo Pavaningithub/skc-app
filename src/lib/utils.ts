@@ -229,7 +229,7 @@ _${BUSINESS_NAME} — Pure • Fresh • Handcrafted_`;
 // Keep old names as aliases so nothing breaks
 export const orderPlacedMessage = (order: Order) => newOrderAlertToAdmin(order, typeof window !== 'undefined' ? window.location.origin : '');
 export const outForDeliveryMessage = outForDeliveryToCustomer;
-export const deliveredMessage = (order: Order) => deliveredToCustomer(order, `https://YOUR_DOMAIN/feedback/${order.id}`);
+export const deliveredMessage = (order: Order) => deliveredToCustomer(order, `${APP_CONFIG.STORE_URL}/feedback/${order.id}`);
 
 export function formatQuantity(qty: number, unit: string): string {
   if (unit === 'piece') return `${qty} pc${qty !== 1 ? 's' : ''}`;

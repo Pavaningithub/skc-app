@@ -222,7 +222,7 @@ function buildOrderActionButtons(orderId: string, order: Order): InlineButton[][
 
   const ofdPayBlock = order.type === "sample" && order.total === 0
     ? "\n✅ FREE SAMPLE — no payment needed."
-    : `\n💳 *Payment Due: ₹${order.total}*\n\nPay via GPay / PhonePe / any UPI app:\n📲 UPI ID: *${upiId}*\n🔗 Tap to pay (Android): upi://pay?pa=${upiId}%26pn=SriKrishnaCondiments%26am=${order.total}%26tn=Order%20${order.orderNumber}%26cu=INR`;
+    : `\n💳 *Payment Due: ₹${order.total}*\n\nPay via GPay / PhonePe / any UPI app:\n📲 UPI ID: *${upiId}*\n🔗 Tap to pay (Android): upi://pay?pa=${upiId}&pn=SriKrishnaCondiments&am=${order.total}&tn=Order%20${order.orderNumber}&cu=INR`;
 
   const ofdMsg = [
     "🙏 *Hare Krishna!* 🪷",
@@ -711,7 +711,7 @@ export const weeklyUnpaidSummary = onSchedule(
         "",
         "Pay via GPay / PhonePe / any UPI app:",
         `📲 UPI ID: *${upiId}*`,
-        `🔗 Tap to pay (Android): upi://pay?pa=${upiId}%26pn=SriKrishnaCondiments%26am=${order.total}%26tn=Order%20${order.orderNumber}%26cu=INR`,
+        `🔗 Tap to pay (Android): upi://pay?pa=${upiId}&pn=SriKrishnaCondiments&am=${order.total}&tn=Order%20${order.orderNumber}&cu=INR`,
         "",
         "Thank you so much! 🙏",
         "_Sri Krishna Condiments — Pure • Fresh • Handcrafted_",
