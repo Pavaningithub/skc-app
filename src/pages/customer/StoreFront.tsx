@@ -1060,7 +1060,7 @@ export default function StoreFront() {
 
           </div>
 
-          <p className="text-xs mt-6" style={{ color: 'rgba(255,255,255,0.3)' }}>© 2026 Sri Krishna Condiments. All rights reserved.</p>
+          <p className="text-xs mt-6" style={{ color: 'rgba(255,255,255,0.3)' }}>© 2026 Sri Krishna Condiments. All rights reserved by pavan.</p>
         </div>
       </footer>
 
