@@ -48,6 +48,10 @@ export default function RawMaterialCostsPage() {
   const [cellDraft, setCellDraft] = useState('');
   const cellInputRef = useRef<HTMLInputElement>(null);
 
+  // inline material name editing
+  const [editingMatId, setEditingMatId] = useState<string | null>(null);
+  const [matDraft, setMatDraft] = useState({ nameEn: '', nameKn: '' });
+
   const tableRef = useRef<HTMLDivElement>(null);
 
   // Load from Firestore on mount, then subscribe
@@ -110,6 +114,27 @@ export default function RawMaterialCostsPage() {
     mutate(s => ({ ...s, batches: s.batches.map(b => b.id === batchId ? { ...b, date } : b) }));
   }
 
+  function updateBatchNumber(batchId: string, batchNumber: string) {
+    if (!batchNumber.trim()) return;
+    mutate(s => ({ ...s, batches: s.batches.map(b => b.id === batchId ? { ...b, batchNumber: batchNumber.trim() } : b) }));
+  }
+
+  // ── Edit material name / unit ──
+  function startEditMat(mat: RawMaterialRow) {
+    setEditingMatId(mat.id);
+    setMatDraft({ nameEn: mat.nameEn, nameKn: mat.nameKn });
+  }
+
+  function commitMatEdit(matId: string) {
+    if (!matDraft.nameEn.trim()) return;
+    mutate(s => ({ ...s, materials: s.materials.map(m => m.id === matId ? { ...m, nameEn: matDraft.nameEn.trim(), nameKn: matDraft.nameKn.trim() } : m) }));
+    setEditingMatId(null);
+  }
+
+  function toggleUnit(matId: string) {
+    mutate(s => ({ ...s, materials: s.materials.map(m => m.id === matId ? { ...m, unit: m.unit === 'piece' ? 'kg' : 'piece' } : m) }));
+  }
+
   // ── Add material row ──
   function addMaterial() {
     if (!newMaterial.nameEn.trim()) return toast.error('Enter English name');
@@ -159,6 +184,18 @@ export default function RawMaterialCostsPage() {
     if (cur < prev) return 'down';
     return 'same';
   }
+
+  // ── Per-batch total spend (computed live from cells) ──
+  const batchTotals = useMemo(() => {
+    const totals: Record<string, number> = {};
+    for (const batch of sheet.batches) {
+      totals[batch.id] = sheet.materials.reduce((sum, mat) => {
+        const val = sheet.cells[`${mat.id}__${batch.id}`];
+        return sum + (val && val > 0 ? val : 0);
+      }, 0);
+    }
+    return totals;
+  }, [sheet.batches, sheet.materials, sheet.cells]);
 
   // ── Filtered materials ──
   const filteredMaterials = useMemo(() =>
@@ -253,7 +290,13 @@ export default function RawMaterialCostsPage() {
                   <th key={batch.id} className="border border-gray-200 px-3 py-2.5 text-center bg-gray-50 min-w-[120px] group/col">
                     <div className="flex items-start justify-between gap-1">
                       <div className="text-left flex-1">
-                        <p className="font-semibold text-gray-700 text-xs">{batch.batchNumber}</p>
+                        <input
+                          type="text"
+                          value={batch.batchNumber}
+                          onChange={e => updateBatchNumber(batch.id, e.target.value)}
+                          className="font-semibold text-gray-700 text-xs bg-transparent border-none outline-none cursor-pointer w-full focus:bg-white focus:border focus:border-orange-300 focus:rounded px-0.5"
+                          title="Click to rename batch"
+                        />
                         <input
                           type="date"
                           value={batch.date}
@@ -262,7 +305,12 @@ export default function RawMaterialCostsPage() {
                           title="Click to change date"
                         />
                         {batch.totalSpend != null && (
-                          <p className="text-orange-600 font-semibold text-xs mt-1">₹{batch.totalSpend.toLocaleString('en-IN')}</p>
+                          <p className="text-orange-600 font-semibold text-xs mt-1">
+                            ₹{batchTotals[batch.id]?.toLocaleString('en-IN') ?? '—'}
+                            {batchTotals[batch.id] !== batch.totalSpend && batch.totalSpend > 0 && (
+                              <span className="text-gray-400 font-normal ml-1">(bill: ₹{batch.totalSpend.toLocaleString('en-IN')})</span>
+                            )}
+                          </p>
                         )}
                       </div>
                       <button
@@ -281,21 +329,49 @@ export default function RawMaterialCostsPage() {
                 <tr key={mat.id} className="hover:bg-orange-50/30 group">
                   {/* Frozen material name */}
                   <td className="sticky left-0 z-10 bg-white border border-gray-200 px-3 py-2 min-w-[220px]">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium text-gray-800 text-sm">{mat.nameEn}</p>
-                        {mat.nameKn && <p className="text-xs text-gray-400">{mat.nameKn}</p>}
+                    {editingMatId === mat.id ? (
+                      <div className="flex flex-col gap-1">
+                        <input
+                          autoFocus
+                          value={matDraft.nameEn}
+                          onChange={e => setMatDraft(d => ({ ...d, nameEn: e.target.value }))}
+                          onBlur={() => commitMatEdit(mat.id)}
+                          onKeyDown={e => { if (e.key === 'Enter') commitMatEdit(mat.id); if (e.key === 'Escape') setEditingMatId(null); }}
+                          className="border border-orange-400 rounded px-1.5 py-0.5 text-sm outline-none w-full font-medium"
+                          placeholder="English name"
+                        />
+                        <input
+                          value={matDraft.nameKn}
+                          onChange={e => setMatDraft(d => ({ ...d, nameKn: e.target.value }))}
+                          onBlur={() => commitMatEdit(mat.id)}
+                          onKeyDown={e => { if (e.key === 'Enter') commitMatEdit(mat.id); if (e.key === 'Escape') setEditingMatId(null); }}
+                          className="border border-orange-200 rounded px-1.5 py-0.5 text-xs outline-none w-full text-gray-500"
+                          placeholder="ಕನ್ನಡ ಹೆಸರು"
+                        />
                       </div>
-                      <button onClick={() => removeMaterial(mat.id)}
-                        className="text-gray-300 hover:text-red-400 ml-1 flex-shrink-0"
-                        title="Remove material">
-                        <X className="w-3 h-3" />
-                      </button>
-                    </div>
+                    ) : (
+                      <div className="flex items-center justify-between">
+                        <div className="cursor-pointer flex-1" onClick={() => startEditMat(mat)} title="Click to edit name">
+                          <p className="font-medium text-gray-800 text-sm">{mat.nameEn}</p>
+                          {mat.nameKn && <p className="text-xs text-gray-400">{mat.nameKn}</p>}
+                          {mat.billName && <p className="text-xs text-blue-400 italic">Bill: {mat.billName}</p>}
+                        </div>
+                        <button onClick={() => removeMaterial(mat.id)}
+                          className="text-gray-300 hover:text-red-400 ml-1 flex-shrink-0"
+                          title="Remove material">
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    )}
                   </td>
-                  {/* Unit label */}
+                  {/* Unit — click to toggle */}
                   <td className="sticky left-[220px] z-10 bg-white border border-gray-200 px-3 py-2 text-xs text-gray-500 font-medium min-w-[70px] whitespace-nowrap">
-                    {mat.unit === 'piece' ? '₹/pc' : '₹/kg'}
+                    <button
+                      onClick={() => toggleUnit(mat.id)}
+                      title="Click to toggle unit"
+                      className="hover:text-orange-500 transition-colors">
+                      {mat.unit === 'piece' ? '₹/pc' : '₹/kg'}
+                    </button>
                   </td>
                   {/* Cost cells */}
                   {sheet.batches.map((batch, bIdx) => {

@@ -388,6 +388,7 @@ export interface RawMaterialRow {
   nameKn: string;      // Kannada name
   unit: 'gram' | 'kg' | 'piece';
   brand?: string;      // e.g. "PREMIA", "D-MART", "HLTY"
+  billName?: string;   // name as printed on the purchase bill/receipt
 }
 
 export interface BatchColumn {
