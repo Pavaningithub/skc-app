@@ -185,18 +185,6 @@ export default function RawMaterialCostsPage() {
     return 'same';
   }
 
-  // ── Per-batch total spend (computed live from cells) ──
-  const batchTotals = useMemo(() => {
-    const totals: Record<string, number> = {};
-    for (const batch of sheet.batches) {
-      totals[batch.id] = sheet.materials.reduce((sum, mat) => {
-        const val = sheet.cells[`${mat.id}__${batch.id}`];
-        return sum + (val && val > 0 ? val : 0);
-      }, 0);
-    }
-    return totals;
-  }, [sheet.batches, sheet.materials, sheet.cells]);
-
   // ── Filtered materials ──
   const filteredMaterials = useMemo(() =>
     sheet.materials.filter(m =>
@@ -304,13 +292,8 @@ export default function RawMaterialCostsPage() {
                           className="text-gray-400 text-xs font-normal bg-transparent border-none outline-none cursor-pointer w-full mt-0.5"
                           title="Click to change date"
                         />
-                        {batch.totalSpend != null && (
-                          <p className="text-orange-600 font-semibold text-xs mt-1">
-                            ₹{batchTotals[batch.id]?.toLocaleString('en-IN') ?? '—'}
-                            {batchTotals[batch.id] !== batch.totalSpend && batch.totalSpend > 0 && (
-                              <span className="text-gray-400 font-normal ml-1">(bill: ₹{batch.totalSpend.toLocaleString('en-IN')})</span>
-                            )}
-                          </p>
+                        {batch.totalSpend != null && batch.totalSpend > 0 && (
+                          <p className="text-orange-600 font-semibold text-xs mt-1">Bill: ₹{batch.totalSpend.toLocaleString('en-IN')}</p>
                         )}
                       </div>
                       <button
