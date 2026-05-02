@@ -493,10 +493,19 @@ export const feedbackService = {
     return { id: snap.docs[0].id, ...snap.docs[0].data() } as Feedback;
   },
   subscribe(cb: (items: Feedback[]) => void): Unsubscribe {
+    return onSnapshot(query(collection(db, COLLECTIONS.FEEDBACK), where("isPublic", "==", true)), snap => {
+      const items = snap.docs.map(d => ({ id: d.id, ...d.data() } as Feedback));
+      cb(items.sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
+    });
+  },
+  subscribeAll(cb: (items: Feedback[]) => void): Unsubscribe {
     return onSnapshot(collection(db, COLLECTIONS.FEEDBACK), snap => {
       const items = snap.docs.map(d => ({ id: d.id, ...d.data() } as Feedback));
       cb(items.sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
     });
+  },
+  async update(id: string, data: Partial<Feedback>): Promise<void> {
+    await updateDoc(doc(db, COLLECTIONS.FEEDBACK, id), { ...data, updatedAt: now() });
   },
 };
 

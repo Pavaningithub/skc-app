@@ -87,7 +87,7 @@ export function orderConfirmedToCustomer(order: Order, referralCode?: string, st
     .map(i => `  • ${i.productName}: ${formatQuantity(i.quantity, i.unit)} = ₹${i.totalPrice}`)
     .join('\n');
   const referralLine = referralCode
-    ? `\n\n🎁 *Refer a friend & earn store credit!*\nShare your link: ${storeUrl ?? 'https://YOUR_DOMAIN'}?ref=${referralCode}`
+    ? `\n\n🎁 *Refer a friend and earn store credit!*\nShare your link: ${storeUrl ?? window.location.origin}?ref=${referralCode}`
     : '';
   return `🙏 *Hare Krishna!* 🪷
 
@@ -107,7 +107,7 @@ Thank you for choosing ${BUSINESS_NAME}! 🌿${referralLine}`;
 
 // Sent TO CUSTOMER when out for delivery
 export function outForDeliveryToCustomer(order: Order): string {
-  const upiLink = `upi://pay?pa=${APP_CONFIG.UPI_ID}&pn=SriKrishnaCondiments&am=${order.total}&tn=Order%20${order.orderNumber}&cu=INR`;
+  const upiLink = `upi://pay?pa=${APP_CONFIG.UPI_ID}%26pn=SriKrishnaCondiments%26am=${order.total}%26tn=Order%20${order.orderNumber}%26cu=INR`;
   return `🙏 *Hare Krishna!* 🪷
 
 Hi *${order.customerName}*, your order is on the way! 🚀
@@ -134,10 +134,10 @@ We hope you love our products! 🙏
 📝 *Please share your feedback* (takes 30 seconds):
 ${feedbackUrl}
 
-💬 *Join our WhatsApp group* for offers & updates:
+💬 *Join our WhatsApp group* for offers and updates:
 ${APP_CONFIG.WHATSAPP_GROUP_LINK}
 
-${BUSINESS_NAME} — Pure & Healthy 🌿`;
+${BUSINESS_NAME} — Pure and Healthy 🌿`;
 }
 
 // Alert sent TO ADMIN when new order arrives — includes console link to action it
@@ -199,7 +199,7 @@ Hi *${order.customerName}*, your order *${order.orderNumber}* has been cancelled
 If you have any questions, please reach out to us on WhatsApp.
 
 Sorry for the inconvenience. We hope to serve you soon! 🙏
-${BUSINESS_NAME} — Pure & Healthy 🌿`;
+${BUSINESS_NAME} — Pure and Healthy 🌿`;
 }
 
 // Friendly payment reminder sent to customer
@@ -219,7 +219,7 @@ ${items}${order.discount > 0 ? `\nDiscount: -₹${order.discount}` : ''}
 *Total Due: ₹${order.total}*
 
 Pay via GPay / PhonePe / any UPI app:
-📲 UPI ID: \`${APP_CONFIG.UPI_ID}\`
+📲 UPI ID: *${APP_CONFIG.UPI_ID}*
 🔗 Tap to pay (Android): ${upiLink}
 
 Thank you so much! 🙏
@@ -229,7 +229,7 @@ _${BUSINESS_NAME} — Pure • Fresh • Handcrafted_`;
 // Keep old names as aliases so nothing breaks
 export const orderPlacedMessage = (order: Order) => newOrderAlertToAdmin(order, typeof window !== 'undefined' ? window.location.origin : '');
 export const outForDeliveryMessage = outForDeliveryToCustomer;
-export const deliveredMessage = (order: Order) => deliveredToCustomer(order, `https://YOUR_DOMAIN/feedback/${order.id}`);
+export const deliveredMessage = (order: Order) => deliveredToCustomer(order, `${APP_CONFIG.STORE_URL}/feedback/${order.id}`);
 
 export function formatQuantity(qty: number, unit: string): string {
   if (unit === 'piece') return `${qty} pc${qty !== 1 ? 's' : ''}`;

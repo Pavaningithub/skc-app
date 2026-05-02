@@ -2,6 +2,7 @@ import * as admin from "firebase-admin";
 import {setGlobalOptions} from "firebase-functions";
 import {onDocumentCreated} from "firebase-functions/v2/firestore";
 import {onRequest} from "firebase-functions/v2/https";
+import {onSchedule} from "firebase-functions/v2/scheduler";
 import {defineSecret, defineString} from "firebase-functions/params";
 import * as logger from "firebase-functions/logger";
 
@@ -28,6 +29,7 @@ interface OrderItem {
   quantity: number;
   unit: string;
   total: number;
+  totalPrice: number;
   customizationNote?: string;
 }
 
@@ -91,7 +93,7 @@ async function editTelegramMessage(
     text,
     parse_mode: "HTML",
   };
-  if (buttons && buttons.length > 0) {
+  if (buttons !== undefined) {
     body.reply_markup = {inline_keyboard: buttons};
   }
   await fetch(`https://api.telegram.org/bot${token}/editMessageText`, {
@@ -188,9 +190,14 @@ function buildOrderActionButtons(orderId: string, order: Order): InlineButton[][
 
   const upiId = UPI_ID_PARAM.value();
 
-  // Items list for confirmed message
+  // Items list — mirrors utils.ts orderConfirmedToCustomer format
+  const formatQty = (qty: number, unit: string) => {
+    if (unit === "gram") return qty >= 1000 ? `${qty / 1000}kg` : `${qty}g`;
+    if (unit === "kg") return `${qty}kg`;
+    return `${qty} pc`;
+  };
   const itemsList = (order.items ?? [])
-    .map((i) => `  • ${i.productName}: ${i.quantity}${i.unit !== "piece" ? "g" : " pc"}`)
+    .map((i) => `  • ${i.productName}: ${formatQty(i.quantity, i.unit)} = ₹${i.totalPrice ?? i.total}`)
     .join("\n");
   const discountLine = (order.discount ?? 0) > 0 ? `\nDiscount: -₹${order.discount}` : "";
 
@@ -207,10 +214,11 @@ function buildOrderActionButtons(orderId: string, order: Order): InlineButton[][
     itemsList,
     discountLine,
     `*Total: ${order.type === "sample" && order.total === 0 ? "FREE SAMPLE" : `₹${order.total}`}*`,
+    order.type === "sample" && order.total === 0 ? "\n✅ This is a *FREE SAMPLE* — no payment needed." : "",
     "",
     "We will keep you updated on your order.",
     `Thank you for choosing Sri Krishna Condiments! 🌿`,
-  ].filter((l) => l !== null).join("\n");
+  ].filter((l) => l !== null && l !== undefined).join("\n");
 
   const ofdPayBlock = order.type === "sample" && order.total === 0
     ? "\n✅ FREE SAMPLE — no payment needed."
@@ -240,10 +248,10 @@ function buildOrderActionButtons(orderId: string, order: Order): InlineButton[][
     "📝 *Please share your feedback* (takes 30 seconds):",
     `${STORE_URL()}/feedback/${orderId}`,
     "",
-    "💬 *Join our WhatsApp group* for offers & updates:",
+    "💬 *Join our WhatsApp group* for offers and updates:",
     WA_GROUP_LINK_PARAM.value() || "(ask us for the group link!)",
     "",
-    "Sri Krishna Condiments — Pure & Healthy 🌿",
+    "Sri Krishna Condiments — Pure and Healthy 🌿",
   ].join("\n");
 
   const cancelledMsg = [
@@ -254,7 +262,7 @@ function buildOrderActionButtons(orderId: string, order: Order): InlineButton[][
     "If you have any questions, please reach out to us on WhatsApp.",
     "",
     "Sorry for the inconvenience. We hope to serve you soon! 🙏",
-    "Sri Krishna Condiments — Pure & Healthy 🌿",
+    "Sri Krishna Condiments — Pure and Healthy 🌿",
   ].join("\n");
 
   const waConfirmedUrl = buildWaCustomerUrl(confirmedMsg);
@@ -452,8 +460,65 @@ export const telegramWebhook = onRequest(
           });
         }
         toastMessage = `${PAY_EMOJI[value] ?? "💸"} ${order.orderNumber} payment → ${PAY_LABEL[value] ?? value} (by ${adminName})`;
-      } else {
-        await answerCallbackQuery(token, callbackId, "❓ Unknown action");
+      } else if (action === "WPAY") {
+        // Mark this order paid + recalc customer pendingAmount
+        await orderRef.update({paymentStatus: "paid", updatedAt: now});
+        const customerId2 = (orderSnap.data() as {customerId?: string}).customerId;
+        if (customerId2) {
+          const ordersSnap3 = await db.collection("orders").where("customerId", "==", customerId2).get();
+          const pendingTotal3 = ordersSnap3.docs
+            .map((d) => d.data() as {paymentStatus?: string; total?: number})
+            .filter((o) => o.paymentStatus === "pending")
+            .reduce((sum, o) => sum + (o.total ?? 0), 0);
+          await db.collection("customers").doc(customerId2).update({pendingAmount: Math.max(0, pendingTotal3)});
+        }
+        // Update state and rebuild the single summary message
+        const stateRef = db.collection("settings").doc("weekly_summary_state");
+        const stateSnap = await stateRef.get();
+        if (stateSnap.exists) {
+          const state = stateSnap.data() as {messageId: number; chatId: string; orders: WeeklySummaryOrder[]};
+          const updatedOrders = state.orders.map((o) =>
+            o.id === orderId ? {...o, paid: true} : o
+          );
+          const {text: newText, buttons: newButtons} = buildWeeklySummaryContent(updatedOrders);
+          await editTelegramMessage(token, state.chatId, state.messageId, newText, newButtons);
+          await stateRef.update({orders: updatedOrders, updatedAt: now});
+        }
+        await answerCallbackQuery(token, callbackId, `✅ ${order.orderNumber} marked paid`);
+        res.status(200).send("OK");
+        return;
+      } else if (action === "WPAYALL") {
+        // Mark all unpaid orders from summary as paid
+        const stateRef2 = db.collection("settings").doc("weekly_summary_state");
+        const stateSnap2 = await stateRef2.get();
+        if (!stateSnap2.exists) {
+          await answerCallbackQuery(token, callbackId, "❓ Summary state not found");
+          res.status(200).send("OK");
+          return;
+        }
+        const state2 = stateSnap2.data() as {messageId: number; chatId: string; orders: WeeklySummaryOrder[]};
+        const unpaidOrders = state2.orders.filter((o) => !o.paid);
+        const nowAll = new Date().toISOString();
+        await Promise.all(unpaidOrders.map(async (o) => {
+          const ref = db.collection("orders").doc(o.id);
+          const snap2 = await ref.get();
+          if (!snap2.exists) return;
+          await ref.update({paymentStatus: "paid", updatedAt: nowAll});
+          const cid = (snap2.data() as {customerId?: string}).customerId;
+          if (cid) {
+            const ordersSnap2 = await db.collection("orders").where("customerId", "==", cid).get();
+            const pendingTotal2 = ordersSnap2.docs
+              .map((d) => d.data() as {paymentStatus?: string; total?: number})
+              .filter((ord) => ord.paymentStatus === "pending")
+              .reduce((sum, ord) => sum + (ord.total ?? 0), 0);
+            await db.collection("customers").doc(cid).update({pendingAmount: Math.max(0, pendingTotal2)});
+          }
+        }));
+        const allPaidOrders = state2.orders.map((o) => ({...o, paid: true}));
+        const {text: allPaidText, buttons: allPaidButtons} = buildWeeklySummaryContent(allPaidOrders);
+        await editTelegramMessage(token, state2.chatId, state2.messageId, allPaidText, allPaidButtons);
+        await stateRef2.update({orders: allPaidOrders, updatedAt: nowAll});
+        await answerCallbackQuery(token, callbackId, `✅ ${unpaidOrders.length} orders marked paid`);
         res.status(200).send("OK");
         return;
       }
@@ -566,5 +631,114 @@ export const notifyNewSubscription = onDocumentCreated(
     } catch (err) {
       logger.error("Failed to send subscription Telegram notification", {subId, err});
     }
+  }
+);
+
+// ─── Weekly unpaid summary → Telegram ────────────────────────────────────────
+// Runs every Monday at 9 AM IST
+
+interface WeeklySummaryOrder {
+  id: string;
+  orderNumber: string;
+  customerName: string;
+  total: number;
+  waUrl: string | null;
+  paid: boolean;
+}
+
+function buildWeeklySummaryContent(orders: WeeklySummaryOrder[]): {text: string; buttons: InlineButton[][]} {
+  const unpaidCount = orders.filter((o) => !o.paid).length;
+  const header = unpaidCount > 0
+    ? `💸 <b>Weekly Unpaid Summary</b>  —  ${unpaidCount} pending`
+    : `✅ <b>Weekly Unpaid Summary</b>  —  All paid! 🎉`;
+  const lines = orders.map((o) =>
+    o.paid
+      ? `  ✅  <code>${o.orderNumber}</code>  ${o.customerName}  ₹${o.total}`
+      : `  💸  <code>${o.orderNumber}</code>  ${o.customerName}  ₹${o.total}`
+  );
+  const text = [header, "", ...lines].join("\n");
+  const buttons: InlineButton[][] = orders
+    .filter((o) => !o.paid)
+    .map((o) => [
+      ...(o.waUrl ? [{text: "📲 Remind", url: o.waUrl}] : []),
+      {text: `✅ ${o.orderNumber}`, callback_data: `WPAY:${o.id}:paid`},
+    ]);
+  if (unpaidCount > 1) {
+    buttons.push([{text: `✅ Mark All ${unpaidCount} Paid`, callback_data: "WPAYALL:all:paid"}]);
+  }
+  return {text, buttons};
+}
+
+export const weeklyUnpaidSummary = onSchedule(
+  {
+    schedule: "30 9 * * 1",
+    timeZone: "Asia/Kolkata",
+    secrets: [TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID],
+    region: "asia-south1",
+  },
+  async () => {
+    const token = TELEGRAM_BOT_TOKEN.value();
+    const chatId = TELEGRAM_CHAT_ID.value();
+    const upiId = UPI_ID_PARAM.value();
+
+    const snap = await db.collection("orders")
+      .where("status", "==", "delivered")
+      .where("paymentStatus", "==", "pending")
+      .get();
+
+    if (snap.empty) {
+      await sendTelegram(token, chatId,
+        "✅ <b>Weekly Unpaid Summary</b>\n\nNo unpaid delivered orders. All clear! 🎉"
+      );
+      return;
+    }
+
+    const rawOrders = snap.docs.map((d) => ({
+      id: d.id,
+      createdAt: (d.data().createdAt as string) ?? "",
+      ...(d.data() as Order),
+    }));
+    rawOrders.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+
+    const summaryOrders: WeeklySummaryOrder[] = rawOrders.map((order) => {
+      const phone = order.customerWhatsapp ?? "";
+      const reminderLines = [
+        "🙏 *Hare Krishna!* 🪷",
+        "",
+        `Hi *${order.customerName}*, hope you're enjoying your order! 😊`,
+        "",
+        `Just a gentle reminder that payment of *₹${order.total}* is pending for your order *${order.orderNumber}*.`,
+        "",
+        "Pay via GPay / PhonePe / any UPI app:",
+        `📲 UPI ID: *${upiId}*`,
+        `🔗 Tap to pay (Android): upi://pay?pa=${upiId}&pn=SriKrishnaCondiments&am=${order.total}&tn=Order%20${order.orderNumber}&cu=INR`,
+        "",
+        "Thank you so much! 🙏",
+        "_Sri Krishna Condiments — Pure • Fresh • Handcrafted_",
+      ].join("\n");
+      return {
+        id: order.id,
+        orderNumber: order.orderNumber ?? order.id.slice(-8).toUpperCase(),
+        customerName: order.customerName,
+        total: order.total,
+        waUrl: phone ? `https://wa.me/91${phone}?text=${encodeURIComponent(reminderLines)}` : null,
+        paid: false,
+      };
+    });
+
+    const {text, buttons} = buildWeeklySummaryContent(summaryOrders);
+    const sent = await sendTelegram(token, chatId, text, buttons);
+
+    // Save state so webhook can update this message when buttons are tapped
+    if (sent?.message_id) {
+      await db.collection("settings").doc("weekly_summary_state").set({
+        messageId: sent.message_id,
+        chatId,
+        orders: summaryOrders,
+        updatedAt: new Date().toISOString(),
+      });
+    }
+
+    logger.info("Weekly unpaid summary sent", {count: summaryOrders.length});
   }
 );
