@@ -387,12 +387,14 @@ export interface RawMaterialRow {
   nameEn: string;
   nameKn: string;      // Kannada name
   unit: 'gram' | 'kg' | 'piece';
+  brand?: string;      // e.g. "PREMIA", "D-MART", "HLTY"
 }
 
 export interface BatchColumn {
   id: string;          // uuid
   batchNumber: string;
   date: string;        // ISO date YYYY-MM-DD
+  totalSpend?: number; // total ₹ spent on this batch purchase
 }
 
 export interface RawMaterialCostSheet {

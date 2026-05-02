@@ -261,6 +261,9 @@ export default function RawMaterialCostsPage() {
                           className="text-gray-400 text-xs font-normal bg-transparent border-none outline-none cursor-pointer w-full mt-0.5"
                           title="Click to change date"
                         />
+                        {batch.totalSpend != null && (
+                          <p className="text-orange-600 font-semibold text-xs mt-1">₹{batch.totalSpend.toLocaleString('en-IN')}</p>
+                        )}
                       </div>
                       <button
                         onClick={() => removeBatch(batch.id)}
