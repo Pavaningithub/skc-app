@@ -1,8 +1,8 @@
 import * as admin from "firebase-admin";
 import {setGlobalOptions} from "firebase-functions";
 import {onDocumentCreated} from "firebase-functions/v2/firestore";
-import {onRequest} from "firebase-functions/v2/https";
-import {onSchedule} from "firebase-functions/v2/scheduler";
+// import {onRequest} from "firebase-functions/v2/https";
+// import {onSchedule} from "firebase-functions/v2/scheduler";
 import {defineSecret, defineString} from "firebase-functions/params";
 import * as logger from "firebase-functions/logger";
 
@@ -19,7 +19,7 @@ const APP_DOMAIN_PARAM = defineString("APP_DOMAIN", {default: ""});
 
 
 const ADMIN_BASE_URL = () => `https://${APP_DOMAIN_PARAM.value()}/admin/orders`;
-const ADMIN_SUBS_URL = () => `https://${APP_DOMAIN_PARAM.value()}/admin/subscriptions`;
+// const ADMIN_SUBS_URL = () => `https://${APP_DOMAIN_PARAM.value()}/admin/subscriptions`;
 const STORE_URL = () => `https://${APP_DOMAIN_PARAM.value()}`;
 
 // ─── Shared types ────────────────────────────────────────────────────────────
@@ -80,6 +80,7 @@ async function sendTelegram(
   return json.result ?? null;
 }
 
+/*
 async function editTelegramMessage(
   token: string,
   chatId: string,
@@ -110,6 +111,7 @@ async function answerCallbackQuery(token: string, callbackQueryId: string, text?
     body: JSON.stringify({callback_query_id: callbackQueryId, text, show_alert: false}),
   });
 }
+*/
 
 // ─── Order message builder ────────────────────────────────────────────────────
 
@@ -361,6 +363,7 @@ export const notifyNewOrder = onDocumentCreated(
 //   STATUS:{orderId}:{newStatus}  — update order status
 //   PAY:{orderId}:{payStatus}     — update payment status
 
+/*
 export const telegramWebhook = onRequest(
   {
     secrets: [TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID],
@@ -542,7 +545,9 @@ export const telegramWebhook = onRequest(
     res.status(200).send("OK");
   }
 );
+*/
 
+/*
 interface SubscriptionItem {
   productName: string;
   quantity: number;
@@ -633,10 +638,12 @@ export const notifyNewSubscription = onDocumentCreated(
     }
   }
 );
+*/
 
 // ─── Weekly unpaid summary → Telegram ────────────────────────────────────────
 // Runs every Monday at 9 AM IST
 
+/*
 interface WeeklySummaryOrder {
   id: string;
   orderNumber: string;
@@ -742,3 +749,4 @@ export const weeklyUnpaidSummary = onSchedule(
     logger.info("Weekly unpaid summary sent", {count: summaryOrders.length});
   }
 );
+*/
