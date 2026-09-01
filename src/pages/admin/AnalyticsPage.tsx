@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   TrendingUp, TrendingDown, ShoppingBag, Users, Package,
   ChevronLeft, ChevronRight, BarChart2, IndianRupee,
@@ -7,10 +7,11 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   Cell, PieChart, Pie,
 } from 'recharts';
-import { ordersService, expensesService, customersService } from '../../lib/services';
+import { ordersService, expensesService, customersService, productRecipeService, rawMaterialCostSheetService } from '../../lib/services';
 import { useRealtimeCollection } from '../../lib/useRealtimeCollection';
 import { formatCurrency } from '../../lib/utils';
-import type { Order, Expense, Customer } from '../../lib/types';
+import { computeCogs } from '../../lib/costing';
+import type { Order, Expense, Customer, ProductRecipe, RawMaterialCostSheet } from '../../lib/types';
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 function monthLabel(year: number, month: number) {
@@ -32,6 +33,9 @@ export default function AnalyticsPage() {
   const [orders,    ordersLoading]    = useRealtimeCollection<Order>(ordersService.subscribe.bind(ordersService));
   const [expenses,  expensesLoading]  = useRealtimeCollection<Expense>(expensesService.subscribe.bind(expensesService));
   const [customers, customersLoading] = useRealtimeCollection<Customer>(customersService.subscribe.bind(customersService));
+  const [recipes] = useRealtimeCollection<ProductRecipe>(productRecipeService.subscribe.bind(productRecipeService));
+  const [sheet, setSheet] = useState<RawMaterialCostSheet>({ materials: [], batches: [], cells: {}, updatedAt: '' });
+  useEffect(() => rawMaterialCostSheetService.subscribe(setSheet), []);
   const loading = ordersLoading || expensesLoading || customersLoading;
 
   // ── month picker ────────────────────────────────────────────────────────────
@@ -136,6 +140,7 @@ export default function AnalyticsPage() {
     const deliveryChargeTotal = monthOrders.reduce((s, o) => s + (o.deliveryCharge ?? 0), 0);
 
     return {
+      monthOrders,
       revenue, expTotal, profit,
       orderCount: monthOrders.length,
       cancelledCount: cancelledOrders.length,
@@ -180,6 +185,15 @@ export default function AnalyticsPage() {
     );
   }
 
+  // Gross margin from recipes — what the goods sold this month cost to make.
+  // Distinct from net profit, which is revenue minus whatever was *spent* this
+  // month: a large bill lands entirely in the month it was paid, even though the
+  // stock it bought is sold over the months that follow.
+  const cogs = useMemo(
+    () => computeCogs(stats.monthOrders, recipes, sheet),
+    [stats.monthOrders, recipes, sheet],
+  );
+
   const revenueD = delta(stats.revenue, prevStats.revenue);
   const profitD  = delta(stats.profit,  prevStats.profit);
   const ordersD  = delta(stats.orderCount, prevStats.orderCount);
@@ -210,7 +224,7 @@ export default function AnalyticsPage() {
       </div>
 
       {/* KPI cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         {/* Revenue */}
         <div className="bg-white rounded-xl border border-green-200 p-4">
           <div className="flex items-center gap-2 mb-1">
@@ -255,6 +269,29 @@ export default function AnalyticsPage() {
           )}
         </div>
 
+        {/* Gross margin — from recipes, not from cash spent */}
+        <div className="bg-white rounded-xl border border-amber-200 p-4">
+          <div className="flex items-center gap-2 mb-1">
+            <Package className="w-4 h-4 text-amber-500" />
+            <span className="text-xs text-gray-400 uppercase tracking-wide font-medium">Gross Margin</span>
+          </div>
+          {cogs.grossMarginPct === null ? (
+            <>
+              <p className="text-2xl font-bold text-gray-300">—</p>
+              <p className="text-xs text-gray-400 mt-0.5">No costed sales</p>
+            </>
+          ) : (
+            <>
+              <p className={`text-2xl font-bold ${cogs.grossProfit >= 0 ? 'text-amber-600' : 'text-red-600'}`}>
+                {formatCurrency(Math.round(cogs.grossProfit))}
+              </p>
+              <p className="text-xs text-gray-400 mt-0.5">
+                {cogs.grossMarginPct.toFixed(1)}% · cost {formatCurrency(Math.round(cogs.cogs))}
+              </p>
+            </>
+          )}
+        </div>
+
         {/* Orders */}
         <div className="bg-white rounded-xl border border-blue-200 p-4">
           <div className="flex items-center gap-2 mb-1">
@@ -271,6 +308,30 @@ export default function AnalyticsPage() {
           )}
         </div>
       </div>
+
+      {/* How much of the month's revenue the gross margin actually rests on. A
+          margin computed from a fraction of sales is easy to over-read. */}
+      {cogs.coveragePct < 99.5 && stats.revenue > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-xs text-amber-800">
+          {cogs.coveredRevenue === 0 ? (
+            <>
+              <strong>Gross margin has nothing to work from.</strong> No product sold this
+              month has a recipe with purchase rates behind it. Add recipes in Product
+              Costing and record bills, and this fills in.
+            </>
+          ) : (
+            <>
+              <strong>Gross margin covers {cogs.coveragePct.toFixed(0)}% of revenue.</strong>{' '}
+              {formatCurrency(Math.round(cogs.uncoveredRevenue))} of sales could not be costed,
+              so it is left out of the figure rather than counted as free.
+              {cogs.productsWithoutRecipe.length > 0 && (
+                <> No recipe yet: {cogs.productsWithoutRecipe.slice(0, 6).join(', ')}
+                {cogs.productsWithoutRecipe.length > 6 ? ', …' : ''}.</>
+              )}
+            </>
+          )}
+        </div>
+      )}
 
       {/* Secondary stats row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
