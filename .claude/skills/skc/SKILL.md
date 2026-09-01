@@ -109,10 +109,43 @@ that deserves:
 
 ## Recipes
 
-Product costing needs a recipe (ingredients per batch, overheads, profit target). Recipes
-are edited by hand in the admin UI at `admin.skctreats.in` → Product Costing. If
-`skc_product_costing` reports a product under `productsWithoutRecipe`, tell the family the
-recipe has to be entered there first — you cannot cost it without one.
+A product can only be costed if it has a recipe: the raw materials and quantities for one
+batch, the overheads, and the profit target. `skc_set_recipe` creates and edits them, so
+this can be done by talking to you — the admin UI at `admin.skctreats.in` → Product Costing
+does the same thing by hand.
+
+Quantities are **per batch**, not per kg. If one batch makes 2 kg, `yieldKg` is 2 and the
+ingredient grams are what goes into that whole batch.
+
+Three things to get right, because each one quietly distorts every price that follows:
+
+- **Wastage.** `yieldKg` is what you actually sell, not what you put in. If 1 kg of input
+  cooks down to 900 g, `yieldKg` is 0.9. Ask what comes out of a batch, not what goes in.
+- **Overheads.** A new recipe starts with Labour, Gas, Packaging and Delivery at ₹0. Empty
+  rows mean those costs are invisible in the price — walk through them and ask for a rough
+  per-batch rupee figure for each. Packaging (jars, pouches, labels) is the one people
+  forget.
+- **Unmatched ingredients.** A name with no cost-sheet row is refused, because an
+  ingredient with no purchase rate can never be costed. Add it with `skc_add_raw_material`
+  or record a bill containing it, then retry.
+
+The preview returns the resulting cost and suggested price, so read the price back before
+saving — it is the fastest way for the family to catch a wrong quantity.
+
+Setting a recipe never changes what customers pay. That is `skc_set_product_price`.
+
+## Margins
+
+The default target is **30%**, not the 20% the app used to suggest. The reason: the
+suggested price is a list price, and several discounts come off it afterwards — referral
+(up to 7.5%), referral credit (10%, capped ₹75), subscription (3–10%), standing
+family/friend discounts, absorbed delivery charges, and agent commission. Two of those
+stacking on one order is roughly 15%, so a 20% list margin can leave almost nothing.
+
+When someone asks what margin to set, say this plainly rather than quoting 30% as a rule.
+And when they ask how the business is actually doing, use `skc_business_summary` — it
+compares real revenue against real expenses, so it captures the discounts that per-product
+costing cannot see.
 
 ## When the tools fail
 

@@ -64,10 +64,13 @@ function emptyRecipe(productId: string, productName: string): ProductRecipe {
     overheads: [
       { id: uid(), label: 'Labour', type: 'fixed', value: 0 },
       { id: uid(), label: 'Gas', type: 'fixed', value: 0 },
+      { id: uid(), label: 'Packaging', type: 'fixed', value: 0 },
       { id: uid(), label: 'Delivery', type: 'fixed', value: 0 },
     ],
     profitType: 'pct',
-    profitValue: 20,
+    // 30% rather than 20%: referral, subscription and standing discounts stack to
+    // ~15% on some orders, so a 20% list margin can leave almost nothing.
+    profitValue: 30,
     updatedAt: '',
   };
 }

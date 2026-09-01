@@ -106,7 +106,7 @@ body.
 | `GET /raw-material-trends` | Latest vs previous rate per material; `minChangePct`, `limit` |
 | `GET /material-history` | Full rate history for one `materialId` |
 | `GET /product-costing` | Cost breakdown and suggested price per product; `productId` |
-| `GET /margin-suggestions` | Prices for a `targetMarginPct` (default 25) |
+| `GET /margin-suggestions` | Prices for a `targetMarginPct` (default 30) |
 | `GET /bill-impact` | Products affected by rate changes; `purchaseId` or `materialIds` |
 | `GET /bills` | Recorded bills; `from`, `to`, `limit` |
 | `GET /products` | Products, live prices, whether a recipe exists |
@@ -119,6 +119,7 @@ body.
 | `POST /record-bill` | Record a bill → purchase + batch column + rates + expense |
 | `POST /add-raw-material` | Add a cost-sheet row |
 | `POST /set-product-price` | Change a live storefront price |
+| `POST /set-recipe` | Create or update a product's ingredients, overheads and profit target |
 
 **Every write defaults to `dryRun: true`** and returns a full preview without touching
 Firestore. Pass `"dryRun": false` to persist. This is deliberate: the family reviews the
@@ -143,6 +144,28 @@ curl -s -X POST "$SKC_API_URL/record-bill" \
 The response reports, per line, the new ₹/kg, the previous ₹/kg and the % change; then
 which products got costlier and which need a price review. Re-send with `"dryRun": false`
 to save.
+
+## Margins
+
+`margin-suggestions` and the summary's pricing alerts default to a **30%** target, and new
+recipes start at 30% profit with Labour, Gas, Packaging and Delivery overhead rows.
+
+30 rather than 20 because the suggested price is a list price. Referral discounts (up to
+7.5%), redeemed referral credit (10%, capped ₹75), subscription discounts (3–10%), standing
+customer discounts, absorbed delivery charges and agent commission all come off it
+afterwards, and two stacking on one order is roughly 15%. A 20% list margin leaves close to
+nothing on those orders.
+
+Per-product costing cannot see any of that — it works from recipes and purchase rates. Use
+`GET /summary` for realised performance: it compares actual order revenue against actual
+recorded expenses.
+
+Two recipe fields matter more than they look:
+
+- **`yieldKg`** is finished weight, not input weight. If 1 kg of input yields 900 g sold,
+  set 0.9 — otherwise every price is computed against weight that was never sold.
+- **Overhead rows left at ₹0** are costs that silently do not exist. Packaging is the
+  usual omission.
 
 ## What recording a bill does
 

@@ -226,14 +226,14 @@ server.registerTool("skc_margin_suggestions", {
   description: `Suggest a selling price per product for a target margin, and flag products currently priced below it.
 
 Args:
-  - targetMarginPct (number, optional): margin over cost to aim for. Default 25.
+  - targetMarginPct (number, optional): margin over cost to aim for. Default 30 — chosen so that orders carrying a referral, subscription or family discount still clear a real margin.
   - productId (string, optional): limit to one product.
 
 Returns: { targetMarginPct, underTarget, suggestions: [{ productId, productName, costPerKg, currentPricePerKg, currentMarginPct, targetMarginPct, suggestedPricePerKg, suggestedPricePerPiece, roundedPricePerKg, changeFromCurrentPct, reason }] }, worst margin first.
 
 roundedPricePerKg is the shop-friendly figure (nearest ₹5 under ₹500/kg, else ₹10) — quote that one to people. This only suggests; use skc_set_product_price to actually change a price.`,
   inputSchema: {
-    targetMarginPct: z.number().min(0).max(500).optional().describe("Target margin over cost, %"),
+    targetMarginPct: z.number().min(0).max(500).optional().describe("Target margin over cost, % (default 30)"),
     productId: z.string().optional().describe("Product id or exact product name"),
   },
   annotations: READ_ONLY,
@@ -269,6 +269,46 @@ Returns: { dryRun|saved, productId, name, unit, currentPricePerUnit/previousPric
   },
   annotations: WRITES,
 }, async (args) => run("set-product-price", args, "POST"));
+
+
+server.registerTool("skc_set_recipe", {
+  title: "Create or update a product recipe",
+  description: `Set what a product is made of: the raw materials and quantities for one batch, the overheads, and the profit target. Product costing and price suggestions are impossible without a recipe.
+
+DEFAULTS TO A PREVIEW. dryRun is true unless you pass false. The preview costs the recipe immediately, so you can read back the resulting price per kg before saving.
+
+Args:
+  - productId (string): product id or exact product name, from skc_list_products.
+  - ingredients (array, optional): [{ name, quantityGrams }] — quantities for ONE batch of yieldKg, not per kg. Replaces the whole ingredient list; omit to keep the current one. Names are matched against the cost sheet (Kannada, English, or bill name); an unmatched name is an error, because an ingredient with no purchase rate can never be costed — add it with skc_add_raw_material or record a bill containing it first.
+  - yieldKg (number, optional): kg of finished product one batch makes. Default 1. If 1 kg of input yields only 900 g sold, set 0.9 — otherwise you price against weight you never sell.
+  - piecesPerKg (number, optional): for products sold by piece, e.g. 54 laddus per kg.
+  - overheads (array, optional): [{ label, type: 'fixed'|'pct', value }] — 'fixed' is rupees per batch, 'pct' is a percent of raw-material cost. Replaces the whole list. A new recipe starts with Labour, Gas, Packaging and Delivery at ₹0.
+  - profitType ('fixed'|'pct', optional) and profitValue (number, optional): profit on top of total cost. Defaults to 30%.
+  - dryRun (boolean, optional): default true.
+
+Returns: { dryRun|saved, productId, productName, isNew, recipe: {...}, costing: { rawMaterialCost, overheadCost, totalCost, profitAmount, suggestedPricePerKg, suggestedPricePerPiece, currentPricePerKg, currentMarginPct, missingRates } }
+
+Setting a recipe does not change the selling price — use skc_set_product_price for that.`,
+  inputSchema: {
+    productId: z.string().min(1).describe("Product id or exact name from skc_list_products"),
+    ingredients: z.array(z.object({
+      name: z.string().optional().describe("Material name — Kannada, English, or as printed on bills"),
+      materialId: z.string().optional().describe("Cost-sheet row id, instead of matching by name"),
+      quantityGrams: z.number().positive().describe("Grams used per batch of yieldKg"),
+    })).optional().describe("Full ingredient list for one batch; omit to keep the current one"),
+    yieldKg: z.number().positive().optional().describe("Kg of finished product per batch"),
+    piecesPerKg: z.number().positive().optional().describe("Pieces per kg, for per-piece products"),
+    overheads: z.array(z.object({
+      label: z.string().min(1).describe("e.g. Labour, Gas, Packaging, Delivery"),
+      type: z.enum(["fixed", "pct"]).describe("'fixed' = ₹ per batch, 'pct' = % of raw cost"),
+      value: z.number().min(0).describe("Rupees or percent, per the type"),
+    })).optional().describe("Full overhead list; omit to keep the current one"),
+    profitType: z.enum(["fixed", "pct"]).optional().describe("Profit as rupees or percent of cost"),
+    profitValue: z.number().min(0).optional().describe("Profit amount or percent"),
+    dryRun: z.boolean().optional().describe("Preview without saving (default true)"),
+  },
+  annotations: WRITES,
+}, async (args) => run("set-recipe", args, "POST"));
 
 // ─── Summary ─────────────────────────────────────────────────────────────────
 
