@@ -5,9 +5,14 @@
 
 import type { Order, ProductRecipe, RawMaterialCostSheet } from './types';
 
+// Firestore documents are cast to these types without validation, so a doc
+// saved before a field existed arrives with it undefined. Reading such a field
+// as an array would throw during render and blank the whole page, so every
+// access below tolerates it being absent.
+
 /** Batches oldest first — cost-sheet columns are not guaranteed to be in date order. */
 function orderedBatches(sheet: RawMaterialCostSheet) {
-  return sheet.batches
+  return (sheet?.batches ?? [])
     .map((b, i) => ({ b, i }))
     .sort((x, y) => x.b.date.localeCompare(y.b.date) || x.i - y.i)
     .map(({ b }) => b);
@@ -16,8 +21,9 @@ function orderedBatches(sheet: RawMaterialCostSheet) {
 /** Latest recorded cost per gram for a material. 0 when never purchased. */
 export function latestCostPerGram(materialId: string, sheet: RawMaterialCostSheet): number {
   const batches = orderedBatches(sheet);
+  const cells = sheet?.cells ?? {};
   for (let i = batches.length - 1; i >= 0; i--) {
-    const perKg = sheet.cells[`${materialId}__${batches[i].id}`];
+    const perKg = cells[`${materialId}__${batches[i].id}`];
     if (perKg && perKg > 0) return perKg / 1000;
   }
   return 0;
@@ -36,18 +42,18 @@ export interface RecipeCost {
 
 export function recipeCost(recipe: ProductRecipe, sheet: RawMaterialCostSheet): RecipeCost {
   const missingRates: string[] = [];
-  const rawMaterialCost = recipe.ingredients.reduce((sum, ing) => {
+  const rawMaterialCost = (recipe?.ingredients ?? []).reduce((sum, ing) => {
     const perGram = latestCostPerGram(ing.materialId, sheet);
     if (perGram <= 0) missingRates.push(ing.materialName);
     return sum + perGram * ing.quantityGrams;
   }, 0);
 
-  const overheadCost = recipe.overheads.reduce((sum, o) => (
+  const overheadCost = (recipe?.overheads ?? []).reduce((sum, o) => (
     o.type === 'fixed' ? sum + (o.value || 0) : sum + rawMaterialCost * (o.value || 0) / 100
   ), 0);
 
   const totalCost = rawMaterialCost + overheadCost;
-  const yieldKg = recipe.yieldKg || 1;
+  const yieldKg = recipe?.yieldKg || 1;
   const costPerKg = totalCost / yieldKg;
 
   return {
@@ -65,12 +71,14 @@ function lineCost(
   item: Order['items'][number],
   costs: Map<string, RecipeCost>,
 ): number | null {
-  const c = costs.get(item.productId);
-  if (!c || c.costPerKg <= 0) return null;
+  const c = costs.get(item?.productId);
+  if (!c || !Number.isFinite(c.costPerKg) || c.costPerKg <= 0) return null;
+  if (!Number.isFinite(item?.quantity)) return null;
   if (item.unit === 'gram') return (c.costPerKg / 1000) * item.quantity;
   if (item.unit === 'kg') return c.costPerKg * item.quantity;
   // Per-piece products need piecesPerKg on the recipe to convert.
-  return c.costPerPiece !== null ? c.costPerPiece * item.quantity : null;
+  return c.costPerPiece !== null && Number.isFinite(c.costPerPiece)
+    ? c.costPerPiece * item.quantity : null;
 }
 
 export interface CogsResult {
@@ -103,15 +111,17 @@ export function computeCogs(
   sheet: RawMaterialCostSheet,
 ): CogsResult {
   const costs = new Map<string, RecipeCost>();
-  for (const r of recipes) costs.set(r.productId, recipeCost(r, sheet));
+  for (const r of recipes ?? []) {
+    if (r?.productId) costs.set(r.productId, recipeCost(r, sheet));
+  }
 
   let cogs = 0;
   let coveredRevenue = 0;
   let uncoveredRevenue = 0;
   const missing = new Set<string>();
 
-  for (const order of orders) {
-    for (const item of order.items ?? []) {
+  for (const order of orders ?? []) {
+    for (const item of order?.items ?? []) {
       const cost = lineCost(item, costs);
       if (cost === null) {
         uncoveredRevenue += item.totalPrice || 0;
