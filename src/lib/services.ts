@@ -9,7 +9,7 @@ import { db } from "./firebase";
 import { generateReferralCode } from "./utils";
 import type {
   Product, StockItem, RawMaterial, RawMaterialPurchase,
-  Batch, Customer, Order, Expense, Subscription, Feedback, AdminAction, AdminActionType, AdminUser, Agent,
+  Batch, Customer, Order, Expense, Subscription, Feedback, AdminAction, AdminActionType, Agent,
   ReferralConfig, SubscriptionConfig, FeatureFlags, LoadingFact,
   RawMaterialCostSheet, ProductRecipe,
 } from "./types";
@@ -511,45 +511,9 @@ export const feedbackService = {
 
 // ─── Settings (PIN) ───────────────────────────────────────────────────────────
 // ─── Admin Users ──────────────────────────────────────────────────────────────
-export const adminUsersService = {
-  async getAll(): Promise<AdminUser[]> {
-    const snap = await getDocs(collection(db, COLLECTIONS.ADMIN_USERS));
-    return snap.docs.map(d => ({ id: d.id, ...d.data() } as AdminUser));
-  },
-  async getByUsername(username: string): Promise<AdminUser | null> {
-    const snap = await getDocs(
-      query(collection(db, COLLECTIONS.ADMIN_USERS), where("username", "==", username.toLowerCase()))
-    );
-    if (snap.empty) return null;
-    return { id: snap.docs[0].id, ...snap.docs[0].data() } as AdminUser;
-  },
-  async verifyPin(username: string, pin: string): Promise<AdminUser | null> {
-    const user = await this.getByUsername(username);
-    if (!user || user.pin !== pin) return null;
-    return user;
-  },
-  async changePin(userId: string, newPin: string): Promise<void> {
-    await updateDoc(doc(db, COLLECTIONS.ADMIN_USERS, userId), {
-      pin: newPin,
-      mustChangePin: false,
-      updatedAt: now(),
-    });
-  },
-  /** Seed initial users if none exist yet — uses fixed doc IDs to prevent duplicates */
-  async seed(defaultPin: string): Promise<void> {
-    const users: Array<Omit<AdminUser, 'id'> & { docId: string }> = [
-      { docId: 'user_pavan',   username: 'pavan',   displayName: 'Pavan',   role: 'owner', pin: defaultPin, mustChangePin: false, createdAt: now(), updatedAt: now() },
-      { docId: 'user_pallavi', username: 'pallavi', displayName: 'Pallavi', role: 'owner', pin: defaultPin, mustChangePin: true,  createdAt: now(), updatedAt: now() },
-    ];
-    for (const { docId, ...data } of users) {
-      const ref = doc(db, COLLECTIONS.ADMIN_USERS, docId);
-      const snap = await getDoc(ref);
-      if (!snap.exists()) {
-        await setDoc(ref, data);
-      }
-    }
-  },
-};
+// adminUsersService was removed: the adminUsers collection holds PINs and is now
+// closed to all clients by firestore.rules. Admin login, PIN changes and user
+// listing go through the adminAuth Cloud Function — see src/lib/adminAuth.ts.
 
 export const settingsService = {
   async getPin(): Promise<string | null> {

@@ -7,16 +7,25 @@ rules_version = '2';
 // it does not grant access by itself. Security comes from these rules.
 //
 // What these rules protect:
-//   ✅ adminUsers and agents (contain PINs) — NEVER readable from client
-//   ✅ settings doc (contains admin PIN) — NEVER readable from client
-//   ✅ No one can delete orders, customers, or stock
-//   ✅ All creates are validated (shape, field types, phone format, size limits)
-//   ✅ Order updates restricted to safe fields only
+//   ✅ adminUsers (contains admin PINs) — closed to all clients
+//   ✅ settings/admin (legacy admin PIN) — closed to all clients
+//   ✅ authThrottle (failed-login counters) — closed to all clients
+//   ✅ Creates on orders/customers/subscriptions/feedback are shape-validated
 //
-// What these rules CANNOT protect without Firebase Auth migration:
-//   ⚠️  Admin panel reads sensitive collections (orders, customers) client-side.
-//       Without Firebase Auth, Firestore rules cannot distinguish admin vs public.
-//   TODO: Migrate admin to Firebase Auth for full field-level protection.
+// ⚠️  WHAT IS STILL OPEN — do not read the list above as more than it says.
+//   ⚠️  agents/{id} contains agent PINs and commission data, and is still
+//       world readable and writable. The admin Agents page and the agent
+//       console both talk to it directly from the browser, so closing it
+//       needs those flows moved server-side first.
+//   ⚠️  customers and orders are world readable (names, WhatsApp numbers,
+//       order history) and world writable, including delete.
+//   ⚠️  products, stock, expenses, batches, recipes and raw-material costs
+//       are world writable — anyone can change a selling price.
+//
+//   None of this can be fixed by rules alone: the admin panel talks to
+//   Firestore directly from the browser, and without Firebase Auth a rule
+//   cannot tell an admin's browser from a stranger's. Closing these requires
+//   the Firebase Auth migration, tracked as the next step.
 
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -128,10 +137,18 @@ service cloud.firestore {
       allow create, update, delete: if true;
     }
 
-    // Contains admin PINs — readable for PIN login, writable for PIN changes
+    // Contains admin PINs — closed to every client.
+    // Login, PIN changes and the login screen's user list all go through the
+    // adminAuth Cloud Function, which uses the Admin SDK and bypasses these
+    // rules. A PIN never reaches a browser.
     match /adminUsers/{docId} {
-      allow read: if true;
-      allow write: if true;
+      allow read, write: if false;
+    }
+
+    // Failed-login counters written by adminAuth. Client access would let an
+    // attacker clear their own lockout.
+    match /authThrottle/{docId} {
+      allow read, write: if false;
     }
 
     // Contains agent PINs + commission data
@@ -140,10 +157,12 @@ service cloud.firestore {
       allow write: if true;
     }
 
-    // settings — all sub-docs (feature_flags, referral_config, handlers, admin, etc.)
+    // settings — mixed contents, so this is per-document.
+    //   settings/admin holds the legacy admin PIN: closed to clients.
+    //   the rest (referral_config, subscription_config, feature_flags,
+    //   raw_material_costs, handlers) is read by the storefront and admin UI.
     match /settings/{docId} {
-      allow read: if true;
-      allow write: if true;
+      allow read, write: if docId != 'admin';
     }
 
     // Internal audit trail

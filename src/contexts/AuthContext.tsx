@@ -1,14 +1,13 @@
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
-import { adminUsersService } from '../lib/services';
-import { DEFAULT_ADMIN_PIN } from '../lib/constants';
+import React, { createContext, useContext, useState, useCallback } from 'react';
+import { changePin as apiChangePin, verifyPin } from '../lib/adminAuth';
 import type { AdminUser } from '../lib/types';
 
 interface AuthContextType {
   isAdminAuthenticated: boolean;
   currentUser: Pick<AdminUser, 'id' | 'username' | 'displayName' | 'role' | 'mustChangePin'> | null;
-  login: (username: string, pin: string) => Promise<'ok' | 'wrong_pin' | 'no_user'>;
+  login: (username: string, pin: string) => Promise<'ok' | 'wrong_pin' | 'locked' | 'error'>;
   logout: () => void;
-  changePin: (userId: string, newPin: string) => Promise<void>;
+  changePin: (currentPin: string, newPin: string) => Promise<void>;
   /** Legacy single-PIN change — kept for SettingsPage compatibility */
   changePinLegacy: (oldPin: string, newPin: string) => Promise<boolean>;
 }
@@ -27,31 +26,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const isAdminAuthenticated = currentUser !== null;
 
-  // Seed admin users on first app load (runs once)
-  useEffect(() => {
-    adminUsersService.seed(DEFAULT_ADMIN_PIN).catch(() => {/* ignore if offline */});
-  }, []);
+  // Admin users are seeded server-side; the browser cannot write to adminUsers.
 
-  const login = useCallback(async (username: string, pin: string): Promise<'ok' | 'wrong_pin' | 'no_user'> => {
-    try {
-      const user = await adminUsersService.verifyPin(username, pin);
-      if (!user) {
-        const exists = await adminUsersService.getByUsername(username);
-        return exists ? 'wrong_pin' : 'no_user';
-      }
-      const session = {
-        id: user.id,
-        username: user.username,
-        displayName: user.displayName,
-        role: user.role,
-        mustChangePin: user.mustChangePin,
-      };
-      setCurrentUser(session);
-      sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
+  const login = useCallback(async (username: string, pin: string): Promise<'ok' | 'wrong_pin' | 'locked' | 'error'> => {
+    const result = await verifyPin(username, pin);
+    if (result.status === 'ok') {
+      // The response carries only safe fields — there is no PIN to leak here.
+      setCurrentUser(result.user);
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify(result.user));
       return 'ok';
-    } catch {
-      return 'wrong_pin';
     }
+    // A wrong PIN and an unknown username look identical on purpose, so the
+    // login screen cannot be used to discover which usernames exist.
+    if (result.status === 'invalid') return 'wrong_pin';
+    if (result.status === 'locked') return 'locked';
+    return 'error';
   }, []);
 
   const logout = useCallback(() => {
@@ -60,22 +49,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     sessionStorage.removeItem('skc_auth'); // clear legacy key too
   }, []);
 
-  const changePin = useCallback(async (userId: string, newPin: string) => {
-    await adminUsersService.changePin(userId, newPin);
+  const changePin = useCallback(async (currentPin: string, newPin: string) => {
+    const username = currentUser?.username;
+    if (!username) throw new Error('Not signed in.');
+    const result = await apiChangePin(username, currentPin, newPin);
+    if (!result.ok) throw new Error(result.message);
     setCurrentUser(prev => {
       if (!prev) return null;
       const updated = { ...prev, mustChangePin: false };
       sessionStorage.setItem(SESSION_KEY, JSON.stringify(updated));
       return updated;
     });
-  }, []);
+  }, [currentUser]);
 
   const changePinLegacy = useCallback(async (oldPin: string, newPin: string): Promise<boolean> => {
     if (!currentUser) return false;
-    const valid = await adminUsersService.verifyPin(currentUser.username, oldPin);
-    if (!valid) return false;
-    await adminUsersService.changePin(currentUser.id, newPin);
-    return true;
+    const result = await apiChangePin(currentUser.username, oldPin, newPin);
+    return result.ok;
   }, [currentUser]);
 
   return (

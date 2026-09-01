@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { adminUsersService } from '../../lib/services';
+import { listAdminUsers } from '../../lib/adminAuth';
 import toast from 'react-hot-toast';
 import { Lock, Leaf, KeyRound, ChevronDown } from 'lucide-react';
 import type { AdminUser } from '../../lib/types';
@@ -43,6 +43,8 @@ export default function PinLogin() {
   const [shake, setShake]           = useState(false);
   // Change-PIN screen state
   const [mustChange, setMustChange] = useState(false);
+  // Held only until the forced PIN change completes — the server re-verifies it.
+  const [loginPin, setLoginPin]     = useState('');
   const [newPin, setNewPin]         = useState(['', '', '', '']);
   const [confirmPin, setConfirmPin] = useState(['', '', '', '']);
   const [changingPin, setChangingPin] = useState(false);
@@ -51,7 +53,7 @@ export default function PinLogin() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    adminUsersService.getAll()
+    listAdminUsers()
       .then(all => setUsers(all.map(u => ({ username: u.username, displayName: u.displayName }))))
       .catch(() => {});
   }, []);
@@ -67,11 +69,17 @@ export default function PinLogin() {
     try {
       const result = await login(username, code);
       if (result === 'ok') {
-        // Check mustChangePin from freshly set currentUser via context
-        // We'll redirect after re-render; useEffect below handles it
+        setLoginPin(code);
+        // currentUser is set on the next render; the effect below routes from there.
       } else {
         triggerShake();
-        toast.error(result === 'no_user' ? 'User not found' : 'Incorrect PIN');
+        if (result === 'locked') {
+          toast.error('Too many wrong PINs. Try again in a few minutes.');
+        } else if (result === 'error') {
+          toast.error('Could not reach the login service. Check your connection.');
+        } else {
+          toast.error('Incorrect username or PIN');
+        }
       }
     } finally { setLoading(false); }
   };
@@ -95,11 +103,13 @@ export default function PinLogin() {
     if (!currentUser) return;
     setChangingPin(true);
     try {
-      await changePin(currentUser.id, np);
+      await changePin(loginPin, np);
+      setLoginPin('');
       toast.success('PIN changed! Welcome 👋');
       navigate('/admin/dashboard');
-    } catch { toast.error('Failed to change PIN'); }
-    finally { setChangingPin(false); }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to change PIN');
+    } finally { setChangingPin(false); }
   };
 
   // ── Change-PIN screen ──────────────────────────────────────────────────────
