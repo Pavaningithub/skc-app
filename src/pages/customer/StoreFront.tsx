@@ -6,13 +6,14 @@ import {
   Search
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { productsService, feedbackService, ordersService, customersService, stockService, subscriptionsService, loadingFactsService } from '../../lib/services';
-import { generateOrderNumber, generateSubscriptionOrderNumber, formatCurrency, computeReferralDiscountFromTiers, computeCreditRedemption, normalizeWhatsapp } from '../../lib/utils';
+import { productsService, feedbackService, ordersService, customersService, subscriptionsService, loadingFactsService } from '../../lib/services';
+import { generateSubscriptionOrderNumber, formatCurrency, computeReferralDiscountFromTiers, computeCreditRedemption, normalizeWhatsapp } from '../../lib/utils';
+import { placeOrder, requestSample } from '../../lib/storefrontApi';
 import { useReferralConfig } from '../../lib/useReferralConfig';
 import { useSubscriptionConfig } from '../../lib/useSubscriptionConfig';
 import { useFeatureFlags } from '../../lib/useFeatureFlags';
 import { APP_CONFIG } from '../../config';
-import type { Product, Feedback, OrderItem, Order, LoadingFact } from '../../lib/types';
+import type { Product, Feedback, OrderItem, LoadingFact } from '../../lib/types';
 
 interface CartItem extends OrderItem {}
 
@@ -276,88 +277,23 @@ export default function StoreFront() {
     if (cart.length === 0)       return toast.error('Your cart is empty');
     setSubmitting(true);
     try {
-      let customerId: string | undefined;
-      const existing = await customersService.getByWhatsapp(wa);
-      if (existing) customerId = existing.id;
-      else customerId = await customersService.upsert({
-        name: orderForm.name.trim(), whatsapp: wa,
-        place: orderForm.place.trim(), joinedWhatsappGroup: false,
-        createdAt: new Date().toISOString(),
-      });
-
-      // Referral code discount (first order only) — mutually exclusive with credit redemption
-      let referralCodeUsed: string | undefined;
-      let referralDiscountAmt = 0;
-      let referrerCreditAmt = 0;
-      let referrerId: string | undefined;
-      let creditUsedAmt = 0;
-
-      const enteredCode = orderForm.referralCode.trim().toUpperCase();
-      if (enteredCode) {
-        // Final authoritative validation (UI already blocked bad codes pre-submit, this is the safety net)
-        const isReturning = existing && (existing.totalOrders > 0 || existing.referredBy);
-        const referrer = isReturning ? null : await customersService.getByReferralCode(enteredCode);
-        const isSelfReferral = referrer && referrer.id === customerId;
-
-        if (!isReturning && referrer && !isSelfReferral) {
-          // Valid referral — apply discount
-          referralCodeUsed = enteredCode;
-          const split = computeReferralDiscountFromTiers(cartTotal, referralConfig.tiers, referralConfig.splitReferrerPct);
-          referralDiscountAmt = split.customerDiscount;
-          referrerId = referrer.id;
-          referrerCreditAmt = split.referrerCredit;
-        }
-        // If invalid for any reason — fall through, order placed at full price (UI already warned them)
-      } else if (useCredit && existing && (existing.referralCredit ?? 0) > 0) {
-        // Credit redemption — returning customers only, capped by config
-        creditUsedAmt = computeCreditRedemption(existing.referralCredit ?? 0, cartTotal, referralConfig.creditRedemptionPct, referralConfig.creditRedemptionCap);
-      }
-
-      // Standing discount takes priority — if active, ignore referral and credit
-      const standingDiscountAmt = standingDiscount > 0 ? Math.round(cartTotal * standingDiscount / 100) : 0;
-      const totalDiscountAmt = standingDiscountAmt > 0 ? standingDiscountAmt : (referralDiscountAmt + creditUsedAmt);
-      const finalTotal = Math.max(0, cartTotal - totalDiscountAmt);
-      const orderNumber = generateOrderNumber();
-      const order: Omit<Order, 'id'> = {
-        orderNumber, type: 'regular', customerId,
-        customerName: orderForm.name.trim(), customerWhatsapp: wa,
-        customerPlace: orderForm.place.trim(),
-        // Stamp handledBy from product catalogue (internal tracking only, not shown to customer)
-        items: cart.map(item => ({
-          ...item,
-          handledBy: products.find(p => p.id === item.productId)?.handledBy ?? 'Sree Lakshmi',
-        })),
-        subtotal: cartTotal,
-        discount: totalDiscountAmt, total: finalTotal,
-        status: 'pending', paymentStatus: 'pending',
+      // The server prices the cart from the catalogue and does the customer,
+      // order, stock and referral-credit writes together. Nothing about the
+      // total is decided here — see functions/src/storefront/place.ts.
+      const placed = await placeOrder({
+        name: orderForm.name.trim(),
+        whatsapp: wa,
+        place: orderForm.place.trim(),
         notes: orderForm.notes,
-        hasOnDemandItems: hasOnDemand,
-        ...(referralCodeUsed ? { referralCodeUsed } : {}),
-        referralDiscount: referralDiscountAmt,
-        creditUsed: creditUsedAmt,
-        deliveryCharge: 0,
-        createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
-      };
-
-      const orderId = await ordersService.add(order);
-      for (const item of cart) {
-        if (!item.isOnDemand) await stockService.deduct(item.productId, item.quantity, { productName: item.productName, unit: item.unit });
-      }
-      if (customerId) await customersService.updateAfterOrder(customerId, finalTotal, 'pending');
-
-      // Deduct redeemed credit from customer balance (must happen before navigate)
-      if (customerId && creditUsedAmt > 0) {
-        await customersService.deductReferralCredit(customerId, creditUsedAmt);
-      }
-
-      // Credit the referrer with their share and lock in this customer's referredBy
-      if (referrerId && referrerCreditAmt > 0) {
-        await customersService.addReferralCredit(referrerId, referrerCreditAmt);
-      }
-      if (customerId && referralCodeUsed) {
-        // Mark this customer as "referred by X" so they can't use another code later
-        await customersService.update(customerId, { referredBy: referralCodeUsed });
-      }
+        referralCode: orderForm.referralCode.trim().toUpperCase() || undefined,
+        useCredit,
+        items: cart.map(item => ({
+          productId: item.productId,
+          quantity: item.quantity,
+          customizationNote: item.customizationNote,
+        })),
+      });
+      const orderId = placed.orderId;
 
       // Save contact details for autofill on next visit
       try { localStorage.setItem('skc_contact', JSON.stringify({ name: orderForm.name.trim(), whatsapp: wa, place: orderForm.place.trim() })); } catch {}
@@ -380,43 +316,16 @@ export default function StoreFront() {
     if (sampleSelected.length === 0) return toast.error('Please select at least one product');
     setSubmitting(true);
     try {
-      // Guard: belt-and-suspenders check in case inline validation was bypassed
-      const alreadyRequested = await ordersService.hasSampleByWhatsapp(wa);
-      if (alreadyRequested) { setSubmitting(false); return; }
-
-      let customerId: string | undefined;
-      const existing = await customersService.getByWhatsapp(wa);
-      if (existing) customerId = existing.id;
-      else customerId = await customersService.upsert({
-        name: orderForm.name.trim(), whatsapp: wa,
-        place: orderForm.place.trim(), joinedWhatsappGroup: false,
-        createdAt: new Date().toISOString(),
+      // One sample per number is enforced server-side; the inline check above is
+      // only to warn the customer earlier.
+      const placed = await requestSample({
+        name: orderForm.name.trim(),
+        whatsapp: wa,
+        place: orderForm.place.trim(),
+        notes: orderForm.notes,
+        productIds: sampleSelected.map(p => p.id),
       });
-
-      const orderNumber = generateOrderNumber();
-      const charge = APP_CONFIG.SAMPLE_CHARGE;
-      const sampleItems = sampleSelected.map(p => ({
-        productId: p.id, productName: p.name,
-        unit: p.unit as 'gram', quantity: 50, pricePerUnit: 0, totalPrice: 0,
-        customizationNote: '', isOnDemand: false,
-        handledBy: p.handledBy ?? 'Sree Lakshmi',
-      }));
-      const order: Omit<Order, 'id'> = {
-        orderNumber, type: 'sample', customerId,
-        customerName: orderForm.name.trim(), customerWhatsapp: wa,
-        customerPlace: orderForm.place.trim(),
-        items: sampleItems,
-        subtotal: charge, discount: 0, total: charge,
-        status: 'pending',
-        paymentStatus: charge > 0 ? 'pending' : 'na',
-        notes: `Sample request: ${sampleSelected.map(p => p.name).join(', ')}${orderForm.notes ? '. ' + orderForm.notes : ''}`,
-        hasOnDemandItems: false,
-        referralDiscount: 0,
-        creditUsed: 0,
-        deliveryCharge: 0,
-        createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
-      };
-      const orderId = await ordersService.add(order);
+      const orderId = placed.orderId;
       navigate(`/order-confirmation/${orderId}`);
       setShowSampleForm(false);
       toast.success("Sample request received! We'll contact you soon. 🎁");
