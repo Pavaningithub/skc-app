@@ -68,15 +68,17 @@ export default function PinLogin() {
     setLoading(true);
     try {
       const result = await login(username, code);
-      if (result === 'ok') {
+      if (result.status === 'ok') {
         setLoginPin(code);
         // currentUser is set on the next render; the effect below routes from there.
       } else {
         triggerShake();
-        if (result === 'locked') {
+        if (result.status === 'locked') {
           toast.error('Too many wrong PINs. Try again in a few minutes.');
-        } else if (result === 'error') {
-          toast.error('Could not reach the login service. Check your connection.');
+        } else if (result.status === 'error') {
+          // The server's own wording — a generic message here would hide the cause.
+          toast.error(result.message, { duration: 8000 });
+          console.error('[admin login]', result.message);
         } else {
           toast.error('Incorrect username or PIN');
         }
