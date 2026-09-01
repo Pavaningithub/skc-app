@@ -37,6 +37,7 @@ export type LoginResult =
   | { status: 'ok'; user: PublicAdminUser }
   | { status: 'invalid' }
   | { status: 'locked'; retryAfterSeconds: number }
+  /** message is the server's own wording where there is one — do not replace it. */
   | { status: 'error'; message: string };
 
 export async function verifyPin(username: string, pin: string): Promise<LoginResult> {
@@ -54,9 +55,17 @@ export async function verifyPin(username: string, pin: string): Promise<LoginRes
       return { status: 'locked', retryAfterSeconds: Number(data.retryAfterSeconds ?? 900) };
     }
     if (data._status === 401) return { status: 'invalid' };
-    return { status: 'error', message: String(data.error ?? 'Could not reach the login service.') };
-  } catch {
-    return { status: 'error', message: 'Could not reach the login service. Check your connection.' };
+    return {
+      status: 'error',
+      message: String(data.error ?? `Login service returned HTTP ${data._status}.`),
+    };
+  } catch (err) {
+    // Only a thrown fetch is genuinely a connectivity problem; a server error
+    // has a message worth showing, and is handled above.
+    return {
+      status: 'error',
+      message: `Could not reach the login service (${err instanceof Error ? err.message : 'network error'}).`,
+    };
   }
 }
 

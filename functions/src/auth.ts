@@ -27,7 +27,22 @@ export const LOCKOUT_MS = 15 * 60 * 1000;
 async function mintToken(
   uid: string, claims: Record<string, unknown>,
 ): Promise<string> {
-  return admin.auth().createCustomToken(uid, claims);
+  try {
+    return await admin.auth().createCustomToken(uid, claims);
+  } catch (err) {
+    // createCustomToken signs a JWT via the IAM API, which needs
+    // iam.serviceAccounts.signBlob — a permission the default compute service
+    // account does not have until it is granted Service Account Token Creator
+    // on itself. Nothing about the request causes this, so say so rather than
+    // letting it surface as a generic 500.
+    const detail = err instanceof Error ? err.message : String(err);
+    throw new Error(
+      "Could not mint a sign-in token. The Cloud Functions service account is " +
+      "probably missing the Service Account Token Creator role " +
+      "(iam.serviceAccounts.signBlob). Grant it on the service account itself " +
+      `in IAM & Admin, then retry. Underlying error: ${detail}`,
+    );
+  }
 }
 
 export interface PublicAdminUser {

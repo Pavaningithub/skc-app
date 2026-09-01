@@ -13,7 +13,8 @@ interface AuthContextType {
    */
   authReady: boolean;
   currentUser: Pick<AdminUser, 'id' | 'username' | 'displayName' | 'role' | 'mustChangePin'> | null;
-  login: (username: string, pin: string) => Promise<'ok' | 'wrong_pin' | 'locked' | 'error'>;
+  login: (username: string, pin: string) => Promise<
+    { status: 'ok' | 'wrong_pin' | 'locked' } | { status: 'error'; message: string }>;
   logout: () => void;
   changePin: (currentPin: string, newPin: string) => Promise<void>;
   /** Legacy single-PIN change — kept for SettingsPage compatibility */
@@ -45,19 +46,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Admin users are seeded server-side; the browser cannot write to adminUsers.
 
-  const login = useCallback(async (username: string, pin: string): Promise<'ok' | 'wrong_pin' | 'locked' | 'error'> => {
+  const login = useCallback(async (username: string, pin: string) => {
     const result = await verifyPin(username, pin);
     if (result.status === 'ok') {
       // The response carries only safe fields — there is no PIN to leak here.
       setCurrentUser(result.user);
       sessionStorage.setItem(SESSION_KEY, JSON.stringify(result.user));
-      return 'ok';
+      return { status: 'ok' as const };
     }
     // A wrong PIN and an unknown username look identical on purpose, so the
     // login screen cannot be used to discover which usernames exist.
-    if (result.status === 'invalid') return 'wrong_pin';
-    if (result.status === 'locked') return 'locked';
-    return 'error';
+    if (result.status === 'invalid') return { status: 'wrong_pin' as const };
+    if (result.status === 'locked') return { status: 'locked' as const };
+    // Anything else carries the server's own explanation; showing a generic
+    // "check your connection" here hides real faults (a 500, a bad route, an
+    // IAM permission the token minting needs) behind a wrong diagnosis.
+    return { status: 'error' as const, message: result.message };
   }, []);
 
   const logout = useCallback(() => {
