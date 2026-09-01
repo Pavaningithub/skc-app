@@ -11,13 +11,21 @@ import {timingSafeEqual} from "crypto";
 import type {Request} from "firebase-functions/v2/https";
 import type {Response} from "express";
 import {
-  billImpact, costProduct, materialTrends, rateHistory, shopRound, suggestMargin,
+  billImpact, costProduct, matchMaterial, materialTrends, rateHistory, shopRound, suggestMargin,
 } from "./analysis";
 import {applyBill, type BillInput} from "./bills";
 import * as store from "./store";
-import type {Product, ProductRecipe, Unit} from "./types";
+import type {
+  Product, ProductRecipe, RecipeIngredient, RecipeOverhead, Unit,
+} from "./types";
 
-export const DEFAULT_TARGET_MARGIN_PCT = 25;
+export const DEFAULT_TARGET_MARGIN_PCT = 30;
+
+/** Overhead rows every new recipe starts with, all at ₹0 until filled in. */
+export const DEFAULT_OVERHEAD_LABELS = ["Labour", "Gas", "Packaging", "Delivery"];
+
+/** Profit target a new recipe starts with, as % of total cost. */
+export const DEFAULT_PROFIT_PCT = 30;
 
 type Json = Record<string, unknown>;
 
@@ -348,6 +356,144 @@ async function setProductPrice(db: admin.firestore.Firestore, body: Json): Promi
   };
 }
 
+
+async function setRecipe(db: admin.firestore.Firestore, body: Json): Promise<Json> {
+  const key = str(body.productId, "productId");
+  const [products, recipes, sheet] = await Promise.all([
+    store.getProducts(db), store.getRecipes(db), store.getCostSheet(db),
+  ]);
+  const product = products.find((p) => p.id === key || p.name === key);
+  if (!product) {
+    throw new ApiError(404,
+      `No product matching "${key}". Call products to list ids and names.`);
+  }
+  const existing = recipes.find((r) => r.productId === product.id);
+
+  // Ingredients: replace wholesale when given, otherwise keep what is there.
+  let ingredients: RecipeIngredient[];
+  if (Array.isArray(body.ingredients)) {
+    if (!body.ingredients.length) {
+      throw new ApiError(400,
+        "\"ingredients\" cannot be empty — omit it entirely to keep the current ingredients.");
+    }
+    const unmatched: string[] = [];
+    ingredients = body.ingredients.map((raw, i) => {
+      const it = raw as Json;
+      const grams = num(it.quantityGrams, `ingredients[${i}].quantityGrams`);
+      if (grams <= 0) {
+        throw new ApiError(400, `"ingredients[${i}].quantityGrams" must be greater than zero.`);
+      }
+      const byId = typeof it.materialId === "string" ?
+        sheet.materials.find((m) => m.id === it.materialId) ?? null : null;
+      const name = typeof it.name === "string" ? it.name : "";
+      const row = byId ?? (name ? matchMaterial(name, sheet.materials) : null);
+      if (!row) {
+        unmatched.push(name || String(it.materialId ?? `ingredients[${i}]`));
+        return {materialId: "", materialName: name, quantityGrams: grams};
+      }
+      return {
+        materialId: row.id,
+        materialName: row.nameEn || row.nameKn,
+        quantityGrams: grams,
+      };
+    });
+    if (unmatched.length) {
+      // A recipe ingredient with no cost-sheet row could never be costed, so this
+      // is an error rather than something to silently create.
+      throw new ApiError(400,
+        `No raw material matches: ${unmatched.join(", ")}. ` +
+        "Add them first with add-raw-material (or record a bill containing them), " +
+        "then retry. Call raw-materials to see the existing names.");
+    }
+  } else if (existing) {
+    ingredients = existing.ingredients;
+  } else {
+    throw new ApiError(400, "\"ingredients\" is required when creating a new recipe.");
+  }
+
+  let overheads: RecipeOverhead[];
+  if (Array.isArray(body.overheads)) {
+    overheads = body.overheads.map((raw, i) => {
+      const o = raw as Json;
+      const type = String(o.type ?? "fixed");
+      if (type !== "fixed" && type !== "pct") {
+        throw new ApiError(400, `"overheads[${i}].type" must be "fixed" or "pct".`);
+      }
+      return {
+        id: typeof o.id === "string" ? o.id : store.uid(),
+        label: str(o.label, `overheads[${i}].label`),
+        type,
+        value: num(o.value, `overheads[${i}].value`, 0),
+      };
+    });
+  } else if (existing) {
+    overheads = existing.overheads;
+  } else {
+    overheads = DEFAULT_OVERHEAD_LABELS.map((label) => ({
+      id: store.uid(), label, type: "fixed" as const, value: 0,
+    }));
+  }
+
+  const profitType = body.profitType === "fixed" || body.profitType === "pct" ?
+    body.profitType : existing?.profitType ?? "pct";
+  const profitValue = body.profitValue === undefined ?
+    existing?.profitValue ?? DEFAULT_PROFIT_PCT : num(body.profitValue, "profitValue");
+  const yieldKg = body.yieldKg === undefined ?
+    existing?.yieldKg ?? 1 : num(body.yieldKg, "yieldKg");
+  if (yieldKg <= 0) throw new ApiError(400, "\"yieldKg\" must be greater than zero.");
+  const piecesPerKg = body.piecesPerKg === undefined ?
+    existing?.piecesPerKg : num(body.piecesPerKg, "piecesPerKg");
+
+  const recipe: ProductRecipe = {
+    id: product.id,
+    productId: product.id,
+    productName: product.name,
+    yieldKg,
+    ...(piecesPerKg ? {piecesPerKg} : {}),
+    ingredients,
+    overheads,
+    profitType,
+    profitValue,
+    updatedAt: store.nowIso(),
+  };
+
+  // Cost it immediately so the preview shows the price this recipe implies.
+  const costing = costProduct(recipe, sheet, product);
+  const preview = {
+    productId: product.id,
+    productName: product.name,
+    isNew: !existing,
+    recipe: {
+      yieldKg, piecesPerKg: piecesPerKg ?? null, profitType, profitValue,
+      ingredients: ingredients.map((i) => ({
+        materialName: i.materialName, quantityGrams: i.quantityGrams,
+      })),
+      overheads: overheads.map((o) => ({label: o.label, type: o.type, value: o.value})),
+    },
+    costing: {
+      rawMaterialCost: costing.rawMaterialCost,
+      overheadCost: costing.overheadCost,
+      totalCost: costing.totalCost,
+      profitAmount: costing.profitAmount,
+      suggestedPricePerKg: costing.suggestedPricePerKg,
+      suggestedPricePerPiece: costing.suggestedPricePerPiece,
+      currentPricePerKg: costing.currentPricePerKg,
+      currentMarginPct: costing.currentMarginPct,
+      missingRates: costing.missingRates,
+    },
+  };
+
+  if (body.dryRun !== false) {
+    return {...preview, dryRun: true,
+      note: "Nothing was saved. Re-send with dryRun:false to store this recipe."};
+  }
+  await store.saveRecipe(db, recipe);
+  await store.logAction(db,
+    `Recipe ${existing ? "updated" : "created"} for ${product.name} — ` +
+    `${ingredients.length} ingredients, ${yieldKg}kg yield`, product.id, product.name);
+  return {...preview, dryRun: false, saved: true};
+}
+
 async function listProducts(db: admin.firestore.Firestore): Promise<Json> {
   const [products, recipes] = await Promise.all([store.getProducts(db), store.getRecipes(db)]);
   const withRecipe = new Set(recipes.map((r) => r.productId));
@@ -443,6 +589,7 @@ const WRITE_ROUTES: Record<string, Handler> = {
   "record-bill": recordBill,
   "add-raw-material": addRawMaterial,
   "set-product-price": setProductPrice,
+  "set-recipe": setRecipe,
 };
 
 export const ROUTES = {
