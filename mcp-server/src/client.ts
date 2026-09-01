@@ -5,21 +5,55 @@ export interface SkcConfig {
   token: string;
 }
 
+/**
+ * An unexpanded `${VAR}` placeholder. .mcp.json passes `"${SKC_API_URL}"`, and
+ * when the variable is not set in the environment the literal string arrives
+ * instead — non-empty, so a plain emptiness check misses it and the failure
+ * surfaces later as an unhelpful "Invalid URL".
+ */
+function isUnexpanded(value: string): boolean {
+  return /^\$\{[A-Z_][A-Z0-9_]*\}$/i.test(value.trim());
+}
+
+const SETUP_HINT =
+  "Run ./tools/setup-assistant.sh, then `source .skc-assistant.env` and restart " +
+  "the MCP client so it inherits the variables.";
+
 export function readConfig(): SkcConfig {
-  const baseUrl = (process.env.SKC_API_URL || "").replace(/\/+$/, "");
-  const token = process.env.SKC_API_TOKEN || "";
-  if (!baseUrl) {
+  const rawUrl = (process.env.SKC_API_URL || "").trim();
+  const token = (process.env.SKC_API_TOKEN || "").trim();
+
+  if (!rawUrl || isUnexpanded(rawUrl)) {
     throw new Error(
-      "SKC_API_URL is not set. Point it at the deployed skcApi function, e.g. " +
-      "https://asia-south1-<project>.cloudfunctions.net/skcApi",
+      `SKC_API_URL is not set${isUnexpanded(rawUrl) ? " (it arrived as the literal \"" + rawUrl + "\", so the variable is missing from the environment)" : ""}. ` +
+      "It should point at the deployed skcApi function, e.g. " +
+      `https://asia-south1-<project>.cloudfunctions.net/skcApi. ${SETUP_HINT}`,
     );
   }
-  if (!token) {
+  if (!token || isUnexpanded(token)) {
     throw new Error(
-      "SKC_API_TOKEN is not set. Use the same value you gave " +
-      "`firebase functions:secrets:set SKC_API_TOKEN`.",
+      `SKC_API_TOKEN is not set${isUnexpanded(token) ? " (it arrived as the literal \"" + token + "\", so the variable is missing from the environment)" : ""}. ` +
+      `It must match the SKC_API_TOKEN Firebase secret. ${SETUP_HINT}`,
     );
   }
+
+  const baseUrl = rawUrl.replace(/\/+$/, "");
+  let parsed: URL;
+  try {
+    parsed = new URL(baseUrl);
+  } catch {
+    throw new Error(
+      `SKC_API_URL is not a valid URL: "${baseUrl}". ` +
+      "It should look like https://asia-south1-<project>.cloudfunctions.net/skcApi.",
+    );
+  }
+  if (parsed.protocol !== "https:" && parsed.hostname !== "localhost") {
+    throw new Error(
+      `SKC_API_URL must use https (got "${parsed.protocol}//"). ` +
+      "The API token is sent as a header and would otherwise travel in the clear.",
+    );
+  }
+
   return { baseUrl, token };
 }
 
