@@ -30,12 +30,16 @@ const CHART_COLORS = ['#c8821a', '#3d1c02', '#22c55e', '#3b82f6', '#a855f7', '#f
 
 // ── component ─────────────────────────────────────────────────────────────────
 export default function AnalyticsPage() {
-  const [orders,    ordersLoading,    ordersErr]    = useRealtimeCollection<Order>(ordersService.subscribe.bind(ordersService));
-  const [expenses,  expensesLoading,  expensesErr]  = useRealtimeCollection<Expense>(expensesService.subscribe.bind(expensesService));
-  const [customers, customersLoading, customersErr] = useRealtimeCollection<Customer>(customersService.subscribe.bind(customersService));
-  const [recipes] = useRealtimeCollection<ProductRecipe>(productRecipeService.subscribe.bind(productRecipeService));
+  const [orders,    ordersLoading,    ordersErr]    = useRealtimeCollection<Order>(ordersService.subscribe.bind(ordersService), 'orders');
+  const [expenses,  expensesLoading,  expensesErr]  = useRealtimeCollection<Expense>(expensesService.subscribe.bind(expensesService), 'expenses');
+  const [customers, customersLoading, customersErr] = useRealtimeCollection<Customer>(customersService.subscribe.bind(customersService), 'customers');
+  const [recipes, , recipesErr] = useRealtimeCollection<ProductRecipe>(productRecipeService.subscribe.bind(productRecipeService), 'productRecipes');
   const [sheet, setSheet] = useState<RawMaterialCostSheet>({ materials: [], batches: [], cells: {}, updatedAt: '' });
-  useEffect(() => rawMaterialCostSheetService.subscribe(setSheet), []);
+  const [sheetErr, setSheetErr] = useState<Error | null>(null);
+  useEffect(() => rawMaterialCostSheetService.subscribe(
+    setSheet,
+    err => setSheetErr(new Error(`settings/raw_material_costs: ${err.message}`)),
+  ), []);
   const loading = ordersLoading || expensesLoading || customersLoading;
 
   // ── month picker ────────────────────────────────────────────────────────────
@@ -180,6 +184,7 @@ export default function AnalyticsPage() {
   // A failed subscription is named rather than left as an endless spinner —
   // the reason is almost always actionable (a denied read, an expired session).
   const loadError = ordersErr ?? expensesErr ?? customersErr;
+  const marginError = recipesErr ?? sheetErr;
   if (loadError) {
     return (
       <div className="p-6">
@@ -328,7 +333,13 @@ export default function AnalyticsPage() {
 
       {/* How much of the month's revenue the gross margin actually rests on. A
           margin computed from a fraction of sales is easy to over-read. */}
-      {cogs.coveragePct < 99.5 && stats.revenue > 0 && (
+      {marginError && (
+        <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-xs text-red-800">
+          <strong>Gross margin unavailable.</strong> {marginError.message}
+        </div>
+      )}
+
+      {!marginError && cogs.coveragePct < 99.5 && stats.revenue > 0 && (
         <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-xs text-amber-800">
           {cogs.coveredRevenue === 0 ? (
             <>

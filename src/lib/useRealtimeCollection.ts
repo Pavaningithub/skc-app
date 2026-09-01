@@ -17,6 +17,9 @@ import type { Unsubscribe } from 'firebase/firestore';
  */
 export function useRealtimeCollection<T>(
   subscribeFn: (cb: (items: T[]) => void, onError?: (err: Error) => void) => Unsubscribe,
+  /** Names this subscription in errors — "Missing or insufficient permissions"
+   *  is useless without knowing which collection produced it. */
+  label?: string,
 ): [T[], boolean, Error | null] {
   const [data, setData] = useState<T[]>([]);
   const [loading, setLoading] = useState(true);
@@ -32,8 +35,11 @@ export function useRealtimeCollection<T>(
       err => {
         // Surface it and stop loading: a page that renders with one section
         // missing is far more useful than one that never renders at all.
-        console.error('[realtime subscription failed]', err);
-        setError(err);
+        const labelled = label
+          ? new Error(`${label}: ${err.message}`)
+          : err;
+        console.error(`[realtime subscription failed]${label ? ` ${label}` : ''}`, err);
+        setError(labelled);
         setLoading(false);
       },
     );
