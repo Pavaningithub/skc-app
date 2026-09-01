@@ -30,9 +30,9 @@ const CHART_COLORS = ['#c8821a', '#3d1c02', '#22c55e', '#3b82f6', '#a855f7', '#f
 
 // ── component ─────────────────────────────────────────────────────────────────
 export default function AnalyticsPage() {
-  const [orders,    ordersLoading]    = useRealtimeCollection<Order>(ordersService.subscribe.bind(ordersService));
-  const [expenses,  expensesLoading]  = useRealtimeCollection<Expense>(expensesService.subscribe.bind(expensesService));
-  const [customers, customersLoading] = useRealtimeCollection<Customer>(customersService.subscribe.bind(customersService));
+  const [orders,    ordersLoading,    ordersErr]    = useRealtimeCollection<Order>(ordersService.subscribe.bind(ordersService));
+  const [expenses,  expensesLoading,  expensesErr]  = useRealtimeCollection<Expense>(expensesService.subscribe.bind(expensesService));
+  const [customers, customersLoading, customersErr] = useRealtimeCollection<Customer>(customersService.subscribe.bind(customersService));
   const [recipes] = useRealtimeCollection<ProductRecipe>(productRecipeService.subscribe.bind(productRecipeService));
   const [sheet, setSheet] = useState<RawMaterialCostSheet>({ materials: [], batches: [], cells: {}, updatedAt: '' });
   useEffect(() => rawMaterialCostSheetService.subscribe(setSheet), []);
@@ -175,6 +175,23 @@ export default function AnalyticsPage() {
     const pct = ((curr - prev) / prev * 100).toFixed(0);
     const up = curr >= prev;
     return { pct, up };
+  }
+
+  // A failed subscription is named rather than left as an endless spinner —
+  // the reason is almost always actionable (a denied read, an expired session).
+  const loadError = ordersErr ?? expensesErr ?? customersErr;
+  if (loadError) {
+    return (
+      <div className="p-6">
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-800">
+          <p className="font-semibold mb-1">Could not load analytics</p>
+          <p className="text-xs">{loadError.message}</p>
+          <p className="text-xs mt-2 text-red-600">
+            If this says permissions, sign out and back in — the admin session may have expired.
+          </p>
+        </div>
+      </div>
+    );
   }
 
   if (loading) {

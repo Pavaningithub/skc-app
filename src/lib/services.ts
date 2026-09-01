@@ -70,11 +70,11 @@ export const productsService = {
   async delete(id: string): Promise<void> {
     await deleteDoc(doc(db, COLLECTIONS.PRODUCTS, id));
   },
-  subscribe(cb: (items: Product[]) => void): Unsubscribe {
+  subscribe(cb: (items: Product[]) => void, onError?: (err: Error) => void): Unsubscribe {
     return onSnapshot(collection(db, COLLECTIONS.PRODUCTS), snap => {
       const items = snap.docs.map(d => ({ id: d.id, ...d.data() } as Product));
       cb(items.sort((a, b) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999) || a.name.localeCompare(b.name)));
-    });
+    }, onError);
   },
 };
 
@@ -131,10 +131,10 @@ export const stockService = {
   async delete(id: string): Promise<void> {
     await deleteDoc(doc(db, COLLECTIONS.STOCK, id));
   },
-  subscribe(cb: (items: StockItem[]) => void): Unsubscribe {
+  subscribe(cb: (items: StockItem[]) => void, onError?: (err: Error) => void): Unsubscribe {
     return onSnapshot(collection(db, COLLECTIONS.STOCK), snap => {
       cb(snap.docs.map(d => ({ id: d.id, ...d.data() } as StockItem)));
-    });
+    }, onError);
   },
 };
 
@@ -154,10 +154,10 @@ export const rawMaterialsService = {
   async delete(id: string): Promise<void> {
     await deleteDoc(doc(db, COLLECTIONS.RAW_MATERIALS, id));
   },
-  subscribe(cb: (items: RawMaterial[]) => void): Unsubscribe {
+  subscribe(cb: (items: RawMaterial[]) => void, onError?: (err: Error) => void): Unsubscribe {
     return onSnapshot(collection(db, COLLECTIONS.RAW_MATERIALS), snap => {
       cb(snap.docs.map(d => ({ id: d.id, ...d.data() } as RawMaterial)));
-    });
+    }, onError);
   },
 };
 
@@ -197,11 +197,11 @@ export const batchesService = {
   async delete(id: string): Promise<void> {
     await deleteDoc(doc(db, COLLECTIONS.BATCHES, id));
   },
-  subscribe(cb: (items: Batch[]) => void): Unsubscribe {
+  subscribe(cb: (items: Batch[]) => void, onError?: (err: Error) => void): Unsubscribe {
     return onSnapshot(collection(db, COLLECTIONS.BATCHES), snap => {
       const items = snap.docs.map(d => ({ id: d.id, ...d.data() } as Batch));
       cb(items.sort((a, b) => b.date.localeCompare(a.date)));
-    });
+    }, onError);
   },
 };
 
@@ -278,11 +278,11 @@ export const customersService = {
       totalOrders,
     });
   },
-  subscribe(cb: (items: Customer[]) => void): Unsubscribe {
+  subscribe(cb: (items: Customer[]) => void, onError?: (err: Error) => void): Unsubscribe {
     return onSnapshot(collection(db, COLLECTIONS.CUSTOMERS), snap => {
       const items = snap.docs.map(d => ({ id: d.id, ...d.data() } as Customer));
       cb(items.sort((a, b) => a.name.localeCompare(b.name)));
-    });
+    }, onError);
   },
 };
 
@@ -386,11 +386,11 @@ export const ordersService = {
     await deleteDoc(doc(db, COLLECTIONS.ORDERS, id));
   },
   // Real-time listener for all orders
-  subscribe(cb: (items: Order[]) => void): Unsubscribe {
+  subscribe(cb: (items: Order[]) => void, onError?: (err: Error) => void): Unsubscribe {
     return onSnapshot(collection(db, COLLECTIONS.ORDERS), snap => {
       const items = snap.docs.map(d => ({ id: d.id, ...d.data() } as Order));
       cb(items.sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
-    });
+    }, onError);
   },
   // Real-time listener: calls onNew(order) for every order created since subscribeTime
   subscribeToNewOrders(since: string, onNew: (order: Order) => void): Unsubscribe {
@@ -432,11 +432,11 @@ export const expensesService = {
   async delete(id: string): Promise<void> {
     await deleteDoc(doc(db, COLLECTIONS.EXPENSES, id));
   },
-  subscribe(cb: (items: Expense[]) => void): Unsubscribe {
+  subscribe(cb: (items: Expense[]) => void, onError?: (err: Error) => void): Unsubscribe {
     return onSnapshot(collection(db, COLLECTIONS.EXPENSES), snap => {
       const items = snap.docs.map(d => ({ id: d.id, ...d.data() } as Expense));
       cb(items.sort((a, b) => b.date.localeCompare(a.date)));
-    });
+    }, onError);
   },
 };
 
@@ -462,11 +462,11 @@ export const subscriptionsService = {
   async delete(id: string): Promise<void> {
     await deleteDoc(doc(db, COLLECTIONS.SUBSCRIPTIONS, id));
   },
-  subscribe(cb: (items: Subscription[]) => void): Unsubscribe {
+  subscribe(cb: (items: Subscription[]) => void, onError?: (err: Error) => void): Unsubscribe {
     return onSnapshot(collection(db, COLLECTIONS.SUBSCRIPTIONS), snap => {
       const items = snap.docs.map(d => ({ id: d.id, ...d.data() } as Subscription));
       cb(items.sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
-    });
+    }, onError);
   },
 };
 
@@ -492,11 +492,11 @@ export const feedbackService = {
     if (snap.empty) return null;
     return { id: snap.docs[0].id, ...snap.docs[0].data() } as Feedback;
   },
-  subscribe(cb: (items: Feedback[]) => void): Unsubscribe {
+  subscribe(cb: (items: Feedback[]) => void, onError?: (err: Error) => void): Unsubscribe {
     return onSnapshot(query(collection(db, COLLECTIONS.FEEDBACK), where("isPublic", "==", true)), snap => {
       const items = snap.docs.map(d => ({ id: d.id, ...d.data() } as Feedback));
       cb(items.sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
-    });
+    }, onError);
   },
   subscribeAll(cb: (items: Feedback[]) => void): Unsubscribe {
     return onSnapshot(collection(db, COLLECTIONS.FEEDBACK), snap => {
@@ -614,13 +614,13 @@ export const agentsService = {
     });
   },
 
-  subscribe(cb: (items: Agent[]) => void): Unsubscribe {
+  subscribe(cb: (items: Agent[]) => void, onError?: (err: Error) => void): Unsubscribe {
     return onSnapshot(collection(db, COLLECTIONS.AGENTS), snap => {
       const items = snap.docs
         .map(d => ({ id: d.id, ...d.data() } as Agent))
         .sort((a, b) => a.name.localeCompare(b.name));
       cb(items);
-    });
+    }, onError);
   },
 };
 
@@ -638,10 +638,10 @@ export const referralConfigService = {
   async save(config: ReferralConfig): Promise<void> {
     await setDoc(doc(db, 'settings', 'referral_config'), { ...config, updatedAt: now() });
   },
-  subscribe(cb: (config: ReferralConfig) => void): Unsubscribe {
+  subscribe(cb: (config: ReferralConfig) => void, onError?: (err: Error) => void): Unsubscribe {
     return onSnapshot(doc(db, 'settings', 'referral_config'), snap => {
       cb(snap.exists() ? (snap.data() as ReferralConfig) : { ...DEFAULT_REFERRAL_CONFIG });
-    });
+    }, onError);
   },
 };
 
@@ -659,10 +659,10 @@ export const subscriptionConfigService = {
   async save(config: SubscriptionConfig): Promise<void> {
     await setDoc(doc(db, 'settings', 'subscription_config'), { ...config, updatedAt: now() });
   },
-  subscribe(cb: (config: SubscriptionConfig) => void): Unsubscribe {
+  subscribe(cb: (config: SubscriptionConfig) => void, onError?: (err: Error) => void): Unsubscribe {
     return onSnapshot(doc(db, 'settings', 'subscription_config'), snap => {
       cb(snap.exists() ? (snap.data() as SubscriptionConfig) : { ...DEFAULT_SUBSCRIPTION_CONFIG });
-    });
+    }, onError);
   },
 };
 
@@ -680,12 +680,12 @@ export const featureFlagsService = {
   async save(flags: FeatureFlags): Promise<void> {
     await setDoc(doc(db, 'settings', 'feature_flags'), { ...flags, updatedAt: now() });
   },
-  subscribe(cb: (flags: FeatureFlags) => void): Unsubscribe {
+  subscribe(cb: (flags: FeatureFlags) => void, onError?: (err: Error) => void): Unsubscribe {
     return onSnapshot(doc(db, 'settings', 'feature_flags'), snap => {
       cb(snap.exists()
         ? { ...DEFAULT_FEATURE_FLAGS, ...(snap.data() as Partial<FeatureFlags>) }
         : { ...DEFAULT_FEATURE_FLAGS });
-    });
+    }, onError);
   },
 };
 
@@ -728,7 +728,7 @@ export const loadingFactsService = {
   async delete(id: string): Promise<void> {
     await deleteDoc(doc(db, COLLECTIONS.LOADING_FACTS, id));
   },
-  subscribe(cb: (items: LoadingFact[]) => void): Unsubscribe {
+  subscribe(cb: (items: LoadingFact[]) => void, onError?: (err: Error) => void): Unsubscribe {
     return onSnapshot(
       query(collection(db, COLLECTIONS.LOADING_FACTS), where('isActive', '==', true)),
       snap => {
@@ -736,7 +736,8 @@ export const loadingFactsService = {
           .map(d => ({ id: d.id, ...d.data() } as LoadingFact))
           .sort((a, b) => a.sortOrder - b.sortOrder);
         cb(items);
-      }
+      },
+      onError
     );
   },
   /** Admin-only: returns ALL facts including inactive */
@@ -764,10 +765,10 @@ export const handlersService = {
   async save(list: string[]): Promise<void> {
     await setDoc(doc(db, COLLECTIONS.SETTINGS, HANDLERS_DOC), { list });
   },
-  subscribe(cb: (list: string[]) => void): Unsubscribe {
+  subscribe(cb: (list: string[]) => void, onError?: (err: Error) => void): Unsubscribe {
     return onSnapshot(doc(db, COLLECTIONS.SETTINGS, HANDLERS_DOC), snap => {
       cb(snap.exists() ? ((snap.data().list as string[]) ?? ['Sree Lakshmi']) : ['Sree Lakshmi']);
-    });
+    }, onError);
   },
 };
 
@@ -782,10 +783,10 @@ export const rawMaterialCostSheetService = {
   async save(sheet: Omit<RawMaterialCostSheet, 'updatedAt'>): Promise<void> {
     await setDoc(doc(db, COLLECTIONS.RAW_MATERIAL_COSTS, RAW_COST_DOC), { ...sheet, updatedAt: now() });
   },
-  subscribe(cb: (sheet: RawMaterialCostSheet) => void): Unsubscribe {
+  subscribe(cb: (sheet: RawMaterialCostSheet) => void, onError?: (err: Error) => void): Unsubscribe {
     return onSnapshot(doc(db, COLLECTIONS.RAW_MATERIAL_COSTS, RAW_COST_DOC), snap => {
       if (snap.exists()) cb(snap.data() as RawMaterialCostSheet);
-    });
+    }, onError);
   },
 };
 
@@ -801,9 +802,9 @@ export const productRecipeService = {
   async delete(productId: string): Promise<void> {
     await deleteDoc(doc(db, COLLECTIONS.PRODUCT_RECIPES, productId));
   },
-  subscribe(cb: (recipes: ProductRecipe[]) => void): Unsubscribe {
+  subscribe(cb: (recipes: ProductRecipe[]) => void, onError?: (err: Error) => void): Unsubscribe {
     return onSnapshot(collection(db, COLLECTIONS.PRODUCT_RECIPES), snap => {
       cb(snap.docs.map(d => ({ ...d.data(), id: d.id } as ProductRecipe)));
-    });
+    }, onError);
   },
 };
