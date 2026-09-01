@@ -248,8 +248,10 @@ ok "Saved (readable only by you)"
 
 step "Checking the API responds"
 HTTP_BODY="$(mktemp)"; trap 'rm -f "$DEPLOY_LOG" "$HTTP_BODY"' EXIT
+# X-SKC-Token, not Authorization: Firebase strips the Authorization header on
+# HTTP functions, so a bearer token never arrives and the API answers 401.
 HTTP_CODE="$(curl -sS -o "$HTTP_BODY" -w '%{http_code}' \
-  -H "Authorization: Bearer ${SKC_API_TOKEN}" "${FUNCTION_URL}/" 2>/dev/null)" || HTTP_CODE=""
+  -H "X-SKC-Token: ${SKC_API_TOKEN}" "${FUNCTION_URL}/" 2>/dev/null)" || HTTP_CODE=""
 [[ "$HTTP_CODE" =~ ^[0-9]{3}$ ]] || HTTP_CODE="000"
 
 case "$HTTP_CODE" in
@@ -265,8 +267,10 @@ case "$HTTP_CODE" in
     ' "$HTTP_BODY")"
     ok "$ROUTES"
     ;;
-  401|403)
-    die "The API rejected the token (HTTP ${HTTP_CODE}). The deployed secret and the local token differ — re-run with --rotate." ;;
+  401)
+    die "The API received no token (HTTP 401). Something stripped the X-SKC-Token header in transit." ;;
+  403)
+    die "The API rejected the token (HTTP 403). The deployed secret and the local token differ — re-run with --rotate." ;;
   404)
     die "HTTP 404 at ${FUNCTION_URL}. The URL is wrong; copy the 'Function URL' from the deploy output into .skc-assistant.env, then re-run with --verify." ;;
   000)
@@ -277,7 +281,7 @@ case "$HTTP_CODE" in
 esac
 
 # A real read, to prove Firestore access works and not just the auth layer.
-if curl -sS -H "Authorization: Bearer ${SKC_API_TOKEN}" \
+if curl -sS -H "X-SKC-Token: ${SKC_API_TOKEN}" \
      "${FUNCTION_URL}/products" 2>/dev/null | grep -q '"products"'; then
   ok "Firestore read works (products route returned data)"
 else

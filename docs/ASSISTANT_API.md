@@ -94,7 +94,12 @@ environment variables:
 
 ## Routes
 
-Auth on every call: `Authorization: Bearer <SKC_API_TOKEN>` (or `X-SKC-Token`).
+Auth on every call: the `X-SKC-Token` header.
+
+Not `Authorization: Bearer`. Firebase HTTP functions reserve `Authorization` for Firebase
+ID tokens and strip anything else before the request reaches the function, so a bearer
+token never arrives and the API answers `401` (no token) rather than `403` (wrong token).
+The code still reads `Authorization` so the API works unchanged if hosted elsewhere.
 `GET /` lists the routes. Reads are GET with query parameters; writes are POST with a JSON
 body.
 
@@ -129,7 +134,7 @@ parsed result before anything is saved.
 
 ```bash
 curl -s -X POST "$SKC_API_URL/record-bill" \
-  -H "Authorization: Bearer $SKC_API_TOKEN" \
+  -H "X-SKC-Token: $SKC_API_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "date": "2026-09-01",

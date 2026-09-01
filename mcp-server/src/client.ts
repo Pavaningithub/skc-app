@@ -34,7 +34,10 @@ export async function callApi(
   const init: RequestInit = {
     method,
     headers: {
-      "Authorization": `Bearer ${config.token}`,
+      // X-SKC-Token, not Authorization: Firebase HTTP functions reserve the
+      // Authorization header for Firebase ID tokens and strip anything else,
+      // so a bearer token never reaches the function.
+      "X-SKC-Token": config.token,
       "Content-Type": "application/json",
     },
   };
