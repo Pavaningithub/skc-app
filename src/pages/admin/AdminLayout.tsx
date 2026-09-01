@@ -35,7 +35,7 @@ const navItems = [
 ];
 
 export default function AdminLayout() {
-  const { isAdminAuthenticated, logout, currentUser } = useAuth();
+  const { isAdminAuthenticated, authReady, logout, currentUser } = useAuth();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const startTimeRef = useRef(new Date().toISOString());
@@ -95,6 +95,14 @@ export default function AdminLayout() {
     });
     return unsub;
   }, [isAdminAuthenticated]);
+
+  if (!authReady) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-orange-50">
+        <p className="text-sm text-orange-400">Loading…</p>
+      </div>
+    );
+  }
 
   if (!isAdminAuthenticated) {
     return <Navigate to="/admin/login" replace />;

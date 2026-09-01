@@ -3,6 +3,8 @@
 // the browser only ever sends a PIN and receives a yes/no plus the safe fields
 // of the user record.
 
+import { signInWithCustomToken, signOut } from 'firebase/auth';
+import { auth } from './firebase';
 import type { AdminUser } from './types';
 
 export type PublicAdminUser = Pick<AdminUser, 'id' | 'username' | 'displayName' | 'role' | 'mustChangePin'>;
@@ -40,7 +42,14 @@ export type LoginResult =
 export async function verifyPin(username: string, pin: string): Promise<LoginResult> {
   try {
     const data = await call('verify', { username, pin });
-    if (data.ok === true && data.user) return { status: 'ok', user: data.user as PublicAdminUser };
+    if (data.ok === true && data.user) {
+      // Signing in with the custom token is what gives Firestore rules an
+      // identity to check — without it every admin read stays anonymous.
+      if (typeof data.token === 'string') {
+        await signInWithCustomToken(auth, data.token);
+      }
+      return { status: 'ok', user: data.user as PublicAdminUser };
+    }
     if (data.reason === 'locked') {
       return { status: 'locked', retryAfterSeconds: Number(data.retryAfterSeconds ?? 900) };
     }
@@ -49,6 +58,11 @@ export async function verifyPin(username: string, pin: string): Promise<LoginRes
   } catch {
     return { status: 'error', message: 'Could not reach the login service. Check your connection.' };
   }
+}
+
+/** Ends the Firebase session as well as the app's own. */
+export async function signOutAdmin(): Promise<void> {
+  await signOut(auth).catch(() => {/* already signed out */});
 }
 
 export async function changePin(

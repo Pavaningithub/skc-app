@@ -2,41 +2,60 @@ rules_version = '2';
 
 // Sri Krishna Condiments — Firestore Security Rules
 //
-// ⚠️  ARCHITECTURE NOTE: This app uses PIN-based admin auth (not Firebase Auth).
+// ⚠️  ARCHITECTURE NOTE: PINs are the interface; Firebase Auth is the mechanism.
 // The Firebase API key IS intentionally public — it only identifies the project,
 // it does not grant access by itself. Security comes from these rules.
 //
+// Identity comes from a Firebase custom token minted by the adminAuth function
+// after a PIN is verified server-side. Rules check request.auth.token.admin and
+// .agent — a PIN alone proves nothing to Firestore.
+//
 // What these rules protect:
-//   ✅ adminUsers (contains admin PINs) — closed to all clients
-//   ✅ settings/admin (legacy admin PIN) — closed to all clients
-//   ✅ authThrottle (failed-login counters) — closed to all clients
-//   ✅ Creates on orders/customers/subscriptions/feedback are shape-validated
+//   ✅ adminUsers, settings/admin, authThrottle — closed to all clients
+//   ✅ agents (PINs, commissions) — admin only; an agent sees only its own record
+//   ✅ expenses, batches, productRecipes, rawMaterials, rawMaterialPurchases,
+//      rawMaterialCosts — admin only
+//   ✅ products, settings — world readable (the storefront needs them),
+//      admin only to write, so nobody else can change a price
 //
-// ⚠️  WHAT IS STILL OPEN — do not read the list above as more than it says.
-//   ⚠️  agents/{id} contains agent PINs and commission data, and is still
-//       world readable and writable. The admin Agents page and the agent
-//       console both talk to it directly from the browser, so closing it
-//       needs those flows moved server-side first.
-//   ⚠️  customers and orders are world readable (names, WhatsApp numbers,
-//       order history) and world writable, including delete.
-//   ⚠️  products, stock, expenses, batches, recipes and raw-material costs
-//       are world writable — anyone can change a selling price.
+// ⚠️  WHAT IS STILL OPEN, and why rules cannot close it:
+//   ⚠️  customers and orders are world readable and writable, including delete.
+//   ⚠️  stock is world writable.
+//   ⚠️  subscriptions are world readable and writable.
 //
-//   None of this can be fixed by rules alone: the admin panel talks to
-//   Firestore directly from the browser, and without Firebase Auth a rule
-//   cannot tell an admin's browser from a stranger's. Closing these requires
-//   the Firebase Auth migration, tracked as the next step.
+//   These are not an oversight in the rules. The storefront performs them from
+//   an anonymous browser while a customer checks out: it upserts the customer,
+//   creates the order, deducts stock and adjusts referral credit. A customer
+//   has no login, so no rule can distinguish them from anyone else.
+//
+//   Closing these requires moving checkout server-side — one placeOrder function
+//   doing the customer upsert, order creation, stock deduction and referral
+//   credit together — after which the storefront needs no write access at all.
+//   Until then, treat customer names, phone numbers, order history, stock levels
+//   and referral credit as publicly readable and modifiable.
 
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // ════════════════════════════════════════════════════
+    // IDENTITY — set by the custom token adminAuth mints
+    // ════════════════════════════════════════════════════
+
+    function isAdmin() {
+      return request.auth != null && request.auth.token.admin == true;
+    }
+
+    function isAgent() {
+      return request.auth != null && request.auth.token.agent == true;
+    }
 
     // ════════════════════════════════════════════════════
     // PUBLIC — STOREFRONT READS (no auth needed)
     // ════════════════════════════════════════════════════
 
     match /products/{productId} {
-      allow read: if true;
-      allow create, update, delete: if true;
+      allow read: if true;                       // storefront needs the catalogue
+      allow create, update, delete: if isAdmin(); // only admins change prices
     }
 
     match /appConfig/{docId} {
@@ -108,33 +127,27 @@ service cloud.firestore {
     }
 
     match /expenses/{docId} {
-      allow read: if true;
-      allow create, update, delete: if true;
+      allow read, write: if isAdmin();
     }
 
     match /batches/{docId} {
-      allow read: if true;
-      allow create, update, delete: if true;
+      allow read, write: if isAdmin();
     }
 
     match /productRecipes/{docId} {
-      allow read: if true;
-      allow create, update, delete: if true;
+      allow read, write: if isAdmin();
     }
 
     match /rawMaterialCosts/{docId} {
-      allow read: if true;
-      allow create, update, delete: if true;
+      allow read, write: if isAdmin();
     }
 
     match /rawMaterialPurchases/{docId} {
-      allow read: if true;
-      allow create, update, delete: if true;
+      allow read, write: if isAdmin();
     }
 
     match /rawMaterials/{docId} {
-      allow read: if true;
-      allow create, update, delete: if true;
+      allow read, write: if isAdmin();
     }
 
     // Contains admin PINs — closed to every client.
@@ -151,10 +164,12 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
-    // Contains agent PINs + commission data
+    // Contains agent PINs and commission data. Login and PIN changes go through
+    // the adminAuth function; an agent may read and update only its own record.
     match /agents/{docId} {
-      allow read: if true;
-      allow write: if true;
+      allow read: if isAdmin() || (isAgent() && request.auth.token.agentId == docId);
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin() || (isAgent() && request.auth.token.agentId == docId);
     }
 
     // settings — mixed contents, so this is per-document.
@@ -162,7 +177,8 @@ service cloud.firestore {
     //   the rest (referral_config, subscription_config, feature_flags,
     //   raw_material_costs, handlers) is read by the storefront and admin UI.
     match /settings/{docId} {
-      allow read, write: if docId != 'admin';
+      allow read: if docId != 'admin';   // referral/subscription/feature config
+      allow write: if isAdmin();
     }
 
     // Internal audit trail

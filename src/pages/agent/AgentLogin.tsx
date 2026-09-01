@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { agentsService } from '../../lib/services';
+import { changeAgentPin, verifyAgentPin } from '../../lib/agentAuth';
 import toast from 'react-hot-toast';
 
 const SESSION_KEY = 'skc_agent_session';
@@ -36,11 +36,17 @@ export default function AgentLogin() {
     if (!agentCode.trim() || !pin.trim()) return toast.error('Enter your Agent Code and PIN');
     setLoading(true);
     try {
-      const agent = await agentsService.verifyPin(agentCode.trim().toUpperCase(), pin.trim());
-      if (!agent) {
+      const result = await verifyAgentPin(agentCode.trim().toUpperCase(), pin.trim());
+      if (result.status === 'locked') {
+        toast.error('Too many wrong PINs. Try again in a few minutes.');
+        return;
+      }
+      if (result.status === 'error') { toast.error(result.message); return; }
+      if (result.status !== 'ok') {
         toast.error('Invalid Agent Code or PIN');
         return;
       }
+      const agent = result.agent;
       if (agent.mustChangePin) {
         setPendingAgent({ id: agent.id, name: agent.name, phone: agent.phone, agentCode: agent.agentCode, markupPercent: agent.markupPercent ?? 0 });
         setChangingPin(true);
@@ -61,7 +67,12 @@ export default function AgentLogin() {
     if (!pendingAgent) return;
     setLoading(true);
     try {
-      await agentsService.changePin(pendingAgent.id, newPin);
+      // The server re-verifies the current PIN, so it is sent rather than trusted.
+      const result = await changeAgentPin(pendingAgent.agentCode, pin.trim(), newPin);
+      if (result.status !== 'ok') {
+        toast.error(result.status === 'error' ? result.message : 'Could not set the PIN');
+        return;
+      }
       const session = { id: pendingAgent.id, name: pendingAgent.name, phone: pendingAgent.phone, agentCode: pendingAgent.agentCode, markupPercent: pendingAgent.markupPercent, mustChangePin: false };
       sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
       toast.success('PIN set! Welcome, ' + pendingAgent.name);

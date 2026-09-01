@@ -11,12 +11,24 @@ import type {Request} from "firebase-functions/v2/https";
 import type {Response} from "express";
 
 const USERS = "adminUsers";
+const AGENTS = "agents";
 const THROTTLE = "authThrottle";
 
 /** Failed attempts allowed before a lockout kicks in. */
 export const MAX_ATTEMPTS = 5;
 /** How long a lockout lasts, and the window failures are counted over. */
 export const LOCKOUT_MS = 15 * 60 * 1000;
+
+/**
+ * Mint a Firebase custom token carrying the caller's role. Signing in with it
+ * gives Firestore rules an identity (request.auth.token.admin / .agent) — which
+ * is the only way a rule can tell an admin's browser from a stranger's.
+ */
+async function mintToken(
+  uid: string, claims: Record<string, unknown>,
+): Promise<string> {
+  return admin.auth().createCustomToken(uid, claims);
+}
 
 export interface PublicAdminUser {
   id: string;
@@ -185,7 +197,10 @@ export async function serveAuth(
       if (path === "verify") {
         const {pin: _pin, ...user} = found.data;
         void _pin;
-        res.status(200).json({ok: true, user});
+        const token = await mintToken(found.id, {
+          admin: true, role: user.role, username: user.username,
+        });
+        res.status(200).json({ok: true, user, token});
         return;
       }
 
@@ -206,7 +221,66 @@ export async function serveAuth(
       return;
     }
 
-    res.status(404).json({error: `Unknown route "${path}". Available: users, verify, change-pin.`});
+    // ── Agents ───────────────────────────────────────────────────────────────
+    // Agent PINs live in the agents collection, which is now closed to clients,
+    // so agent login runs here as well.
+    if (path === "agent/verify" || path === "agent/change-pin") {
+      if (req.method !== "POST") {
+        res.status(405).json({error: "Use POST."});
+        return;
+      }
+      const code = String(body.agentCode ?? "").trim().toUpperCase();
+      if (!code) {
+        res.status(400).json({error: "\"agentCode\" is required."});
+        return;
+      }
+      const throttleKey = `agent:${code}`;
+      const state = await readThrottle(db, throttleKey);
+      const held = lockoutRemaining(state, now);
+      if (held > 0) {
+        res.status(429).json({
+          ok: false, reason: "locked", retryAfterSeconds: held,
+          error: `Too many wrong PINs. Try again in ${Math.ceil(held / 60)} minute(s).`,
+        });
+        return;
+      }
+
+      const snap = await db.collection(AGENTS)
+        .where("agentCode", "==", code).limit(1).get();
+      const doc = snap.empty ? null : snap.docs[0];
+      const data = doc?.data();
+      const supplied = path === "agent/verify" ? body.pin : body.currentPin;
+
+      if (!doc || !data || data.isActive === false ||
+          typeof supplied !== "string" || supplied !== data.pin) {
+        await recordFailure(db, throttleKey, now);
+        res.status(401).json({ok: false, reason: "invalid", error: "Wrong agent code or PIN."});
+        return;
+      }
+      await clearFailures(db, throttleKey);
+
+      const {pin: _agentPin, ...agent} = data;
+      void _agentPin;
+
+      if (path === "agent/verify") {
+        const token = await mintToken(doc.id, {agent: true, agentId: doc.id});
+        res.status(200).json({ok: true, agent: {id: doc.id, ...agent}, token});
+        return;
+      }
+
+      if (!isPin(body.newPin)) {
+        res.status(400).json({error: "\"newPin\" must be 4 to 6 digits."});
+        return;
+      }
+      await db.collection(AGENTS).doc(doc.id).update({
+        pin: body.newPin, mustChangePin: false, updatedAt: new Date(now).toISOString(),
+      });
+      const token = await mintToken(doc.id, {agent: true, agentId: doc.id});
+      res.status(200).json({ok: true, changed: true, agent: {id: doc.id, ...agent}, token});
+      return;
+    }
+
+    res.status(404).json({error: `Unknown route "${path}".`});
   } catch (err) {
     res.status(500).json({error: err instanceof Error ? err.message : "Unexpected error."});
   }

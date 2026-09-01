@@ -581,13 +581,9 @@ export const agentsService = {
     return { id: snap.docs[0].id, ...snap.docs[0].data() } as Agent;
   },
 
-  /** Verify agent PIN. Returns agent if correct, null if wrong. */
-  async verifyPin(agentCode: string, pin: string): Promise<Agent | null> {
-    const agent = await this.getByCode(agentCode);
-    if (!agent || !agent.isActive) return null;
-    if (agent.pin !== pin) return null;
-    return agent;
-  },
+  // verifyPin and changePin moved to the adminAuth Cloud Function — the agents
+  // collection holds PINs and is no longer readable by clients.
+  // See src/lib/agentAuth.ts.
 
   async add(data: Omit<Agent, 'id' | 'totalOrders' | 'totalRevenue' | 'createdAt' | 'updatedAt'>): Promise<string> {
     const ref = await addDoc(collection(db, COLLECTIONS.AGENTS), {
@@ -604,6 +600,7 @@ export const agentsService = {
     await updateDoc(doc(db, COLLECTIONS.AGENTS, id), { ...data, updatedAt: now() });
   },
 
+  /** Admin-side reset. Agents change their own PIN via agentAuth. */
   async changePin(id: string, newPin: string): Promise<void> {
     await updateDoc(doc(db, COLLECTIONS.AGENTS, id), { pin: newPin, mustChangePin: false, updatedAt: now() });
   },

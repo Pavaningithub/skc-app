@@ -1,9 +1,17 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
-import { changePin as apiChangePin, verifyPin } from '../lib/adminAuth';
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth } from '../lib/firebase';
+import { changePin as apiChangePin, signOutAdmin, verifyPin } from '../lib/adminAuth';
 import type { AdminUser } from '../lib/types';
 
 interface AuthContextType {
   isAdminAuthenticated: boolean;
+  /**
+   * False until Firebase has restored (or confirmed the absence of) a session.
+   * Firestore reads made before this are anonymous and the rules reject them,
+   * so admin screens must wait rather than querying on mount.
+   */
+  authReady: boolean;
   currentUser: Pick<AdminUser, 'id' | 'username' | 'displayName' | 'role' | 'mustChangePin'> | null;
   login: (username: string, pin: string) => Promise<'ok' | 'wrong_pin' | 'locked' | 'error'>;
   logout: () => void;
@@ -25,6 +33,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   });
 
   const isAdminAuthenticated = currentUser !== null;
+  const [authReady, setAuthReady] = useState(false);
+
+  useEffect(() => onAuthStateChanged(auth, user => {
+    // A stored app session without a Firebase one means the sign-in was lost
+    // (cleared storage, expired refresh token) — every query would be denied,
+    // so drop the app session and send them back to the PIN screen.
+    if (!user) setCurrentUser(prev => (prev ? null : prev));
+    setAuthReady(true);
+  }), []);
 
   // Admin users are seeded server-side; the browser cannot write to adminUsers.
 
@@ -44,6 +61,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const logout = useCallback(() => {
+    void signOutAdmin();
     setCurrentUser(null);
     sessionStorage.removeItem(SESSION_KEY);
     sessionStorage.removeItem('skc_auth'); // clear legacy key too
@@ -69,7 +87,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [currentUser]);
 
   return (
-    <AuthContext.Provider value={{ isAdminAuthenticated, currentUser, login, logout, changePin, changePinLegacy }}>
+    <AuthContext.Provider value={{ isAdminAuthenticated, authReady, currentUser, login, logout, changePin, changePinLegacy }}>
       {children}
     </AuthContext.Provider>
   );
