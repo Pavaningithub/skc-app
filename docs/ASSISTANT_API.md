@@ -32,37 +32,47 @@ Claude.
 
 ## Setup
 
-### 1. Deploy the API
+Run the setup script. It reads the project id from `.firebaserc` and the region from
+`functions/src/index.ts`, generates the API token, sets the secret, deploys, builds the MCP
+server, saves the credentials, and checks the whole chain end to end:
 
 ```bash
-firebase functions:secrets:set SKC_API_TOKEN     # paste a long random string; save it
+./tools/setup-assistant.sh
+```
+
+You will need to be logged in to the firebase CLI (`npm install -g firebase-tools`); the
+script starts the login flow itself if you are not. Afterwards:
+
+```bash
+source .skc-assistant.env
+```
+
+then restart Claude Code and check `/mcp` — `skc` should show as connected.
+
+Other modes:
+
+| Command | Does |
+|---|---|
+| `./tools/setup-assistant.sh` | Full setup. Safe to re-run; reuses the existing token. |
+| `./tools/setup-assistant.sh --rotate` | Replace the API token and redeploy. |
+| `./tools/setup-assistant.sh --verify` | Re-check that the API answers. Needs only node and curl. |
+| `./tools/setup-assistant.sh --budget` | Print the ₹100 budget-alert steps. |
+
+The script writes `.skc-assistant.env` (mode 600, gitignored) holding `SKC_API_URL` and
+`SKC_API_TOKEN`, and adds a line to your shell profile so both load in new shells.
+
+### Doing it by hand
+
+```bash
+firebase functions:secrets:set SKC_API_TOKEN     # openssl rand -hex 32
 firebase deploy --only functions:skcApi
-```
-
-Generate a token with `openssl rand -hex 32`. It is the only credential — treat it like a
-password and never commit it.
-
-The deployed URL looks like:
-`https://asia-south1-<project-id>.cloudfunctions.net/skcApi`
-
-### 2. Build the MCP server
-
-```bash
 cd mcp-server && npm install && npm run build
+export SKC_API_URL="https://<the Function URL from the deploy output>"
+export SKC_API_TOKEN="<the token>"
 ```
 
-### 3. Point Claude Code at it
-
-`.mcp.json` in the repo root already registers the server and reads two environment
-variables, so the token stays out of git:
-
-```bash
-export SKC_API_URL="https://asia-south1-<project-id>.cloudfunctions.net/skcApi"
-export SKC_API_TOKEN="<the token from step 1>"
-```
-
-Put those in your shell profile, then restart Claude Code. Check with `/mcp` — `skc`
-should be listed as connected.
+`.mcp.json` in the repo root already registers the server against those two variables, so
+the token stays out of git.
 
 For Claude Desktop or another MCP client, register the same command with the same two
 environment variables:
@@ -74,7 +84,7 @@ environment variables:
       "command": "node",
       "args": ["/absolute/path/to/skc-app/mcp-server/dist/index.js"],
       "env": {
-        "SKC_API_URL": "https://asia-south1-<project-id>.cloudfunctions.net/skcApi",
+        "SKC_API_URL": "https://<function url>",
         "SKC_API_TOKEN": "<token>"
       }
     }

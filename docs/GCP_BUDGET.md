@@ -5,6 +5,13 @@ credentials, and no access to your billing account. Budgets also require the
 **Billing Account Administrator** role, which is deliberately outside what a repo session
 holds. Below is the whole thing — it takes about two minutes.
 
+## Fastest route
+
+`./tools/setup-assistant.sh --budget` reads your project id and, if `gcloud` is installed
+and authenticated, your billing account and project number — and prints the exact
+`gcloud billing budgets create` command with those filled in. If it cannot reach `gcloud`
+it prints the console steps below instead.
+
 ## Console (easiest)
 
 1. Open <https://console.cloud.google.com/billing> and pick the billing account that pays

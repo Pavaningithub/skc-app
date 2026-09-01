@@ -51,5 +51,8 @@ skills-lock.json
 # Firebase functions env (contains UPI ID and WA links — never commit)
 functions/.env.*
 
+# SKC assistant credentials written by tools/setup-assistant.sh — never commit
+.skc-assistant.env
+
 # Husky hooks are local-only
 .husky/
