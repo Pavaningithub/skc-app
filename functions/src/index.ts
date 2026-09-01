@@ -7,6 +7,7 @@ import {onRequest} from "firebase-functions/v2/https";
 import {defineSecret, defineString} from "firebase-functions/params";
 import {serve as serveSkcApi} from "./skc/api";
 import {serveAuth} from "./auth";
+import {serveStorefront} from "./storefront/api";
 import * as logger from "firebase-functions/logger";
 
 admin.initializeApp();
@@ -22,6 +23,7 @@ const WA_GROUP_LINK_PARAM = defineString("WA_GROUP_LINK", {default: ""});
 const APP_DOMAIN_PARAM = defineString("APP_DOMAIN", {default: ""});
 // Only used to create the owner account on a project with no admin users.
 const ADMIN_DEFAULT_PIN = defineString("ADMIN_DEFAULT_PIN", {default: "1234"});
+const SAMPLE_CHARGE = defineString("SAMPLE_CHARGE", {default: "0"});
 
 
 const ADMIN_BASE_URL = () => `https://${APP_DOMAIN_PARAM.value()}/admin/orders`;
@@ -793,5 +795,22 @@ export const adminAuth = onRequest(
   },
   async (req, res) => {
     await serveAuth(req, res, db, ADMIN_DEFAULT_PIN.value());
+  },
+);
+
+// ─── Storefront checkout ─────────────────────────────────────────────────────
+// Order placement moved off the browser so customers, orders and stock no
+// longer need to be world-writable, and so prices are decided by the catalogue
+// rather than by the request.
+//
+//   firebase deploy --only functions:storefront
+
+export const storefront = onRequest(
+  {
+    region: "asia-south1",
+    cors: true,
+  },
+  async (req, res) => {
+    await serveStorefront(req, res, db, Number(SAMPLE_CHARGE.value()) || 0);
   },
 );
