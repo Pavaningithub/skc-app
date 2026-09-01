@@ -92,7 +92,10 @@ export default function AdminLayout() {
           style: { maxWidth: '320px', padding: '12px' },
         }
       );
-    });
+    },
+    // Without a handler this rejects uncaught, which floods the console and
+    // buries whatever else is failing on the page.
+    err => console.error('[new-order watcher failed]', err));
     return unsub;
   }, [isAdminAuthenticated]);
 

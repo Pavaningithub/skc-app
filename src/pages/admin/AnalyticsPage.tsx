@@ -185,6 +185,16 @@ export default function AnalyticsPage() {
   // the reason is almost always actionable (a denied read, an expired session).
   const loadError = ordersErr ?? expensesErr ?? customersErr;
   const marginError = recipesErr ?? sheetErr;
+
+  // Gross margin from recipes — what the goods sold this month cost to make.
+  // Distinct from net profit, which is revenue minus whatever was *spent* this
+  // month: a large bill lands entirely in the month it was paid, even though the
+  // stock it bought is sold over the months that follow.
+  const cogs = useMemo(
+    () => computeCogs(stats.monthOrders, recipes, sheet),
+    [stats.monthOrders, recipes, sheet],
+  );
+
   if (loadError) {
     return (
       <div className="p-6">
@@ -206,15 +216,6 @@ export default function AnalyticsPage() {
       </div>
     );
   }
-
-  // Gross margin from recipes — what the goods sold this month cost to make.
-  // Distinct from net profit, which is revenue minus whatever was *spent* this
-  // month: a large bill lands entirely in the month it was paid, even though the
-  // stock it bought is sold over the months that follow.
-  const cogs = useMemo(
-    () => computeCogs(stats.monthOrders, recipes, sheet),
-    [stats.monthOrders, recipes, sheet],
-  );
 
   const revenueD = delta(stats.revenue, prevStats.revenue);
   const profitD  = delta(stats.profit,  prevStats.profit);

@@ -393,7 +393,11 @@ export const ordersService = {
     }, onError);
   },
   // Real-time listener: calls onNew(order) for every order created since subscribeTime
-  subscribeToNewOrders(since: string, onNew: (order: Order) => void): Unsubscribe {
+  subscribeToNewOrders(
+    since: string,
+    onNew: (order: Order) => void,
+    onError?: (err: Error) => void,
+  ): Unsubscribe {
     const q = query(
       collection(db, COLLECTIONS.ORDERS),
       where('createdAt', '>', since),
@@ -404,7 +408,7 @@ export const ordersService = {
           onNew({ id: change.doc.id, ...change.doc.data() } as Order);
         }
       });
-    });
+    }, onError);
   },
 };
 
