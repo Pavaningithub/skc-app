@@ -3,7 +3,9 @@ import {setGlobalOptions} from "firebase-functions";
 import {onDocumentCreated} from "firebase-functions/v2/firestore";
 // import {onRequest} from "firebase-functions/v2/https";
 // import {onSchedule} from "firebase-functions/v2/scheduler";
+import {onRequest} from "firebase-functions/v2/https";
 import {defineSecret, defineString} from "firebase-functions/params";
+import {serve as serveSkcApi} from "./skc/api";
 import * as logger from "firebase-functions/logger";
 
 admin.initializeApp();
@@ -12,6 +14,7 @@ const db = admin.firestore();
 setGlobalOptions({maxInstances: 10, region: "asia-south1"});
 
 const TELEGRAM_BOT_TOKEN = defineSecret("TELEGRAM_BOT_TOKEN");
+const SKC_API_TOKEN = defineSecret("SKC_API_TOKEN");
 const TELEGRAM_CHAT_ID = defineSecret("TELEGRAM_CHAT_ID");
 const UPI_ID_PARAM = defineString("UPI_ID", {default: ""});
 const WA_GROUP_LINK_PARAM = defineString("WA_GROUP_LINK", {default: ""});
@@ -750,3 +753,25 @@ export const weeklyUnpaidSummary = onSchedule(
   }
 );
 */
+
+// ─── SKC assistant API ───────────────────────────────────────────────────────
+// Token-authenticated JSON API over bills, raw-material costs and product
+// costing. Used by the SKC MCP server (mcp-server/) so an AI assistant can read
+// and write this data without any AI running inside the app itself.
+//
+// Setup:
+//   firebase functions:secrets:set SKC_API_TOKEN
+//   firebase deploy --only functions:skcApi
+//
+// Routes are documented in docs/ASSISTANT_API.md; GET / lists them.
+
+export const skcApi = onRequest(
+  {
+    secrets: [SKC_API_TOKEN],
+    region: "asia-south1",
+    cors: false,
+  },
+  async (req, res) => {
+    await serveSkcApi(req, res, db, SKC_API_TOKEN.value());
+  },
+);

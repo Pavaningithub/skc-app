@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "skc": {
+      "command": "node",
+      "args": ["mcp-server/dist/index.js"],
+      "env": {
+        "SKC_API_URL": "${SKC_API_URL}",
+        "SKC_API_TOKEN": "${SKC_API_TOKEN}"
+      }
+    }
+  }
+}

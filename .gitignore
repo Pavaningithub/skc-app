@@ -42,9 +42,10 @@ README.md
 test-results/
 playwright-report/
 
-# AI tooling
+# AI tooling — local settings stay out, but project skills are versioned
 .agents/
-.claude/
+.claude/*
+!.claude/skills/
 skills-lock.json
 
 # Firebase functions env (contains UPI ID and WA links — never commit)
