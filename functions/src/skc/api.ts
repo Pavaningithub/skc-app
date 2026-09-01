@@ -625,12 +625,18 @@ export function authorize(req: Request, expectedToken: string): void {
     throw new ApiError(500,
       "SKC_API_TOKEN is not configured. Set it with: firebase functions:secrets:set SKC_API_TOKEN");
   }
+  // Prefer X-SKC-Token. Firebase HTTP functions reserve the Authorization
+  // header for Firebase ID tokens and strip anything else before the request
+  // reaches us, so a bearer token silently never arrives; the header is still
+  // read here so the API works unchanged if it is ever hosted elsewhere.
   const header = req.get("authorization") || "";
   const bearer = /^Bearer\s+(.+)$/i.exec(header)?.[1];
-  const supplied = (bearer || req.get("x-skc-token") || "").trim();
+  const supplied = (req.get("x-skc-token") || bearer || "").trim();
   if (!supplied) {
     throw new ApiError(401,
-      "Missing token. Send it as \"Authorization: Bearer <token>\" or the X-SKC-Token header.");
+      "Missing token. Send it in the X-SKC-Token header. " +
+      "(Authorization: Bearer is also read, but Firebase strips that header " +
+      "on HTTP functions, so it will not arrive.)");
   }
   const a = Buffer.from(supplied);
   const b = Buffer.from(expectedToken);
