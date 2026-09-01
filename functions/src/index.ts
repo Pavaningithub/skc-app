@@ -6,6 +6,7 @@ import {onDocumentCreated} from "firebase-functions/v2/firestore";
 import {onRequest} from "firebase-functions/v2/https";
 import {defineSecret, defineString} from "firebase-functions/params";
 import {serve as serveSkcApi} from "./skc/api";
+import {serveAuth} from "./auth";
 import * as logger from "firebase-functions/logger";
 
 admin.initializeApp();
@@ -19,6 +20,8 @@ const TELEGRAM_CHAT_ID = defineSecret("TELEGRAM_CHAT_ID");
 const UPI_ID_PARAM = defineString("UPI_ID", {default: ""});
 const WA_GROUP_LINK_PARAM = defineString("WA_GROUP_LINK", {default: ""});
 const APP_DOMAIN_PARAM = defineString("APP_DOMAIN", {default: ""});
+// Only used to create the owner account on a project with no admin users.
+const ADMIN_DEFAULT_PIN = defineString("ADMIN_DEFAULT_PIN", {default: "1234"});
 
 
 const ADMIN_BASE_URL = () => `https://${APP_DOMAIN_PARAM.value()}/admin/orders`;
@@ -773,5 +776,22 @@ export const skcApi = onRequest(
   },
   async (req, res) => {
     await serveSkcApi(req, res, db, SKC_API_TOKEN.value());
+  },
+);
+
+// ─── Admin authentication ────────────────────────────────────────────────────
+// PIN checking runs server-side so admin PINs never reach a browser and the
+// adminUsers collection stays closed to clients. Public by necessity — it is
+// called before login — with per-username lockout after repeated wrong PINs.
+//
+//   firebase deploy --only functions:adminAuth
+
+export const adminAuth = onRequest(
+  {
+    region: "asia-south1",
+    cors: true,
+  },
+  async (req, res) => {
+    await serveAuth(req, res, db, ADMIN_DEFAULT_PIN.value());
   },
 );
